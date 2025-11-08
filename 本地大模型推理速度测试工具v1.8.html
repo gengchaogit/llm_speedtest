@@ -1424,11 +1424,11 @@
         });
 
         exportCSVBtn.addEventListener('click', () => {
-
             let csvContent = "data:text/csv;charset=utf-8,";
             csvContent += `${currentApiType === 'openai' ? 'OpenAI兼容接口' : 'Ollama接口'}, ${currentModelName}\n`;
             csvContent += `备注：, "${notes.replace(/"/g, '""')}"\n`; // 处理备注中的引号
-            csvContent += `并发数：, ${document.getElementById('concurrency').value}\n`;
+            const concurrencyValue = document.getElementById('concurrency').value; // 获取并发数
+            csvContent += `并发数：, ${concurrencyValue}\n`;
             csvContent += "提示词长度(tokens),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态\n";
             testResultsData.forEach(res => {
                 csvContent += `${res.promptLength},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
@@ -1436,11 +1436,23 @@
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `model_perf_${currentApiType}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`);
+
+            // 获取备注（可能需要对特殊字符进行处理，确保文件名兼容性）
+            const cleanNotes = notes // 假设notes是包含备注的变量
+                .replace(/[\s\t\n\r]+/g, '_') // 将空格和换行符替换为下划线
+                .replace(/[^a-zA-Z0-9_\-\.]/g, '') // 移除其他非字母数字下划线连接符点号的字符
+                .substring(0, 30); // 限制文件名中的备注长度，防止过长
+
+            // 构建新的文件名
+            const filename = `${currentModelName}_${cleanNotes}_concurrency_${concurrencyValue}.csv`;
+            // --- 重点修改部分结束 ---
+
+            link.setAttribute("download", filename);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         });
+
 
         // ===============================================================================
         // v1.8: 新增功能：图表导出和结果对比 (重构)
