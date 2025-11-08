@@ -1,9 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v1.7 (chao基于原版魔改版-qq群:1028429001):
+<!-- v1.8 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
+    1. (v1.8) 添加图表导出按钮
+    2. (v1.8) 添加多个CSV结果导入对比功能
+    3. (v1.8) 合并图表导出：将Prefill和Decode图表一键导出为一张图片
+    4. (v1.8) 对比标签：使用CSV文件名作为对比图表的图例标签
+    5. (v1.8) 对比导出：为对比图表也增加一键导出功能，并自动生成包含参数的文件名
+-->
+
+<!-- v1.7 (chao基于原版魔改版-qq群:1028429001):
     1. 为每个请求增加3次重试（间隔1.5秒），以过滤掉瞬时/偶发的服务器失败。
     2. 自动显示图表，无需点击
     3. 将 Prefill 和 Decode 速度分离到两张图表
@@ -16,7 +24,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v1.7</title>
+    <title>本地大模型推理速度测试工具 v1.8</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
@@ -383,7 +391,7 @@
 
 <body>
     <div class="container">
-        <h1><span class="logo">🚀</span> 大模型 Prefill & Decode 性能测试工具 v1.7 (chao魔改版-加绘图修bug-自动保存api)</h1>
+        <h1><span class="logo">🚀</span> 大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)</h1>
 
         <div class="api-selector">
             <div class="api-option active" data-type="openai">OpenAI兼容接口</div>
@@ -482,10 +490,22 @@
             <button id="stopTest" style="display: none; background: #E74C3C;">停止测试</button>
             <button id="copyMarkdown" style="display: none; background: #4CAF50;">复制 Markdown 表格</button>
             <button id="exportCSV" style="display: none; background: #4eb8a6;">导出 CSV 数据</button>
-            <!-- “生成图表”按钮已移除，改为自动显示 -->
+            <!-- v1.8: 合并图表导出 -->
+            <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
         </div>
         <div class="progress-container">
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+        </div>
+
+        <!-- v1.8: 新增对比功能 -->
+        <div class="config-section">
+            <h2>多结果对比</h2>
+            <div class="form-group">
+                <label for="importFiles">导入CSV结果文件 (可多选)</label>
+                <input type="file" id="importFiles" multiple accept=".csv" style="padding: 5px;">
+            </div>
+            <button id="startComparison" style="background: #27ae60;">生成对比图表</button>
+            <p class="notes" style="margin-top: 10px;">说明：先“开始测试”运行一次，然后再导入其他CSV文件，点击“生成对比图表”</p>
         </div>
 
         <div id="results">
@@ -500,6 +520,19 @@
             <h3 style="margin-top: 25px;">输出 (Decode) 吞吐</h3>
             <canvas id="outputChart"></canvas>
         </div>
+
+        <!-- v1.8: 新的对比绘图区域 -->
+        <div id="comparisonChartContainer" style="display: none; margin-top: 30px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h3>对比 - 预填充 (Prefill) 吞吐</h3>
+            <canvas id="comparisonPrefillChart"></canvas>
+
+            <h3 style="margin-top: 25px;">对比 - 输出 (Decode) 吞吐</h3>
+            <canvas id="comparisonOutputChart"></canvas>
+
+            <!-- v1.8: 对比图表导出按钮 -->
+            <button id="exportComparisonChart" style="display: none; background: #8e44ad; margin-top: 15px;">导出一张对比图</button>
+        </div>
+
 
         <textarea id="markdownOutputHidden"></textarea>
     </div>
@@ -607,6 +640,11 @@
         const stopTestBtn = document.getElementById('stopTest');
         const copyMarkdownBtn = document.getElementById('copyMarkdown');
         const exportCSVBtn = document.getElementById('exportCSV');
+        const exportCombinedChartBtn = document.getElementById('exportCombinedChart'); // v1.8
+        const startComparisonBtn = document.getElementById('startComparison'); // v1.8
+        const importFilesInput = document.getElementById('importFiles'); // v1.8
+        const exportComparisonChartBtn = document.getElementById('exportComparisonChart'); // v1.8
+
         const resultsDiv = document.getElementById('results');
         const markdownOutputHidden = document.getElementById('markdownOutputHidden');
         const progressBar = document.getElementById('progressBar');
@@ -615,8 +653,13 @@
         const chartContainer = document.getElementById('chartContainer');
         const prefillChartCanvas = document.getElementById('prefillChart');
         const outputChartCanvas = document.getElementById('outputChart');
-        let prefillChartInstance = null; //
-        let outputChartInstance = null;  //
+        let prefillChartInstance = null;
+        let outputChartInstance = null;
+
+        // 对比图表 (v1.8)
+        let comparisonData = [];
+        let comparisonPrefillChartInstance = null;
+        let comparisonOutputChartInstance = null;
 
         let testResultsData = [];
         let totalTests = 0;
@@ -1094,6 +1137,22 @@
                         }
                     }
 
+                    // (v1.8 bug fix) 等待所有成功的响应被处理
+                    const concurrencyResults = [];
+                    const processedResponses = await Promise.allSettled(processPromises);
+
+                    for (const result of processedResponses) {
+                        if (result.status === 'fulfilled') {
+                            concurrencyResults.push(result.value);
+                        } else {
+                            failedMessages.push(result.reason.message);
+                        }
+                    }
+
+                    if (concurrencyResults.length === 0) {
+                         throw new Error(`所有并发请求失败: ${failedMessages.join(', ')}`);
+                    }
+
                     const avgPrefillTimeMs = concurrencyResults.reduce((sum, res) => sum + res.prefillTimeMs, 0) / concurrencyResults.length;
                     const avgPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0) / concurrencyResults.length;
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
@@ -1189,6 +1248,16 @@
         }
 
         startTestBtn.addEventListener('click', async () => {
+            // v1.8: 隐藏对比图表并清空数据
+            document.getElementById('comparisonChartContainer').style.display = 'none';
+            exportComparisonChartBtn.style.display = 'none'; // v1.8
+            if (comparisonPrefillChartInstance) comparisonPrefillChartInstance.destroy();
+            if (comparisonOutputChartInstance) comparisonOutputChartInstance.destroy();
+            comparisonPrefillChartInstance = null;
+            comparisonOutputChartInstance = null;
+            comparisonData = [];
+            importFilesInput.value = ""; // 清空文件选择
+
             currentApiType = document.querySelector('.api-option.active').dataset.type;
             const apiUrl = document.getElementById('apiUrl').value.trim();
             currentModelName = document.getElementById('modelName').value.trim();
@@ -1240,7 +1309,8 @@
             startTestBtn.textContent = "测试中...";
             copyMarkdownBtn.style.display = 'none';
             exportCSVBtn.style.display = 'none';
-            // chartContainer.style.display = 'none'; //
+            exportCombinedChartBtn.style.display = 'none'; // v1.8
+            // chartContainer.style.display = 'none';
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
             testResultsData = [];
@@ -1278,7 +1348,7 @@
                 headerRow.appendChild(th);
             });
             thead.appendChild(headerRow);
-            chartContainer.style.display = 'block'; //
+            chartContainer.style.display = 'block';
 
             stopTestBtn.disabled = false;
             stopTestBtn.textContent = "停止";
@@ -1342,6 +1412,7 @@
             startTestBtn.textContent = "开始测试";
             copyMarkdownBtn.style.display = 'block';
             exportCSVBtn.style.display = 'block';
+            exportCombinedChartBtn.style.display = 'block'; // v1.8
             stopTestBtn.style.display = 'none';
         });
 
@@ -1370,6 +1441,325 @@
             link.click();
             document.body.removeChild(link);
         });
+
+        // ===============================================================================
+        // v1.8: 新增功能：图表导出和结果对比 (重构)
+        // ===============================================================================
+
+        /**
+         * v1.8: 将两个 canvas 合并并下载为一张图片
+         * @param {HTMLCanvasElement} canvas1 - 顶部图表
+         * @param {HTMLCanvasElement} canvas2 - 底部图表
+         * @param {string} filename - 下载的文件名
+         * @param {string} title - (可选) 在图表顶部添加的
+         */
+        function downloadCombinedChart(canvas1, canvas2, filename, title = null) {
+            if (!canvas1 || !canvas2) {
+                alert("图表尚未生成！");
+                return;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const padding = 20; // 图表间的间距
+            const titleHeight = title ? 60 : 0; // 为顶部大标题留出空间
+
+            // 设置画布尺寸
+            tempCanvas.width = Math.max(canvas1.width, canvas2.width);
+            tempCanvas.height = canvas1.height + canvas2.height + padding + titleHeight;
+
+            // 1. 填充白色背景
+            tempCtx.fillStyle = '#FFFFFF';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 2. (可选) 绘制大标题
+            if (title) {
+                tempCtx.fillStyle = '#333333';
+                tempCtx.font = 'bold 24px sans-serif';
+                tempCtx.textAlign = 'center';
+                tempCtx.fillText(title, tempCanvas.width / 2, 40);
+            }
+
+            // 3. 绘制第一个图表 (Chart.js的图表标题是canvas的一部分,所以会一起绘制)
+            tempCtx.drawImage(canvas1, 0, titleHeight);
+
+            // 4. 绘制第二个图表
+            tempCtx.drawImage(canvas2, 0, titleHeight + canvas1.height + padding);
+
+            // 5. 触发下载
+            const link = document.createElement('a');
+            link.href = tempCanvas.toDataURL('image/png');
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // v1.8: 监听合并导出按钮
+        exportCombinedChartBtn.addEventListener('click', () => {
+            const modelName = currentModelName.replace(/[\/\\]/g, '_'); // 清理文件名
+            downloadCombinedChart(
+                prefillChartCanvas,
+                outputChartCanvas,
+                `Perf_Chart_${modelName}.png`,
+                `性能测试图表 - ${currentModelName}` // 大标题
+            );
+        });
+
+        // v1.8: 监听对比图表导出按钮
+        exportComparisonChartBtn.addEventListener('click', () => {
+            if (comparisonData.length === 0) {
+                alert("没有对比数据可导出。");
+                return;
+            }
+            // v1.8: 从 comparisonData 动态生成文件名
+            const labels = comparisonData.map(d =>
+                d.label.replace(/【.*?】/g, '') // 移除【导入】
+                       .replace(/[\s\(\),]/g, '_') // 替换非法字符
+                       .replace(/_+/g, '_') // 移除连续的下划线
+            );
+            // 限制文件名长度，防止过长
+            const filename = `Comparison_${labels.join('_vs_').slice(0, 100)}.png`;
+
+            downloadCombinedChart(
+                document.getElementById('comparisonPrefillChart'),
+                document.getElementById('comparisonOutputChart'),
+                filename,
+                "性能对比图表" // 大标题
+            );
+        });
+
+
+        // 2. 结果对比功能
+        startComparisonBtn.addEventListener('click', async () => {
+            const files = importFilesInput.files;
+            comparisonData = []; // 重置对比数据
+
+            // 1. 添加当前测试数据 (如果存在)
+            if (testResultsData.length > 0) {
+                const currentConcurrency = document.getElementById('concurrency').value;
+                // v1.8: 修改当前测试的标签
+                const label = `【当前测试】${currentModelName} (并发 ${currentConcurrency})`;
+                comparisonData.push(formatDataForComparison(testResultsData, label));
+            } else {
+                alert("请先至少运行一次“开始测试”，以便将当前结果包含在对比中。");
+                // 即使没有当前数据，也继续处理导入的数据
+            }
+
+            // 2. 添加导入的CSV文件数据
+            for (const file of files) {
+                try {
+                    const fileContent = await file.text();
+                    const parsedData = parseImportedCSV(fileContent);
+
+                    // v1.8: 使用文件名作为标签
+                    const fileName = file.name.replace(/.csv$/i, ''); // 移除.csv
+                    const label = `【导入】${fileName}`;
+
+                    comparisonData.push(formatDataForComparison(parsedData.results, label));
+                } catch (error) {
+                    console.error(`解析文件 ${file.name} 失败:`, error);
+                    alert(`解析文件 ${file.name} 失败: ${error.message}`);
+                }
+            }
+
+            // 3. 生成对比图表
+            if (comparisonData.length > 0) {
+                generateComparisonCharts();
+            } else if (testResultsData.length === 0) {
+                // 仅在既没有当前数据 *也* 没有导入数据时才显示此消息
+                alert("没有可用于对比的数据。");
+            }
+        });
+
+        /**
+         * 将 testResultsData 格式的数据转换为对比图表所需的对象数组格式
+         * @param {Array} resultsArray - 来源数据 (e.g., testResultsData)
+         * @param {string} label - 这个数据集的图例标签
+         * @returns {object} - { label, prefillData: [{x, y}], outputData: [{x, y}] }
+         */
+        function formatDataForComparison(resultsArray, label) {
+            const data = {
+                label: label,
+                prefillData: [], // {x: promptLength, y: speed}
+                outputData: []   // {x: promptLength, y: speed}
+            };
+
+            for (const res of resultsArray) {
+                const promptLength = parseFloat(res.promptLength);
+                const prefillSpeed = res.prefillSpeed === 'N/A' ? null : parseFloat(res.prefillSpeed);
+                const outputSpeed = res.outputSpeed === 'N/A' ? null : parseFloat(res.outputSpeed);
+
+                if (!isNaN(promptLength)) {
+                    if (prefillSpeed !== null) {
+                        data.prefillData.push({ x: promptLength, y: prefillSpeed });
+                    }
+                    if (outputSpeed !== null) {
+                        data.outputData.push({ x: promptLength, y: outputSpeed });
+                    }
+                }
+            }
+            // 按 x (promptLength) 排序以确保线条正确绘制
+            data.prefillData.sort((a, b) => a.x - b.x);
+            data.outputData.sort((a, b) => a.x - b.x);
+
+            return data;
+        }
+
+        /**
+         * 解析导入的CSV文件内容
+         * @param {string} csvContent - CSV文件文本内容
+         * @returns {object} - { modelName, notes, concurrency, results }
+         */
+        function parseImportedCSV(csvContent) {
+            // v1.8 bug fix: 同时处理 \n 和 \r\n 换行
+            const lines = csvContent.trim().split(/\r?\n/);
+            if (lines.length < 5) throw new Error("CSV文件格式不正确，行数不足。");
+
+            // 移除\r (再次确保)
+            const cleanLines = lines.map(line => line.replace(/\r$/, ''));
+
+            const modelName = cleanLines[0].split(',')[1]?.trim() || '未知模型';
+            const notes = (cleanLines[1].split(',"')[1] || '').replace(/"$/, '') || '无备注';
+            const concurrency = cleanLines[2].split(',')[1]?.trim() || '1';
+
+            const headerLine = cleanLines[3];
+            const headers = headerLine.split(',').map(h => h.trim());
+
+            // 查找列索引
+            const lenIdx = headers.indexOf("提示词长度(tokens)");
+            const prefillSpdIdx = headers.indexOf("预填充速度(tokens/s)");
+            const outputSpdIdx = headers.indexOf("输出速度(tokens/s)");
+
+            if (lenIdx === -1 || prefillSpdIdx === -1 || outputSpdIdx === -1) {
+                throw new Error("CSV文件缺少必要的列 (提示词长度, 预填充速度, 输出速度)");
+            }
+
+            const results = [];
+            for (let i = 4; i < cleanLines.length; i++) {
+                if (cleanLines[i].trim() === "") continue;
+                const values = cleanLines[i].split(',');
+
+                if (values.length > Math.max(lenIdx, prefillSpdIdx, outputSpdIdx)) {
+                    results.push({
+                        promptLength: values[lenIdx],
+                        prefillSpeed: values[prefillSpdIdx],
+                        outputSpeed: values[outputSpdIdx],
+                        prefillTimeMs: 'N/A',
+                        outputTokens: 'N/A',
+                        outputTimeMs: 'N/A',
+                        status: 'N/A'
+                    });
+                }
+            }
+
+            return { modelName, notes, concurrency, results };
+        }
+
+        /**
+         * 生成对比图表
+         */
+        function generateComparisonCharts() {
+            const comparisonChartContainer = document.getElementById('comparisonChartContainer');
+            const compPrefillCanvas = document.getElementById('comparisonPrefillChart').getContext('2d');
+            const compOutputCanvas = document.getElementById('comparisonOutputChart').getContext('2d');
+
+            if (comparisonData.length === 0) {
+                comparisonChartContainer.style.display = 'none';
+                return;
+            }
+
+            comparisonChartContainer.style.display = 'block';
+
+            // 定义一组颜色
+            const colors = [
+                '#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00', '#FFFF33',
+                '#A65628', '#F781BF', '#999999', '#1B9E77', '#D95F02', '#7570B3'
+            ];
+
+            // 1. 创建 Prefill 对比图表
+            const prefillDatasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label, // v1.8: 标签已在调用时格式化
+                    data: dataset.prefillData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33', // 20% 透明度
+                    tension: 0.1,
+                    spanGaps: false, // 在 null 数据点处断开
+                    fill: false // 线条不填充
+                };
+            });
+
+            if (comparisonPrefillChartInstance) comparisonPrefillChartInstance.destroy();
+            comparisonPrefillChartInstance = new Chart(compPrefillCanvas, {
+                type: 'line',
+                data: { datasets: prefillDatasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - 总预填充 (Prefill) 吞吐' }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear', // X轴使用线性刻度
+                            position: 'bottom',
+                            title: { display: true, text: '提示词长度 (tokens)' }
+                        },
+                        y: {
+                            title: { display: true, text: '总吞吐 (tokens/s)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 2. 创建 Output 对比图表
+            const outputDatasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label,
+                    data: dataset.outputData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false
+                };
+            });
+
+            if (comparisonOutputChartInstance) comparisonOutputChartInstance.destroy();
+            comparisonOutputChartInstance = new Chart(compOutputCanvas, {
+                type: 'line',
+                data: { datasets: outputDatasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - 总输出 (Decode) 吞吐' }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: '提示词长度 (tokens)' }
+                        },
+                        y: {
+                            title: { display: true, text: '总吞吐 (tokens/s)' }, //
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // v1.8: 显示对比图表导出按钮
+            exportComparisonChartBtn.style.display = 'block';
+        }
+
+
+        // ===============================================================================
+        // 原有图表生成
+        // ===============================================================================
 
         // 生成图表 (现在是两张图)
         function generateCharts() {
