@@ -341,6 +341,21 @@
             font-size: 24px;
         }
 
+        .lang-toggle {
+            margin-left: auto;
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .lang-toggle:hover {
+            background-color: #e0e0e0;
+        }
+
         .concurrent-stats {
             background-color: #2c3e50;
             padding: 10px;
@@ -398,7 +413,7 @@
 
 <body>
     <div class="container">
-        <h1><span class="logo">🚀</span> 大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)</h1>
+        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
 
         <div class="api-selector">
             <div class="api-option active" data-type="openai">OpenAI兼容接口</div>
@@ -546,6 +561,273 @@
     </div>
 
     <script>
+        // ===============================================================================
+        // 语言切换功能 (Language Toggle)
+        // ===============================================================================
+        const translations = {
+            'zh': {
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)',
+                langToggle: 'English',
+                apiOpenAI: 'OpenAI兼容接口',
+                apiOllama: 'Ollama接口',
+                apiDescOpenAITitle: 'OpenAI兼容接口测试说明',
+                apiDescOpenAI1: '使用流式响应(stream=true)测量首字延迟',
+                apiDescOpenAI2: '预填充速度 = 提示词长度 / (首字到达时间 - 请求开始时间)',
+                apiDescOpenAI3: '输出速度 = 输出token数 / (输出完成时间 - 首字到达时间)',
+                apiDescOpenAI4: '适用于所有兼容OpenAI API的大模型服务',
+                apiDescOpenAI5: '<strong> 支持思考模型</strong>（DeepSeek-R1、Qwen-QwQ等）：自动统计总吞吐（思考+答案tokens）',
+                apiDescOllamaTitle: 'Ollama接口测试说明',
+                apiDescOllama1: '使用非流式请求(stream=false)',
+                apiDescOllama2: '直接使用API返回的prompt_eval_duration和eval_duration指标',
+                apiDescOllama3: '预填充速度 = 提示词长度 / (prompt_eval_duration / 1000)',
+                apiDescOllama4: '输出速度 = 输出token数 / (eval_duration / 1000)',
+                apiDescOllama5: '<strong> 支持思考模型</strong>：eval_count自动包含所有输出tokens',
+                sectionApiInfo: 'API 信息',
+                labelApiUrl: 'API 地址',
+                labelModelName: '模型名称',
+                labelApiKey: 'API-Key',
+                placeholderApiKey: '未设置 API-Key 则留空',
+                labelNotes: '备注',
+                placeholderNotes: '请填写设备信息、模型信息、模型推理框架，以便在结果中显示',
+                sectionTestParams: '测试参数配置',
+                labelMinLength: '最小提示词长度',
+                labelMaxLength: '最大提示词长度',
+                labelStep: '步长',
+                labelOutputLength: '期望输出长度',
+                labelConcurrency: '并发数',
+                labelTimeout: '请求超时 (ms)',
+                sectionExecTest: '执行测试',
+                btnStartTest: '开始测试',
+                btnStopTest: '停止测试',
+                btnCopyMarkdown: '复制 Markdown 表格',
+                btnExportCSV: '导出 CSV 数据',
+                btnExportCombinedChart: '导出一张图表',
+                sectionComparison: '多结果对比',
+                labelImportFiles: '导入CSV结果文件 (可多选)',
+                btnStartComparison: '生成对比图表',
+                comparisonNote: '说明：先"开始测试"运行一次，然后再导入其他CSV文件，点击"生成对比图表"',
+                msgWaiting: '等待开始测试...',
+                chartPrefillTitle: '预填充 (Prefill) 吞吐',
+                chartDecodeTitle: '输出 (Decode) 吞吐',
+                chartComparisonPrefillTitle: '对比 - 预填充 (Prefill) 吞吐',
+                chartComparisonDecodeTitle: '对比 - 输出 (Decode) 吞吐',
+                btnExportComparisonChart: '导出一张对比图',
+                concurrentStatsTitle: '总吞吐量性能统计',
+                concurrentLabel: '并发',
+                // 表格标题
+                tableHeaderPromptLen: '提示词长度<br>(tokens)',
+                tableHeaderPrefillTime: '预填充耗时<br>(ms)',
+                tableHeaderPrefillSpeed: '预填充速度<br>(tokens/s)',
+                tableHeaderOutputLen: '输出长度<br>(tokens)',
+                tableHeaderOutputTime: '输出耗时<br>(ms)',
+                tableHeaderOutputSpeed: '输出速度<br>(tokens/s)',
+                tableHeaderStatus: '状态',
+                // 统计标题
+                statTotalPrefillRange: '总预填充吞吐范围:',
+                statTotalDecodeRange: '总输出吞吐范围:',
+                statAvgPrefill: '平均总预填充吞吐:',
+                statAvgDecode: '平均总输出吞吐:',
+                // 图表相关
+                chartLabelPrefillThroughput: '总预填充吞吐 (tokens/s)',
+                chartLabelDecodeThroughput: '总输出吞吐 (tokens/s)',
+                chartTitlePrefillThroughput: '总预填充 (Prefill) 吞吐',
+                chartTitleDecodeThroughput: '总输出 (Decode) 吞吐',
+                chartAxisPromptLen: '提示词长度 (tokens)',
+                chartAxisThroughput: '吞吐 (tokens/s)',
+                chartComparisonPrefillThroughput: '对比 - 总预填充 (Prefill) 吞吐',
+                chartComparisonDecodeThroughput: '对比 - 总输出 (Decode) 吞吐',
+                // Markdown / CSV
+                mdTestResults: '测试结果',
+                mdNotes: '备注：',
+                mdConcurrency: '并发数:',
+                csvConcurrency: '并发数：',
+                csvHeaders: '提示词长度(tokens),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态',
+                // 错误消息和提示
+                errMissingColumns: 'CSV文件缺少必要的列 (提示词长度, 预填充速度, 输出速度)',
+                errHttpError: 'HTTP错误! 状态:',
+                alertMarkdownCopied: 'Markdown表格已复制到剪贴板！',
+                alertNoTestResults: '请先至少运行一次"开始测试"，以便将当前结果包含在对比中。',
+                btnTextStart: '开始测试',
+                btnTextStop: '停止'
+            },
+            'en': {
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v1.8 (chao mod - charts + bugfix + autosave)',
+                langToggle: '中文',
+                apiOpenAI: 'OpenAI Compatible API',
+                apiOllama: 'Ollama API',
+                apiDescOpenAITitle: 'OpenAI Compatible API Test Description',
+                apiDescOpenAI1: 'Use streaming response (stream=true) to measure time to first token',
+                apiDescOpenAI2: 'Prefill speed = prompt length / (time to first token - request start time)',
+                apiDescOpenAI3: 'Decode speed = output tokens / (completion time - time to first token)',
+                apiDescOpenAI4: 'Works with all OpenAI API compatible LLM services',
+                apiDescOpenAI5: '<strong> Supports thinking models</strong> (DeepSeek-R1, Qwen-QwQ, etc.): automatically counts total throughput (reasoning + answer tokens)',
+                apiDescOllamaTitle: 'Ollama API Test Description',
+                apiDescOllama1: 'Use non-streaming request (stream=false)',
+                apiDescOllama2: 'Directly use prompt_eval_duration and eval_duration from API response',
+                apiDescOllama3: 'Prefill speed = prompt length / (prompt_eval_duration / 1000)',
+                apiDescOllama4: 'Decode speed = output tokens / (eval_duration / 1000)',
+                apiDescOllama5: '<strong> Supports thinking models</strong>: eval_count automatically includes all output tokens',
+                sectionApiInfo: 'API Information',
+                labelApiUrl: 'API URL',
+                labelModelName: 'Model Name',
+                labelApiKey: 'API Key',
+                placeholderApiKey: 'Leave empty if no API key is required',
+                labelNotes: 'Notes',
+                placeholderNotes: 'Fill in device info, model info, inference framework for display in results',
+                sectionTestParams: 'Test Parameters',
+                labelMinLength: 'Min Prompt Length',
+                labelMaxLength: 'Max Prompt Length',
+                labelStep: 'Step Size',
+                labelOutputLength: 'Expected Output Length',
+                labelConcurrency: 'Concurrency',
+                labelTimeout: 'Request Timeout (ms)',
+                sectionExecTest: 'Execute Test',
+                btnStartTest: 'Start Test',
+                btnStopTest: 'Stop Test',
+                btnCopyMarkdown: 'Copy Markdown Table',
+                btnExportCSV: 'Export CSV Data',
+                btnExportCombinedChart: 'Export Combined Chart',
+                sectionComparison: 'Multi-Result Comparison',
+                labelImportFiles: 'Import CSV result files (multiple selection)',
+                btnStartComparison: 'Generate Comparison Charts',
+                comparisonNote: 'Note: First run "Start Test", then import other CSV files and click "Generate Comparison Charts"',
+                msgWaiting: 'Waiting to start test...',
+                chartPrefillTitle: 'Prefill Throughput',
+                chartDecodeTitle: 'Decode Throughput',
+                chartComparisonPrefillTitle: 'Comparison - Prefill Throughput',
+                chartComparisonDecodeTitle: 'Comparison - Decode Throughput',
+                btnExportComparisonChart: 'Export Comparison Chart',
+                concurrentStatsTitle: 'Total Throughput Performance Statistics',
+                concurrentLabel: 'Concurrent',
+                // Table headers
+                tableHeaderPromptLen: 'Prompt Length<br>(tokens)',
+                tableHeaderPrefillTime: 'Prefill Time<br>(ms)',
+                tableHeaderPrefillSpeed: 'Prefill Speed<br>(tokens/s)',
+                tableHeaderOutputLen: 'Output Length<br>(tokens)',
+                tableHeaderOutputTime: 'Output Time<br>(ms)',
+                tableHeaderOutputSpeed: 'Output Speed<br>(tokens/s)',
+                tableHeaderStatus: 'Status',
+                // Statistics
+                statTotalPrefillRange: 'Total Prefill Throughput Range:',
+                statTotalDecodeRange: 'Total Decode Throughput Range:',
+                statAvgPrefill: 'Avg Total Prefill Throughput:',
+                statAvgDecode: 'Avg Total Decode Throughput:',
+                // Chart related
+                chartLabelPrefillThroughput: 'Total Prefill Throughput (tokens/s)',
+                chartLabelDecodeThroughput: 'Total Decode Throughput (tokens/s)',
+                chartTitlePrefillThroughput: 'Total Prefill Throughput',
+                chartTitleDecodeThroughput: 'Total Decode Throughput',
+                chartAxisPromptLen: 'Prompt Length (tokens)',
+                chartAxisThroughput: 'Throughput (tokens/s)',
+                chartComparisonPrefillThroughput: 'Comparison - Total Prefill Throughput',
+                chartComparisonDecodeThroughput: 'Comparison - Total Decode Throughput',
+                // Markdown / CSV
+                mdTestResults: 'Test Results',
+                mdNotes: 'Notes:',
+                mdConcurrency: 'Concurrency:',
+                csvConcurrency: 'Concurrency:',
+                csvHeaders: 'Prompt Length(tokens),Prefill Time(ms),Prefill Speed(tokens/s),Output Length(tokens),Output Time(ms),Output Speed(tokens/s),Status',
+                // Error messages and alerts
+                errMissingColumns: 'CSV file missing required columns (Prompt Length, Prefill Speed, Output Speed)',
+                errHttpError: 'HTTP Error! Status:',
+                alertMarkdownCopied: 'Markdown table copied to clipboard!',
+                alertNoTestResults: 'Please run "Start Test" at least once to include current results in comparison.',
+                btnTextStart: 'Start Test',
+                btnTextStop: 'Stop'
+            }
+        };
+
+        // 当前语言
+        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+
+        // 切换语言函数
+        function switchLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('llmPerfTestLang', lang);
+
+            const t = translations[lang];
+
+            // 更新页面标题
+            document.getElementById('pageTitle').textContent = t.pageTitle;
+            document.getElementById('langToggle').textContent = t.langToggle;
+
+            // 更新API选择器
+            const apiOptions = document.querySelectorAll('.api-option');
+            apiOptions[0].textContent = t.apiOpenAI;
+            apiOptions[1].textContent = t.apiOllama;
+
+            // 更新API描述（根据当前选中的类型）
+            const activeApiType = document.querySelector('.api-option.active').dataset.type;
+            updateApiDescription(activeApiType);
+
+            // 更新各个section标题
+            const sections = document.querySelectorAll('.config-section h2, h2');
+            sections[0].textContent = t.sectionApiInfo;
+            sections[1].textContent = t.sectionTestParams;
+            sections[2].textContent = t.sectionExecTest;
+            sections[3].textContent = t.sectionComparison;
+
+            // 更新标签
+            document.querySelector('label[for="apiUrl"]').textContent = t.labelApiUrl;
+            document.querySelector('label[for="modelName"]').textContent = t.labelModelName;
+            document.querySelector('label[for="apiKey"]').textContent = t.labelApiKey;
+            document.getElementById('apiKey').placeholder = t.placeholderApiKey;
+            document.querySelector('label[for="notes"]').textContent = t.labelNotes;
+            document.getElementById('notes').placeholder = t.placeholderNotes;
+            document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
+            document.querySelector('label[for="maxLength"]').textContent = t.labelMaxLength;
+            document.querySelector('label[for="step"]').textContent = t.labelStep;
+            document.querySelector('label[for="outputLength"]').textContent = t.labelOutputLength;
+            document.querySelector('label[for="concurrency"]').textContent = t.labelConcurrency;
+            document.querySelector('label[for="timeout"]').textContent = t.labelTimeout;
+            document.querySelector('label[for="importFiles"]').textContent = t.labelImportFiles;
+
+            // 更新按钮
+            document.getElementById('startTest').textContent = t.btnStartTest;
+            document.getElementById('stopTest').textContent = t.btnStopTest;
+            document.getElementById('copyMarkdown').textContent = t.btnCopyMarkdown;
+            document.getElementById('exportCSV').textContent = t.btnExportCSV;
+            document.getElementById('exportCombinedChart').textContent = t.btnExportCombinedChart;
+            document.getElementById('startComparison').textContent = t.btnStartComparison;
+            document.getElementById('exportComparisonChart').textContent = t.btnExportComparisonChart;
+
+            // 更新说明文字
+            document.querySelector('.config-section p.notes').textContent = t.comparisonNote;
+
+            // 更新图表标题
+            const chartTitles = document.querySelectorAll('#chartContainer h3');
+            if (chartTitles.length >= 2) {
+                chartTitles[0].textContent = t.chartPrefillTitle;
+                chartTitles[1].textContent = t.chartDecodeTitle;
+            }
+
+            const comparisonTitles = document.querySelectorAll('#comparisonChartContainer h3');
+            if (comparisonTitles.length >= 2) {
+                comparisonTitles[0].textContent = t.chartComparisonPrefillTitle;
+                comparisonTitles[1].textContent = t.chartComparisonDecodeTitle;
+            }
+
+            // 如果结果区域是等待状态，更新文本
+            const resultsDiv = document.getElementById('results');
+            if (resultsDiv && resultsDiv.querySelector('.info')) {
+                const infoElem = resultsDiv.querySelector('.info');
+                if (infoElem.textContent.includes('等待') || infoElem.textContent.includes('Waiting')) {
+                    infoElem.textContent = t.msgWaiting;
+                }
+            }
+        }
+
+        // 绑定语言切换按钮
+        document.getElementById('langToggle').addEventListener('click', function() {
+            const newLang = currentLang === 'zh' ? 'en' : 'zh';
+            switchLanguage(newLang);
+        });
+
+        // 页面加载时应用保存的语言
+        document.addEventListener('DOMContentLoaded', function() {
+            switchLanguage(currentLang);
+        });
+
         // 默认参数设置
         // ===============================================================================
         // API 端点和模型名称配置
@@ -583,26 +865,27 @@
         });
 
         function updateApiDescription(apiType) {
+            const t = translations[currentLang];
             if (apiType === 'openai') {
                 apiDescription.innerHTML = `
-                    <h3>OpenAI兼容接口测试说明</h3>
+                    <h3>${t.apiDescOpenAITitle}</h3>
                     <ul>
-                        <li>使用流式响应(stream=true)测量首字延迟</li>
-                        <li>预填充速度 = 提示词长度 / (首字到达时间 - 请求开始时间)</li>
-                        <li>输出速度 = 输出token数 / (输出完成时间 - 首字到达时间)</li>
-                        <li>适用于所有兼容OpenAI API的大模型服务</li>
-                        <li><strong> 支持思考模型</strong>（DeepSeek-R1、Qwen-QwQ等）：自动统计总吞吐（思考+答案tokens）</li>
+                        <li>${t.apiDescOpenAI1}</li>
+                        <li>${t.apiDescOpenAI2}</li>
+                        <li>${t.apiDescOpenAI3}</li>
+                        <li>${t.apiDescOpenAI4}</li>
+                        <li>${t.apiDescOpenAI5}</li>
                     </ul>
                 `;
             } else {
                 apiDescription.innerHTML = `
-                    <h3>Ollama接口测试说明</h3>
+                    <h3>${t.apiDescOllamaTitle}</h3>
                     <ul>
-                        <li>使用非流式请求(stream=false)</li>
-                        <li>直接使用API返回的prompt_eval_duration和eval_duration指标</li>
-                        <li>预填充速度 = 提示词长度 / (prompt_eval_duration / 1000)</li>
-                        <li>输出速度 = 输出token数 / (eval_duration / 1000)</li>
-                        <li><strong> 支持思考模型</strong>：eval_count自动包含所有输出tokens</li>
+                        <li>${t.apiDescOllama1}</li>
+                        <li>${t.apiDescOllama2}</li>
+                        <li>${t.apiDescOllama3}</li>
+                        <li>${t.apiDescOllama4}</li>
+                        <li>${t.apiDescOllama5}</li>
                     </ul>
                 `;
             }
@@ -1210,22 +1493,23 @@
             const avgO = isFinite(concurrencyStats.avgOutputSpeed) && concurrencyStats.avgOutputSpeed > 0 ? concurrencyStats.avgOutputSpeed.toFixed(2) : 'N/A';
 
 
+            const t = translations[currentLang];
             statsDiv.innerHTML = `
-                <h3>总吞吐量性能统计 (${document.getElementById('concurrency').value}并发)</h3>
+                <h3>${t.concurrentStatsTitle} (${document.getElementById('concurrency').value} ${t.concurrentLabel})</h3>
                 <div class="stat-item">
-                    <span>总预填充吞吐范围:</span>
+                    <span>${t.statTotalPrefillRange}</span>
                     <span class="stat-value">${minP} - ${maxP} tokens/s</span>
                 </div>
                 <div class="stat-item">
-                    <span>总输出吞吐范围:</span>
+                    <span>${t.statTotalDecodeRange}</span>
                     <span class="stat-value">${minO} - ${maxO} tokens/s</span>
                 </div>
                 <div class="stat-item">
-                    <span>平均总预填充吞吐:</span>
+                    <span>${t.statAvgPrefill}</span>
                     <span class="stat-value">${avgP} tokens/s</span>
                 </div>
                 <div class="stat-item">
-                    <span>平均总输出吞吐:</span>
+                    <span>${t.statAvgDecode}</span>
                     <span class="stat-value">${avgO} tokens/s</span>
                 </div>
             `;
@@ -1574,14 +1858,15 @@
             resultsDiv.appendChild(table);
 
             const headerRow = document.createElement('tr');
+            const t = translations[currentLang];
             [
-                '提示词长度<br>(tokens)',
-                '预填充耗时<br>(ms)',
-                '预填充速度<br>(tokens/s)',
-                '输出长度<br>(tokens)',
-                '输出耗时<br>(ms)',
-                '输出速度<br>(tokens/s)',
-                '状态'
+                t.tableHeaderPromptLen,
+                t.tableHeaderPrefillTime,
+                t.tableHeaderPrefillSpeed,
+                t.tableHeaderOutputLen,
+                t.tableHeaderOutputTime,
+                t.tableHeaderOutputSpeed,
+                t.tableHeaderStatus
             ].forEach(text => {
                 const th = document.createElement('th');
                 th.innerHTML = text;
@@ -1591,7 +1876,7 @@
             chartContainer.style.display = 'block';
 
             stopTestBtn.disabled = false;
-            stopTestBtn.textContent = "停止";
+            stopTestBtn.textContent = translations[currentLang].btnTextStop;
             stopTestBtn.style.display = 'block';
             isTestingRunning = true;
 
@@ -1637,9 +1922,10 @@
             isTestingRunning = false; //
 
             // 生成Markdown表格
-            let markdownTable = `## 测试结果 (${currentApiType === 'openai' ? 'OpenAI兼容接口' : 'Ollama接口'} - ${currentModelName})\n\n`;
-            markdownTable += `备注：${notes} | 并发数: ${concurrency}\n\n`;
-            markdownTable += `| 提示词长度 (tokens) | 预填充耗时 (ms) | 总预填充吞吐 (tokens/s) | 输出长度 (tokens) | 输出耗时 (ms) | 总输出吞吐 (tokens/s) |\n`;
+            const apiTypeText = currentApiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+            let markdownTable = `## ${t.mdTestResults} (${apiTypeText} - ${currentModelName})\n\n`;
+            markdownTable += `${t.mdNotes}${notes} | ${t.mdConcurrency} ${concurrency}\n\n`;
+            markdownTable += `| ${t.tableHeaderPromptLen.replace('<br>', ' ')} | ${t.tableHeaderPrefillTime.replace('<br>', ' ')} | ${t.tableHeaderPrefillSpeed.replace('<br>', ' ')} | ${t.tableHeaderOutputLen.replace('<br>', ' ')} | ${t.tableHeaderOutputTime.replace('<br>', ' ')} | ${t.tableHeaderOutputSpeed.replace('<br>', ' ')} |\n`;
             markdownTable += `|---------------------|-------------------|-------------------------|-------------------|---------------|---------------------|\n`;
 
             testResultsData.forEach(res => {
@@ -1649,7 +1935,7 @@
             markdownOutputHidden.value = markdownTable;
 
             startTestBtn.disabled = false;
-            startTestBtn.textContent = "开始测试";
+            startTestBtn.textContent = translations[currentLang].btnTextStart;
             copyMarkdownBtn.style.display = 'block';
             exportCSVBtn.style.display = 'block';
             exportCombinedChartBtn.style.display = 'block'; // v1.8
@@ -1660,16 +1946,18 @@
 
             markdownOutputHidden.select();
             document.execCommand('copy');
-            alert('Markdown表格已复制到剪贴板！');
+            alert(translations[currentLang].alertMarkdownCopied);
         });
 
         exportCSVBtn.addEventListener('click', () => {
+            const t = translations[currentLang];
+            const apiTypeText = currentApiType === 'openai' ? t.apiOpenAI : t.apiOllama;
             let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += `${currentApiType === 'openai' ? 'OpenAI兼容接口' : 'Ollama接口'}, ${currentModelName}\n`;
-            csvContent += `备注：, "${notes.replace(/"/g, '""')}"\n`; // 处理备注中的引号
+            csvContent += `${apiTypeText}, ${currentModelName}\n`;
+            csvContent += `${t.mdNotes}, "${notes.replace(/"/g, '""')}"\n`; // 处理备注中的引号
             const concurrencyValue = document.getElementById('concurrency').value; // 获取并发数
-            csvContent += `并发数：, ${concurrencyValue}\n`;
-            csvContent += "提示词长度(tokens),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态\n";
+            csvContent += `${t.csvConcurrency}, ${concurrencyValue}\n`;
+            csvContent += t.csvHeaders + "\n";
             testResultsData.forEach(res => {
                 csvContent += `${res.promptLength},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
             });
@@ -1795,7 +2083,7 @@
                 const label = `【当前测试】${currentModelName} (并发 ${currentConcurrency})`;
                 comparisonData.push(formatDataForComparison(testResultsData, label));
             } else {
-                alert("请先至少运行一次“开始测试”，以便将当前结果包含在对比中。");
+                alert(translations[currentLang].alertNoTestResults);
                 // 即使没有当前数据，也继续处理导入的数据
             }
 
@@ -1943,6 +2231,7 @@
                 };
             });
 
+            const t = translations[currentLang];
             if (comparisonPrefillChartInstance) comparisonPrefillChartInstance.destroy();
             comparisonPrefillChartInstance = new Chart(compPrefillCanvas, {
                 type: 'line',
@@ -1951,16 +2240,16 @@
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - 总预填充 (Prefill) 吞吐' }
+                        title: { display: true, text: t.chartComparisonPrefillThroughput }
                     },
                     scales: {
                         x: {
                             type: 'linear', // X轴使用线性刻度
                             position: 'bottom',
-                            title: { display: true, text: '提示词长度 (tokens)' }
+                            title: { display: true, text: t.chartAxisPromptLen }
                         },
                         y: {
-                            title: { display: true, text: '总吞吐 (tokens/s)' },
+                            title: { display: true, text: t.chartAxisThroughput },
                             beginAtZero: true
                         }
                     }
@@ -1988,16 +2277,16 @@
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - 总输出 (Decode) 吞吐' }
+                        title: { display: true, text: t.chartComparisonDecodeThroughput }
                     },
                     scales: {
                         x: {
                             type: 'linear',
                             position: 'bottom',
-                            title: { display: true, text: '提示词长度 (tokens)' }
+                            title: { display: true, text: t.chartAxisPromptLen }
                         },
                         y: {
-                            title: { display: true, text: '总吞吐 (tokens/s)' }, //
+                            title: { display: true, text: t.chartAxisThroughput },
                             beginAtZero: true
                         }
                     }
@@ -2022,6 +2311,7 @@
                 return;
             }
 
+            const t = translations[currentLang];
             // 从数据中提取标签和数据集
             const labels = testResultsData.map(d => d.promptLength);
             // 将 'N/A' 转换为 null，以便 Chart.js 知道在何处断开线条
@@ -2044,7 +2334,7 @@
                         labels: labels,
                         datasets: [
                             {
-                                label: '总预填充吞吐 (tokens/s)',
+                                label: t.chartLabelPrefillThroughput,
                                 data: prefillDataTotal,
                                 borderColor: 'rgb(75, 192, 192)',
                                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -2062,20 +2352,20 @@
                             },
                             title: {
                                 display: true,
-                                text: `总预填充 (Prefill) 吞吐 - ${currentModelName}`
+                                text: `${t.chartTitlePrefillThroughput} - ${currentModelName}`
                             }
                         },
                         scales: {
                             x: {
                                 title: {
                                     display: true,
-                                    text: '提示词长度 (tokens)'
+                                    text: t.chartAxisPromptLen
                                 }
                             },
                             y: {
                                 title: {
                                     display: true,
-                                    text: '总吞吐 (tokens/s)'
+                                    text: t.chartAxisThroughput
                                 },
                                 beginAtZero: true
                             }
@@ -2097,7 +2387,7 @@
                         labels: labels,
                         datasets: [
                             {
-                                label: '总输出吞吐 (tokens/s)',
+                                label: t.chartLabelDecodeThroughput,
                                 data: outputDataTotal,
                                 borderColor: 'rgb(255, 99, 132)',
                                 backgroundColor: 'rgba(255, 99, 132, 0.2)',
@@ -2115,20 +2405,20 @@
                             },
                             title: {
                                 display: true,
-                                text: `总输出 (Decode) 吞吐 - ${currentModelName}`
+                                text: `${t.chartTitleDecodeThroughput} - ${currentModelName}`
                             }
                         },
                         scales: {
                             x: {
                                 title: {
                                     display: true,
-                                    text: '提示词长度 (tokens)'
+                                    text: t.chartAxisPromptLen
                                 }
                             },
                             y: {
                                 title: {
                                     display: true,
-                                    text: '总吞吐 (tokens/s)'
+                                    text: t.chartAxisThroughput
                                 },
                                 beginAtZero: true
                             }
