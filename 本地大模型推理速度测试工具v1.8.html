@@ -636,8 +636,14 @@
         ];
 
         // 根据指定长度生成提示词
-        function generatePrompt(length, apiType) {
+        function generatePrompt(length, apiType, seed = 0) {
             let prompt = [];
+
+            //  添加唯一前缀以避免prefix cache命中（并发测试时很重要）
+            if (seed > 0) {
+                prompt.push(`[Request-${seed}-${Date.now()}]`);
+            }
+
             for (let i = 0; i < length - 20; i++) {
                 const randomIndex = Math.floor(Math.random() * wordList.length);
                 prompt.push(wordList[randomIndex]);
@@ -819,7 +825,8 @@
                 const measurementPromises = [];
 
                 for (let i = 0; i < concurrency; i++) {
-                    const prompt = generatePrompt(length, 'openai');
+                    //  传入seed确保每个并发请求的prompt都不同，避免prefix cache命中
+                    const prompt = generatePrompt(length, 'openai', i + 1);
                     const requestBody = {
                         "model": modelName,
                         "messages": [
@@ -1036,8 +1043,14 @@
                             }
 
                             //  通用fallback：打印完整的data结构（仅在最后一个chunk，且是首次打印）
-                            if (data.usage && !serverPrefillTimeMs && !window._debugDataPrinted) {
-                                console.log('[调试] API返回的完整data结构:', JSON.stringify(data, null, 2));
+                            if (data.usage && !window._debugDataPrinted) {
+                                console.log('[调试] 收到usage字段:', JSON.stringify(data.usage, null, 2));
+                                if (data.timings) {
+                                    console.log('[调试] 收到timings字段:', JSON.stringify(data.timings, null, 2));
+                                }
+                                if (!serverPrefillTimeMs) {
+                                    console.log('[警告] 未能提取服务器timing，使用端到端测量（含网络延迟）');
+                                }
                                 window._debugDataPrinted = true;
                             }
 
@@ -1283,7 +1296,7 @@
                 const requests = [];
 
                 for (let i = 0; i < concurrency; i++) {
-                    const prompt = generatePrompt(length, 'ollama');
+                    const prompt = generatePrompt(length, 'ollama', i + 1);
                     const requestBody = {
                         "model": modelName,
                         "messages": [
