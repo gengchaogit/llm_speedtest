@@ -18,7 +18,7 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 
 <!-- Please note, the following changelog starts from v1.7. -->
 
-### v1.9 (Chao Enhanced Modded Version - History Feature)
+### v1.9 (Chao Enhanced Modded Version - History & Detail View)
 *   **📚 Automatic History Saving**: Test results automatically saved to browser localStorage (up to 20 records)
 *   **🗂️ History Management Panel**: Beautiful new history modal with easy-to-use interface
     *   View test time, notes, configuration, and performance statistics at a glance
@@ -30,8 +30,15 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
     *   Real-time display of selected count
     *   Auto-scroll to comparison chart area
     *   Fully compatible with CSV import feature
+*   **🔍 Test Detail View**: Each test result row has a "View Details" button
+    *   View complete prompt content and model output
+    *   Display detailed request configuration (Temperature, Top P, etc.)
+    *   Show comprehensive performance metrics (Prefill/Decode time and speed)
+    *   Distinguish reasoning content and completion content (supports reasoning models)
+    *   One-click copy prompt or output content
+    *   Beautiful modal interface with auto-wrapping text
 *   **💾 Data Persistence**: All history records saved in localStorage, no data loss
-*   **🎨 Full Bilingual Support**: All history features fully support Chinese/English switching
+*   **🎨 Full Bilingual Support**: All new features fully support Chinese/English switching
 
 ### v1.8 (Chao Enhanced Modded Version)
 *   **🌐 Bilingual Support (Chinese/English)**: Added full bilingual support with a prominent language toggle button. The interface automatically switches between Chinese and English, with the selected language saved to localStorage.
@@ -83,6 +90,14 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
     *   **Individual Export**: Export history records as CSV files
     *   **Record Management**: Delete individual records or clear all
     *   **Comparison**: Select multiple history records and generate comparison charts with one click
+*   **🔍 Test Detail View** (v1.9 New):
+    *   **Detail Button**: Each test result row has a "View Details" button
+    *   **Full Content**: View complete prompt and model output content
+    *   **Request Config**: Display all request parameters (API type, model, Temperature, Top P, etc.)
+    *   **Performance Metrics**: Show detailed Prefill/Decode time and speed
+    *   **Reasoning Model Support**: Distinguish reasoning content and completion content
+    *   **Copy Function**: One-click copy prompt or output content to clipboard
+    *   **Optimized Layout**: Auto-wrapping text, optimized table column widths, no horizontal scrolling
 *   **Automatic Configuration Saving**: Automatically saves the current API address, model name, and API type to browser `localStorage`, loading them automatically next time.
 *   **Result Export**: Supports copying test results as a Markdown table or exporting them as a CSV file.
 *   **Chart Export**: Supports one-click export of generated Prefill and Decode throughput charts as an image.
@@ -190,6 +205,24 @@ In the history panel, you can select multiple history records for comparison:
 5.  View Prefill and Decode performance comparison curves for multiple history records
 
 **Tip**: The history comparison feature is fully compatible with the CSV import feature, allowing you to use both methods for comparative analysis.
+
+### 13. View Test Details (v1.9 New)
+
+In the test results table, each test result row has a `View Details` button. Click this button to open the detail modal and view complete information about the test:
+
+The detail modal contains the following content:
+*   **Basic Information**: API type, model name, prompt length, output length, concurrency, test time
+*   **Performance Metrics**: Prefill time/speed, output time/speed, test status
+*   **Request Configuration**: Temperature, Top P, Max Tokens and all other request parameters
+*   **Prompt Content**: Complete prompt text with one-click copy support
+*   **Output Content**: Complete model output text with one-click copy support
+    *   For reasoning models (e.g., DeepSeek-R1), reasoning content and completion content are displayed separately
+    *   All text auto-wraps for easy reading
+
+**Usage Tips**:
+*   Click outside the modal or the "Close" button to close the detail modal
+*   Click the "Copy Content" button to quickly copy prompt or output content
+*   Modal content is scrollable for viewing long texts
 
 ## Configuration Details
 
