@@ -9,6 +9,13 @@
     3. (v1.8) 合并图表导出：将Prefill和Decode图表一键导出为一张图片
     4. (v1.8) 对比标签：使用CSV文件名作为对比图表的图例标签
     5. (v1.8) 对比导出：为对比图表也增加一键导出功能，并自动生成包含参数的文件名
+    6. (v1.8) 【重要修复】支持思考模型：解析usage字段获取准确token统计（reasoning_tokens + completion_tokens）
+    7. (v1.8) 添加token估算fallback：当API不返回usage时使用字符估算
+    8. (v1.8) 【关键修复】Prefill速度计算错误：现在使用API返回的实际prompt_tokens而非估算值（修复了约10%误差）
+    9. (v1.8) 【兼容性修复】支持多种流式响应格式：delta.reasoning_content（思考）/ delta.content / message.content / text
+    10. (v1.8) 自动保存/恢复所有配置参数：API地址、模型、温度、并发数等所有参数，下次打开自动恢复
+    11. (v1.8) 【思考模型修复】正确计算reasoning+completion总tokens：当usage不准时使用内容估算，确保decode速度准确
+    12. (v1.8) 【性能测量优化】优先使用服务器返回的真实GPU处理时间（prompt_eval_duration/eval_duration），消除网络延迟影响
 -->
 
 <!-- v1.7 (chao基于原版魔改版-qq群:1028429001):
@@ -405,6 +412,7 @@
                 <li>预填充速度 = 提示词长度 / (首字到达时间 - 请求开始时间)</li>
                 <li>输出速度 = 输出token数 / (输出完成时间 - 首字到达时间)</li>
                 <li>适用于所有兼容OpenAI API的大模型服务</li>
+                <li><strong> 支持思考模型</strong>（DeepSeek-R1、Qwen-QwQ等）：自动统计总吞吐（思考+答案tokens）</li>
             </ul>
         </div>
 
@@ -583,6 +591,7 @@
                         <li>预填充速度 = 提示词长度 / (首字到达时间 - 请求开始时间)</li>
                         <li>输出速度 = 输出token数 / (输出完成时间 - 首字到达时间)</li>
                         <li>适用于所有兼容OpenAI API的大模型服务</li>
+                        <li><strong> 支持思考模型</strong>（DeepSeek-R1、Qwen-QwQ等）：自动统计总吞吐（思考+答案tokens）</li>
                     </ul>
                 `;
             } else {
@@ -593,6 +602,7 @@
                         <li>直接使用API返回的prompt_eval_duration和eval_duration指标</li>
                         <li>预填充速度 = 提示词长度 / (prompt_eval_duration / 1000)</li>
                         <li>输出速度 = 输出token数 / (eval_duration / 1000)</li>
+                        <li><strong> 支持思考模型</strong>：eval_count自动包含所有输出tokens</li>
                     </ul>
                 `;
             }
@@ -724,6 +734,23 @@
         }
 
 
+        //  Token估算函数（当API不返回usage时的fallback）
+        function estimateTokenCount(text) {
+            if (!text || text.length === 0) return 0;
+
+            // 统计中文字符数量
+            const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+            // 其他字符（英文、数字、符号等）
+            const otherChars = text.length - chineseChars;
+
+            // 粗略估算：中文约1.5字符=1token，英文约4字符=1token
+            const estimatedTokens = Math.round(chineseChars / 1.5 + otherChars / 4);
+
+            console.log(`[Token估算] 总字符: ${text.length}, 中文: ${chineseChars}, 其他: ${otherChars}, 估算tokens: ${estimatedTokens}`);
+
+            return estimatedTokens;
+        }
+
         // 【修复】测试OpenAI兼容接口
         async function testOpenAI(apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
             for (let length = minLength; length <= maxLength; length += step) {
@@ -839,6 +866,13 @@
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
                     const avgOutputTimeMs = concurrencyResults.reduce((sum, res) => sum + res.outputTimeMs, 0) / concurrencyResults.length;
 
+                    //  获取实际的prompt token数（API返回的准确值）
+                    // 防御性编程：处理undefined的情况
+                    const avgActualPromptTokens = concurrencyResults.reduce((sum, res) => {
+                        const tokens = res.actualPromptTokens ?? length; // fallback到预期长度
+                        return sum + tokens;
+                    }, 0) / concurrencyResults.length;
+
                     // 计算总吞吐
                     const totalPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0);
                     const totalOutputSpeed = concurrencyResults.reduce((sum, res) => sum + res.outputSpeed, 0);
@@ -846,8 +880,16 @@
                     // 仅在成功时更新统计
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
 
+                    //  显示预期vs实际的token数差异
+                    const actualPromptLength = Math.round(avgActualPromptTokens);
+                    if (actualPromptLength !== length) {
+                        const diff = actualPromptLength - length;
+                        const diffPercent = ((diff / length) * 100).toFixed(1);
+                        console.log(`[Token差异] 预期: ${length}, 实际: ${actualPromptLength}, 差异: ${diff > 0 ? '+' : ''}${diff} (${diffPercent}%)`);
+                    }
+
                     resultEntry = {
-                        promptLength: length,
+                        promptLength: actualPromptLength, //  修复：使用实际token数
                         prefillTimeMs: avgPrefillTimeMs.toFixed(2),
                         prefillSpeed: totalPrefillSpeed.toFixed(2),
                         outputTokens: avgOutputTokens.toFixed(0),
@@ -857,6 +899,7 @@
                         concurrency: concurrency
                     };
 
+                    cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
                     cells[1].textContent = resultEntry.prefillTimeMs;
                     cells[2].textContent = resultEntry.prefillSpeed;
                     cells[3].textContent = resultEntry.outputTokens;
@@ -898,7 +941,13 @@
             const startTime = performance.now();
             let firstTokenTime = null;
             let outputContent = '';
-            let receivedTokens = 0;
+            let reasoningContent = ''; //  单独统计reasoning内容
+            let actualOutputTokensFromUsage = null; //  从usage获取的输出token数（支持思考模型）
+            let actualPromptTokensFromUsage = null; //  从usage获取的实际prompt token数
+            let reasoningChunkCount = 0; //  统计reasoning chunk数量（用于fallback）
+            let contentChunkCount = 0;   //  统计content chunk数量（用于fallback）
+            let serverPrefillTimeMs = null; //  服务器返回的prefill真实处理时间
+            let serverDecodeTimeMs = null;  //  服务器返回的decode真实处理时间
 
             const response = await createFetchPromiseWithRetry(apiUrl, fetchOptions, timeout, 3, 1500);
 
@@ -926,13 +975,113 @@
                         const jsonLine = line.replace('data: ', '');
                         try {
                             const data = JSON.parse(jsonLine);
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                const token = data.choices[0].delta.content;
-                                outputContent += token;
-                                receivedTokens++;
+
+                            //  解析usage字段（流式响应的最后一个chunk会包含）
+                            if (data.usage) {
+                                const completion = data.usage.completion_tokens || 0;
+                                const reasoning = data.usage.reasoning_tokens || 0;
+                                const prompt = data.usage.prompt_tokens || 0;
+
+                                // 总decode吞吐 = 思考tokens + 答案tokens
+                                actualOutputTokensFromUsage = completion + reasoning;
+                                actualPromptTokensFromUsage = prompt;
+
+                                console.log(`[Token统计] prompt: ${prompt}, completion: ${completion}, reasoning: ${reasoning}, 输出总计: ${actualOutputTokensFromUsage}`);
+
+                                //  尝试提取服务器的真实处理时间（llama.cpp扩展字段）
+                                // 可能的字段名：timings, prompt_eval_duration, eval_duration等
+                                if (data.usage.prompt_eval_duration) {
+                                    // llama.cpp格式：纳秒
+                                    serverPrefillTimeMs = data.usage.prompt_eval_duration / 1_000_000;
+                                } else if (data.usage.prompt_eval_time) {
+                                    // 可能是毫秒
+                                    serverPrefillTimeMs = data.usage.prompt_eval_time;
+                                }
+
+                                if (data.usage.eval_duration) {
+                                    // llama.cpp格式：纳秒
+                                    serverDecodeTimeMs = data.usage.eval_duration / 1_000_000;
+                                } else if (data.usage.eval_time) {
+                                    // 可能是毫秒
+                                    serverDecodeTimeMs = data.usage.eval_time;
+                                }
+
+                                if (serverPrefillTimeMs && serverDecodeTimeMs) {
+                                    console.log(`[服务器Timing] Prefill: ${serverPrefillTimeMs.toFixed(2)}ms, Decode: ${serverDecodeTimeMs.toFixed(2)}ms`);
+                                }
+                            }
+
+                            //  检查顶层的timings字段（某些实现可能放在这里）
+                            if (data.timings) {
+                                // 尝试多种字段名
+                                if (!serverPrefillTimeMs) {
+                                    if (data.timings.prompt_eval_duration) {
+                                        serverPrefillTimeMs = data.timings.prompt_eval_duration / 1_000_000; // 纳秒转毫秒
+                                    } else if (data.timings.prompt_ms) {
+                                        serverPrefillTimeMs = data.timings.prompt_ms; // 已经是毫秒
+                                    }
+                                }
+
+                                if (!serverDecodeTimeMs) {
+                                    if (data.timings.eval_duration) {
+                                        serverDecodeTimeMs = data.timings.eval_duration / 1_000_000; // 纳秒转毫秒
+                                    } else if (data.timings.predicted_ms) {
+                                        serverDecodeTimeMs = data.timings.predicted_ms; // 已经是毫秒
+                                    }
+                                }
+
+                                if (serverPrefillTimeMs && serverDecodeTimeMs) {
+                                    console.log(`[服务器Timing] Prefill: ${serverPrefillTimeMs.toFixed(2)}ms, Decode: ${serverDecodeTimeMs.toFixed(2)}ms (来自timings字段)`);
+                                }
+                            }
+
+                            //  通用fallback：打印完整的data结构（仅在最后一个chunk，且是首次打印）
+                            if (data.usage && !serverPrefillTimeMs && !window._debugDataPrinted) {
+                                console.log('[调试] API返回的完整data结构:', JSON.stringify(data, null, 2));
+                                window._debugDataPrinted = true;
+                            }
+
+                            // 检查多种可能的content位置
+                            let contentText = null;
+                            let isReasoningToken = false;
+
+                            if (data.choices && data.choices[0]) {
+                                const choice = data.choices[0];
+
+                                //  思考模型格式：delta.reasoning_content（思考过程）
+                                if (choice.delta && choice.delta.reasoning_content) {
+                                    contentText = choice.delta.reasoning_content;
+                                    isReasoningToken = true;
+                                    reasoningChunkCount++;
+                                }
+                                // 标准OpenAI流式格式：delta.content（答案或全部内容）
+                                else if (choice.delta && choice.delta.content) {
+                                    contentText = choice.delta.content;
+                                    contentChunkCount++;
+                                }
+                                // 某些实现：message.content
+                                else if (choice.message && choice.message.content) {
+                                    contentText = choice.message.content;
+                                    contentChunkCount++;
+                                }
+                                // 某些实现：text字段
+                                else if (choice.text) {
+                                    contentText = choice.text;
+                                    contentChunkCount++;
+                                }
+                            }
+
+                            if (contentText) {
+                                if (isReasoningToken) {
+                                    reasoningContent += contentText;
+                                } else {
+                                    outputContent += contentText;
+                                }
 
                                 if (!firstTokenTime) {
                                     firstTokenTime = performance.now();
+                                    const tokenType = isReasoningToken ? 'reasoning' : 'content';
+                                    console.log(`[TTFT] 首token到达（${tokenType}），内容: "${contentText.substring(0, 20)}..."`);
                                 }
                             }
                         } catch (e) {
@@ -944,25 +1093,68 @@
 
             const endTime = performance.now();
 
-            if (!firstTokenTime) {
-                if (receivedTokens === 0) {
-                   throw new Error("未收到任何token (stream ended)");
+            try {
+                if (!firstTokenTime) {
+                    const hasContent = (reasoningContent + outputContent).length > 0;
+                    if (!hasContent) {
+                       throw new Error("未收到任何token (stream ended)");
+                    }
+                    firstTokenTime = endTime;
                 }
-                firstTokenTime = endTime;
+
+                //  优先使用usage中的准确token数，如果没有则估算/使用传入值
+                const actualPromptTokens = actualPromptTokensFromUsage ?? promptLength; // Prefill用API返回的实际值
+
+                //  Token统计：优先使用usage中的准确值
+                let receivedTokens;
+
+                if (actualOutputTokensFromUsage && actualOutputTokensFromUsage > 0) {
+                    // 优先使用API返回的usage
+                    receivedTokens = actualOutputTokensFromUsage;
+                } else if (reasoningContent.length > 0 || outputContent.length > 0) {
+                    // Fallback: 估算
+                    const reasoningTokens = estimateTokenCount(reasoningContent);
+                    const completionTokens = estimateTokenCount(outputContent);
+                    receivedTokens = reasoningTokens + completionTokens;
+                    console.log(`[Token估算] reasoning: ${reasoningTokens}, completion: ${completionTokens}, 总计: ${receivedTokens}`);
+                } else {
+                    receivedTokens = 0;
+                }
+
+                //  计算时间：优先使用服务器真实处理时间，否则使用端到端测量
+                let prefillTimeMs, outputTimeMs;
+                let timeSource = '';
+
+                if (serverPrefillTimeMs && serverDecodeTimeMs) {
+                    // 使用服务器返回的真实GPU处理时间
+                    prefillTimeMs = serverPrefillTimeMs;
+                    outputTimeMs = serverDecodeTimeMs;
+                    timeSource = '服务器真实处理时间';
+                } else {
+                    // Fallback: 使用端到端测量（包含网络延迟）
+                    prefillTimeMs = firstTokenTime - startTime;
+                    outputTimeMs = Math.max(endTime - firstTokenTime, 1);
+                    timeSource = '端到端测量（含网络延迟）';
+                }
+
+                const prefillSpeed = (actualPromptTokens / (prefillTimeMs / 1000));
+                const outputSpeed = receivedTokens > 0 ? (receivedTokens / (outputTimeMs / 1000)) : 0;
+
+                console.log(`[速度统计] 时间来源: ${timeSource}`);
+                console.log(`[速度统计] Prefill: ${prefillSpeed.toFixed(2)} tok/s (${prefillTimeMs.toFixed(2)}ms), Decode: ${outputSpeed.toFixed(2)} tok/s (${outputTimeMs.toFixed(2)}ms, ${receivedTokens} tokens)`);
+
+                return {
+                    prefillTimeMs,
+                    prefillSpeed,
+                    outputTokens: receivedTokens,
+                    outputTimeMs,
+                    outputSpeed,
+                    actualPromptTokens  //  返回实际的prompt token数
+                };
+            } catch (error) {
+                console.error(`[Error] executeAndMeasureRequest异常:`, error);
+                throw error; // 重新抛出
             }
-
-            const prefillTimeMs = firstTokenTime - startTime;
-            const outputTimeMs = Math.max(endTime - firstTokenTime, 1);
-            const prefillSpeed = (promptLength / (prefillTimeMs / 1000));
-            const outputSpeed = receivedTokens > 0 ? (receivedTokens / (outputTimeMs / 1000)) : 0;
-
-            return {
-                prefillTimeMs,
-                prefillSpeed,
-                outputTokens: receivedTokens,
-                outputTimeMs,
-                outputSpeed
-            };
         }
 
         function updateConcurrencyStats(prefillSpeed, outputSpeed) {
@@ -1154,10 +1346,15 @@
                     }
 
                     const avgPrefillTimeMs = concurrencyResults.reduce((sum, res) => sum + res.prefillTimeMs, 0) / concurrencyResults.length;
-                    const avgPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0) / concurrencyResults.length;
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
                     const avgOutputTimeMs = concurrencyResults.reduce((sum, res) => sum + res.outputTimeMs, 0) / concurrencyResults.length;
-                    const avgOutputSpeed = concurrencyResults.reduce((sum, res) => sum + res.outputSpeed, 0) / concurrencyResults.length;
+
+                    //  获取实际的prompt token数（Ollama API返回的准确值）
+                    // 防御性编程：处理undefined的情况
+                    const avgActualPromptTokens = concurrencyResults.reduce((sum, res) => {
+                        const tokens = res.actualPromptTokens ?? length; // fallback到预期长度
+                        return sum + tokens;
+                    }, 0) / concurrencyResults.length;
 
                     //
                     const totalPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0);
@@ -1165,8 +1362,16 @@
 
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
 
+                    //  显示预期vs实际的token数差异
+                    const actualPromptLength = Math.round(avgActualPromptTokens);
+                    if (actualPromptLength !== length) {
+                        const diff = actualPromptLength - length;
+                        const diffPercent = ((diff / length) * 100).toFixed(1);
+                        console.log(`[Ollama Token差异] 预期: ${length}, 实际: ${actualPromptLength}, 差异: ${diff > 0 ? '+' : ''}${diff} (${diffPercent}%)`);
+                    }
+
                     resultEntry = {
-                        promptLength: length,
+                        promptLength: actualPromptLength, //  修复：使用实际token数
                         prefillTimeMs: avgPrefillTimeMs.toFixed(2),
                         prefillSpeed: totalPrefillSpeed.toFixed(2),
                         outputTokens: avgOutputTokens.toFixed(0),
@@ -1176,6 +1381,7 @@
                         concurrency: concurrency
                     };
 
+                    cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
                     cells[1].textContent = resultEntry.prefillTimeMs;
                     cells[2].textContent = resultEntry.prefillSpeed;
                     cells[3].textContent = resultEntry.outputTokens;
@@ -1230,12 +1436,19 @@
 
             // prompt_eval_duration 和 eval_duration 是纳秒 (ns)
             const prefillDurationMs = data.prompt_eval_duration / 1_000_000;
+
+            //  Ollama的eval_count已经包含所有输出token（如果是思考模型，包括思考+答案）
+            // 注意：Ollama目前没有单独的reasoning_tokens字段，但eval_count是准确的总数
             const actualOutputTokens = data.eval_count;
             const outputDurationMs = Math.max(data.eval_duration / 1_000_000, 1); // ns to ms, 最小 1ms
 
-            // promptLength 是用户输入的提示词 token 数，Ollama 返回的 prompt_eval_count 是实际处理的
-            // 为保持一致性，我们使用用户输入的 length
-            const prefillSpeed = (promptLength / (prefillDurationMs / 1000));
+            //  Ollama返回的实际prompt token数
+            const actualPromptTokens = data.prompt_eval_count || promptLength;
+
+            console.log(`[Ollama Token统计] prompt_eval_count: ${actualPromptTokens}, eval_count: ${actualOutputTokens}, prompt_eval_duration: ${data.prompt_eval_duration}ns`);
+
+            //  修复：使用实际的prompt token数
+            const prefillSpeed = (actualPromptTokens / (prefillDurationMs / 1000));
             const outputSpeed = actualOutputTokens > 0 ? (actualOutputTokens / (outputDurationMs / 1000)) : 0;
 
             return {
@@ -1243,7 +1456,8 @@
                 prefillSpeed: prefillSpeed,
                 outputTokens: actualOutputTokens,
                 outputTimeMs: outputDurationMs,
-                outputSpeed: outputSpeed
+                outputSpeed: outputSpeed,
+                actualPromptTokens: actualPromptTokens  //  返回实际的prompt token数
             };
         }
 
@@ -1274,11 +1488,24 @@
             const presence_penalty = parseFloat(document.getElementById('presencePenaltyInput').value);
             const frequency_penalty = parseFloat(document.getElementById('frequencyPenaltyInput').value);
 
-            // 保存当前配置到 localStorage
+            //  保存当前配置到 localStorage（扩展保存所有参数）
             try {
                 localStorage.setItem('llmPerfTestApiUrl', apiUrl);
                 localStorage.setItem('llmPerfTestModelName', currentModelName);
                 localStorage.setItem('llmPerfTestApiType', currentApiType);
+                localStorage.setItem('llmPerfTestApiKey', api_key);
+                localStorage.setItem('llmPerfTestNotes', notes);
+                localStorage.setItem('llmPerfTestMinLength', minLength);
+                localStorage.setItem('llmPerfTestMaxLength', maxLength);
+                localStorage.setItem('llmPerfTestStep', step);
+                localStorage.setItem('llmPerfTestOutputLength', outputLength);
+                localStorage.setItem('llmPerfTestConcurrency', concurrency);
+                localStorage.setItem('llmPerfTestTimeout', timeout);
+                localStorage.setItem('llmPerfTestTemperature', temperature);
+                localStorage.setItem('llmPerfTestTopP', top_p);
+                localStorage.setItem('llmPerfTestPresencePenalty', presence_penalty);
+                localStorage.setItem('llmPerfTestFrequencyPenalty', frequency_penalty);
+                console.log('[配置保存] 已保存当前配置到localStorage');
             } catch (e) {
                 console.warn("无法保存配置到 localStorage:", e);
             }
@@ -1898,12 +2125,24 @@
             }
         }
 
-        // 
+        //  从localStorage加载上次保存的配置
         function setDefaultValues() {
             // 从 localStorage 加载保存的 API 类型、地址和模型名称
             const savedApiType = localStorage.getItem('llmPerfTestApiType') || 'openai';
             const savedApiUrl = localStorage.getItem('llmPerfTestApiUrl');
             const savedModelName = localStorage.getItem('llmPerfTestModelName');
+            const savedApiKey = localStorage.getItem('llmPerfTestApiKey');
+            const savedNotes = localStorage.getItem('llmPerfTestNotes');
+            const savedMinLength = localStorage.getItem('llmPerfTestMinLength');
+            const savedMaxLength = localStorage.getItem('llmPerfTestMaxLength');
+            const savedStep = localStorage.getItem('llmPerfTestStep');
+            const savedOutputLength = localStorage.getItem('llmPerfTestOutputLength');
+            const savedConcurrency = localStorage.getItem('llmPerfTestConcurrency');
+            const savedTimeout = localStorage.getItem('llmPerfTestTimeout');
+            const savedTemperature = localStorage.getItem('llmPerfTestTemperature');
+            const savedTopP = localStorage.getItem('llmPerfTestTopP');
+            const savedPresencePenalty = localStorage.getItem('llmPerfTestPresencePenalty');
+            const savedFrequencyPenalty = localStorage.getItem('llmPerfTestFrequencyPenalty');
 
             // 设置 API 类型的 active 状态
             apiOptions.forEach(o => o.classList.remove('active'));
@@ -1913,31 +2152,26 @@
             }
             updateApiDescription(savedApiType);
 
-            // 如果 localStroage 有数据则使用，否则使用默认数据
+            // 如果 localStorage 有数据则使用，否则使用默认数据
+            document.getElementById('apiUrl').value = savedApiUrl || ((savedApiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl);
+            document.getElementById('modelName').value = savedModelName || ((savedApiType === 'openai') ? d_openai_modelName : d_ollama_modelName);
+            document.getElementById('apiKey').value = savedApiKey || d_api_key;
+            document.getElementById('notes').value = savedNotes || '';
+            document.getElementById('minLength').value = savedMinLength || d_minLength;
+            document.getElementById('maxLength').value = savedMaxLength || d_maxLength;
+            document.getElementById('step').value = savedStep || d_step;
+            document.getElementById('outputLength').value = savedOutputLength || d_outputLength;
+            document.getElementById('concurrency').value = savedConcurrency || 1;
+            document.getElementById('timeout').value = savedTimeout || d_timeout;
+            document.getElementById('temperatureInput').value = savedTemperature || d_temperature;
+            document.getElementById('topPInput').value = savedTopP || d_top_p;
+            document.getElementById('presencePenaltyInput').value = savedPresencePenalty || d_presence_penalty;
+            document.getElementById('frequencyPenaltyInput').value = savedFrequencyPenalty || d_frequency_penalty;
+
+            // 提示用户已加载配置
             if (savedApiUrl) {
-                document.getElementById('apiUrl').value = savedApiUrl;
-            } else {
-                document.getElementById('apiUrl').value = (savedApiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl;
+                console.log('[配置加载] 已从localStorage恢复上次的配置');
             }
-
-            if (savedModelName) {
-                document.getElementById('modelName').value = savedModelName;
-            } else {
-                document.getElementById('modelName').value = (savedApiType === 'openai') ? d_openai_modelName : d_ollama_modelName;
-            }
-
-            // 设置其他默认值
-            document.getElementById('apiKey').value = d_api_key;
-            document.getElementById('minLength').value = d_minLength;
-            document.getElementById('maxLength').value = d_maxLength;
-            document.getElementById('step').value = d_step;
-            document.getElementById('outputLength').value = d_outputLength;
-            document.getElementById('concurrency').value = 1;
-            document.getElementById('timeout').value = d_timeout;
-            document.getElementById('temperatureInput').value = d_temperature;
-            document.getElementById('topPInput').value = d_top_p;
-            document.getElementById('presencePenaltyInput').value = d_presence_penalty;
-            document.getElementById('frequencyPenaltyInput').value = d_frequency_penalty;
         }
 
         // 
