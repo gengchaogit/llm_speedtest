@@ -207,17 +207,18 @@
             border-collapse: collapse;
             margin: 0;
             font-family: "Courier New", Courier, monospace;
-            font-size: 0.9em;
+            font-size: 0.85em; /* 稍微减小字体 */
             table-layout: fixed;
         }
 
         #results th,
         #results td {
             border: 1px solid #444;
-            padding: 8px;
+            padding: 6px 4px; /* 减小内边距 */
             text-align: left;
             color: #abb2bf;
             white-space: normal;
+            word-break: break-word;
         }
 
         #results th {
@@ -226,48 +227,57 @@
             position: sticky;
             top: 0;
             z-index: 1;
+            font-size: 0.9em;
         }
 
         /* 提示词长度 */
         #results th:nth-child(1),
         #results td:nth-child(1) {
-            width: 14%;
+            width: 11%;
         }
 
         /* 预填充耗时 */
         #results th:nth-child(2),
         #results td:nth-child(2) {
-            width: 16%;
+            width: 13%;
         }
 
         /* 预填充速度 */
         #results th:nth-child(3),
         #results td:nth-child(3) {
-            width: 14%;
+            width: 13%;
         }
 
         /* 输出长度 */
         #results th:nth-child(4),
         #results td:nth-child(4) {
-            width: 14%;
+            width: 11%;
         }
 
         /* 输出耗时 */
         #results th:nth-child(5),
         #results td:nth-child(5) {
-            width: 16%;
+            width: 13%;
         }
 
         /* 输出速度 */
         #results th:nth-child(6),
         #results td:nth-child(6) {
-            width: 14%;
+            width: 13%;
         }
 
         /* 状态 */
         #results th:nth-child(7),
         #results td:nth-child(7) {
-            width: 12%;
+            width: 16%;
+        }
+
+        /* 详情按钮 */
+        #results th:nth-child(8),
+        #results td:nth-child(8) {
+            width: 10%;
+            text-align: center;
+            padding: 4px 2px;
         }
 
         #results tr:nth-child(even) {
@@ -654,6 +664,227 @@
             font-size: 1.2em;
         }
 
+        /* v1.9: 详情弹窗样式 */
+        .detail-button {
+            padding: 6px 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .detail-button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .detail-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+
+        .detail-dialog {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            width: 95%;
+            max-width: 1400px; /* 增加宽度 */
+            max-height: 90vh;
+            overflow: auto;
+            animation: slideDown 0.3s;
+        }
+
+        .detail-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+            color: white;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .detail-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .detail-header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .detail-close-button,
+        .detail-copy-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .detail-close-button {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .detail-close-button:hover {
+            background: #c0392b;
+        }
+
+        .detail-copy-button {
+            background: #27ae60;
+            color: white;
+        }
+
+        .detail-copy-button:hover {
+            background: #229954;
+        }
+
+        .detail-body {
+            padding: 20px;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .detail-section-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .detail-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .detail-field {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .detail-field-label {
+            font-weight: bold;
+            color: #34495e;
+            white-space: nowrap;
+        }
+
+        .detail-field-value {
+            background: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: #2c3e50;
+            border: 1px solid #ddd;
+        }
+
+        .detail-block {
+            margin-top: 15px;
+        }
+
+        .detail-block-label {
+            font-weight: bold;
+            color: #34495e;
+            margin-bottom: 8px;
+        }
+
+        /* 详情内容块样式 */
+        .detail-content-block {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #ddd;
+            font-family: 'Courier New', Consolas, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .detail-content-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .detail-prompt-content {
+            border-left-color: #f39c12;
+            background: #fffbf0;
+        }
+
+        .detail-output-content {
+            border-left-color: #27ae60;
+            background: #f0fff4;
+        }
+
+        .detail-reasoning-content {
+            border-left-color: #9b59b6;
+            background: #f5f0ff;
+        }
+
+        .detail-subsection-title {
+            font-size: 1em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+
+        .detail-concurrent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .detail-concurrent-item {
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .detail-concurrent-item-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
         #chartContainer {
             margin-top: 30px;
             background: #fff;
@@ -925,6 +1156,44 @@
                 tableHeaderOutputTime: '输出耗时<br>(ms)',
                 tableHeaderOutputSpeed: '输出速度<br>(tokens/s)',
                 tableHeaderStatus: '状态',
+                tableHeaderDetail: '详情',
+                // 详情弹窗
+                detailBtnView: '查看详情',
+                detailModalTitle: '测试详情',
+                detailBtnClose: '关闭',
+                detailBtnCopy: '复制内容',
+                detailSectionBasic: '基本信息',
+                detailSectionPerformance: '性能指标',
+                detailSectionPrompt: '提示词内容',
+                detailSectionOutput: '输出内容',
+                detailSectionConcurrent: '并发详情',
+                detailSectionRequest: '请求信息',
+                detailSectionConfig: '请求配置',
+                detailPromptLength: '提示词长度:',
+                detailOutputLength: '输出长度:',
+                detailPrefillTime: '预填充耗时:',
+                detailPrefillSpeed: '预填充速度:',
+                detailOutputTime: '输出耗时:',
+                detailOutputSpeed: '输出速度:',
+                detailConcurrency: '并发数:',
+                detailStatus: '状态:',
+                detailRequestTime: '请求时间:',
+                detailTimestamp: '测试时间:',
+                detailApiType: 'API类型:',
+                detailModel: '模型:',
+                detailModelName: '模型名称:',
+                detailTemperature: 'Temperature:',
+                detailTopP: 'Top P:',
+                detailPromptContent: '完整提示词:',
+                detailOutputContent: '完整输出:',
+                detailReasoningContent: '思考内容',
+                detailCompletionContent: '答案内容',
+                detailNoData: '无数据',
+                detailConcurrentCount: '并发请求数:',
+                detailConcurrentItem: '请求',
+                detailServerTiming: '服务器处理时间:',
+                detailNetworkTime: '网络延迟:',
+                detailCopied: '内容已复制到剪贴板！',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1060,6 +1329,44 @@
                 tableHeaderOutputTime: 'Output Time<br>(ms)',
                 tableHeaderOutputSpeed: 'Output Speed<br>(tokens/s)',
                 tableHeaderStatus: 'Status',
+                tableHeaderDetail: 'Detail',
+                // Detail modal
+                detailBtnView: 'View Details',
+                detailModalTitle: 'Test Details',
+                detailBtnClose: 'Close',
+                detailBtnCopy: 'Copy Content',
+                detailSectionBasic: 'Basic Information',
+                detailSectionPerformance: 'Performance Metrics',
+                detailSectionPrompt: 'Prompt Content',
+                detailSectionOutput: 'Output Content',
+                detailSectionConcurrent: 'Concurrent Details',
+                detailSectionRequest: 'Request Information',
+                detailSectionConfig: 'Request Configuration',
+                detailPromptLength: 'Prompt Length:',
+                detailOutputLength: 'Output Length:',
+                detailPrefillTime: 'Prefill Time:',
+                detailPrefillSpeed: 'Prefill Speed:',
+                detailOutputTime: 'Output Time:',
+                detailOutputSpeed: 'Output Speed:',
+                detailConcurrency: 'Concurrency:',
+                detailStatus: 'Status:',
+                detailRequestTime: 'Request Time:',
+                detailTimestamp: 'Test Time:',
+                detailApiType: 'API Type:',
+                detailModel: 'Model:',
+                detailModelName: 'Model Name:',
+                detailTemperature: 'Temperature:',
+                detailTopP: 'Top P:',
+                detailPromptContent: 'Full Prompt:',
+                detailOutputContent: 'Full Output:',
+                detailReasoningContent: 'Reasoning Content',
+                detailCompletionContent: 'Completion Content',
+                detailNoData: 'No Data',
+                detailConcurrentCount: 'Concurrent Requests:',
+                detailConcurrentItem: 'Request',
+                detailServerTiming: 'Server Processing Time:',
+                detailNetworkTime: 'Network Latency:',
+                detailCopied: 'Content copied to clipboard!',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -1561,7 +1868,7 @@
                 const row = document.createElement('tr');
                 resultsDiv.querySelector('tbody').appendChild(row);
                 const cells = [];
-                for (let i = 0; i < 7; i++) {
+                for (let i = 0; i < 8; i++) {
                     const cell = document.createElement('td');
                     cells.push(cell);
                     row.appendChild(cell);
@@ -1574,6 +1881,7 @@
                 cells[4].textContent = translations[currentLang].msgTesting;
                 cells[5].textContent = translations[currentLang].msgTesting;
                 cells[6].textContent = `${concurrency} ${translations[currentLang].msgConcurrentTesting}`;
+                cells[7].textContent = '-'; // Placeholder for detail button
                 row.classList.add('info');
                 resultsDiv.scrollTop = resultsDiv.scrollHeight;
 
@@ -1586,7 +1894,12 @@
                     outputTimeMs: 'N/A',
                     outputSpeed: 'N/A',
                     status: translations[currentLang].statusFailed,
-                    concurrency: concurrency
+                    concurrency: concurrency,
+                    // Detail data
+                    promptText: '',
+                    outputText: '',
+                    requestConfig: {},
+                    timestamp: new Date().toISOString()
                 };
 
                 // 暖机请求 (可选, 保留)
@@ -1617,10 +1930,13 @@
 
 
                 const measurementPromises = [];
+                let firstPrompt = ''; // 保存第一个请求的prompt用于详情展示
 
                 for (let i = 0; i < concurrency; i++) {
                     //  传入seed确保每个并发请求的prompt都不同，避免prefix cache命中
                     const prompt = generatePrompt(length, 'openai', i + 1);
+                    if (i === 0) firstPrompt = prompt; // 保存第一个prompt
+
                     const requestBody = {
                         "model": modelName,
                         "messages": [
@@ -1705,7 +2021,22 @@
                             outputTokens: res.outputTokens,
                             outputTimeMs: res.outputTimeMs,
                             outputSpeed: res.outputSpeed
-                        }))
+                        })),
+                        // 详情数据：保存第一个请求的prompt和output
+                        promptText: firstPrompt,
+                        outputText: concurrencyResults[0]?.outputContent || '',
+                        reasoningText: concurrencyResults[0]?.reasoningContent || '',
+                        completionText: concurrencyResults[0]?.completionContent || '',
+                        requestConfig: {
+                            apiType: 'OpenAI Compatible',
+                            model: modelName,
+                            maxTokens: outputLength,
+                            temperature: temperature,
+                            topP: top_p,
+                            presencePenalty: presence_penalty,
+                            frequencyPenalty: frequency_penalty
+                        },
+                        timestamp: new Date().toISOString()
                     };
 
                     cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
@@ -1716,6 +2047,15 @@
                     cells[5].textContent = resultEntry.outputSpeed;
                     // 显示部分成功
                     cells[6].textContent = `${concurrencyResults.length}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
+
+                    // 添加详情按钮
+                    cells[7].textContent = ''; // 清空占位符
+                    const detailButton = document.createElement('button');
+                    detailButton.className = 'detail-button';
+                    detailButton.textContent = translations[currentLang].detailBtnView;
+                    detailButton.onclick = () => showTestDetail(resultEntry);
+                    cells[7].appendChild(detailButton);
+
                     row.classList.remove('info');
                     row.classList.add('success');
 
@@ -1964,7 +2304,10 @@
                     outputTokens: receivedTokens,
                     outputTimeMs,
                     outputSpeed,
-                    actualPromptTokens  //  返回实际的prompt token数
+                    actualPromptTokens,  //  返回实际的prompt token数
+                    outputContent: outputContent + reasoningContent,  // 完整输出内容（思考+答案）
+                    reasoningContent: reasoningContent,  // 单独的思考内容
+                    completionContent: outputContent  // 单独的答案内容
                 };
             } catch (error) {
                 console.error(`[Error] executeAndMeasureRequest异常:`, error);
@@ -2117,7 +2460,7 @@
                 const row = document.createElement('tr');
                 resultsDiv.querySelector('tbody').appendChild(row);
                 const cells = [];
-                for (let i = 0; i < 7; i++) {
+                for (let i = 0; i < 8; i++) {
                     const cell = document.createElement('td');
                     cells.push(cell);
                     row.appendChild(cell);
@@ -2130,6 +2473,7 @@
                 cells[4].textContent = translations[currentLang].msgTesting;
                 cells[5].textContent = translations[currentLang].msgTesting;
                 cells[6].textContent = `${concurrency} ${translations[currentLang].msgConcurrentTesting}`;
+                cells[7].textContent = '-'; // Placeholder for detail button
                 row.classList.add('info');
                 resultsDiv.scrollTop = resultsDiv.scrollHeight;
 
@@ -2142,7 +2486,12 @@
                     outputTimeMs: 'N/A',
                     outputSpeed: 'N/A',
                     status: translations[currentLang].statusFailed,
-                    concurrency: concurrency
+                    concurrency: concurrency,
+                    // Detail data
+                    promptText: '',
+                    outputText: '',
+                    requestConfig: {},
+                    timestamp: new Date().toISOString()
                 };
 
                 // 暖机
@@ -2169,9 +2518,12 @@
                 }
 
                 const requests = [];
+                let firstPrompt = ''; // 保存第一个请求的prompt用于详情展示
 
                 for (let i = 0; i < concurrency; i++) {
                     const prompt = generatePrompt(length, 'ollama', i + 1);
+                    if (i === 0) firstPrompt = prompt; // 保存第一个prompt
+
                     const requestBody = {
                         "model": modelName,
                         "messages": [
@@ -2274,7 +2626,21 @@
                             outputTokens: res.outputTokens,
                             outputTimeMs: res.outputTimeMs,
                             outputSpeed: res.outputSpeed
-                        }))
+                        })),
+                        // 详情数据：保存第一个请求的prompt和output
+                        promptText: firstPrompt,
+                        outputText: concurrencyResults[0]?.outputContent || '',
+                        reasoningText: concurrencyResults[0]?.reasoningContent || '',
+                        completionText: concurrencyResults[0]?.completionContent || '',
+                        requestConfig: {
+                            apiType: 'Ollama',
+                            model: modelName,
+                            numPredict: outputLength,
+                            temperature: temperature,
+                            topP: top_p,
+                            repeatPenalty: 1.1
+                        },
+                        timestamp: new Date().toISOString()
                     };
 
                     cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
@@ -2284,6 +2650,15 @@
                     cells[4].textContent = resultEntry.outputTimeMs;
                     cells[5].textContent = resultEntry.outputSpeed;
                     cells[6].textContent = `${concurrencyResults.length}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
+
+                    // 添加详情按钮
+                    cells[7].textContent = ''; // 清空占位符
+                    const detailButton = document.createElement('button');
+                    detailButton.className = 'detail-button';
+                    detailButton.textContent = translations[currentLang].detailBtnView;
+                    detailButton.onclick = () => showTestDetail(resultEntry);
+                    cells[7].appendChild(detailButton);
+
                     row.classList.remove('info');
                     row.classList.add('success');
 
@@ -2347,14 +2722,203 @@
             const prefillSpeed = (actualPromptTokens / (prefillDurationMs / 1000));
             const outputSpeed = actualOutputTokens > 0 ? (actualOutputTokens / (outputDurationMs / 1000)) : 0;
 
+            // 提取输出内容
+            const outputText = data.message?.content || '';
+
             return {
                 prefillTimeMs: prefillDurationMs,
                 prefillSpeed: prefillSpeed,
                 outputTokens: actualOutputTokens,
                 outputTimeMs: outputDurationMs,
                 outputSpeed: outputSpeed,
-                actualPromptTokens: actualPromptTokens  //  返回实际的prompt token数
+                actualPromptTokens: actualPromptTokens,  //  返回实际的prompt token数
+                outputContent: outputText,  // 完整输出内容
+                reasoningContent: '',  // Ollama目前不单独区分思考内容
+                completionContent: outputText  // 答案内容
             };
+        }
+
+        // 显示测试详情弹窗
+        function showTestDetail(testData) {
+            const t = translations[currentLang];
+
+            // 禁止页面滚动
+            document.body.style.overflow = 'hidden';
+
+            // 创建遮罩层
+            const overlay = document.createElement('div');
+            overlay.className = 'detail-overlay';
+
+            // 创建对话框
+            const dialog = document.createElement('div');
+            dialog.className = 'detail-dialog';
+
+            // 构建详情内容
+            let detailHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${t.detailModalTitle}</div>
+                    <button type="button" class="detail-close-button">${t.detailBtnClose}</button>
+                </div>
+                <div class="detail-body">
+                    <!-- 基本信息 -->
+                    <div class="detail-section">
+                        <div class="detail-section-title">${t.detailSectionBasic}</div>
+                        <div class="detail-info-grid">
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailApiType}:</span>
+                                <span class="detail-value">${testData.requestConfig?.apiType || 'N/A'}</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailModel}:</span>
+                                <span class="detail-value">${testData.requestConfig?.model || 'N/A'}</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailPromptLength}:</span>
+                                <span class="detail-value">${testData.promptLength} tokens</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailOutputLength}:</span>
+                                <span class="detail-value">${testData.outputTokens} tokens</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailConcurrency}:</span>
+                                <span class="detail-value">${testData.concurrency}</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.detailTimestamp}:</span>
+                                <span class="detail-value">${new Date(testData.timestamp).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 性能指标 -->
+                    <div class="detail-section">
+                        <div class="detail-section-title">${t.detailSectionPerformance}</div>
+                        <div class="detail-info-grid">
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.tableHeaderPrefillTime}:</span>
+                                <span class="detail-value">${testData.prefillTimeMs} ms</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.tableHeaderPrefillSpeed}:</span>
+                                <span class="detail-value">${testData.prefillSpeed} tokens/s</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.tableHeaderOutputTime}:</span>
+                                <span class="detail-value">${testData.outputTimeMs} ms</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.tableHeaderOutputSpeed}:</span>
+                                <span class="detail-value">${testData.outputSpeed} tokens/s</span>
+                            </div>
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.tableHeaderStatus}:</span>
+                                <span class="detail-value">${testData.status}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 请求配置 -->
+                    <div class="detail-section">
+                        <div class="detail-section-title">${t.detailSectionConfig}</div>
+                        <div class="detail-info-grid">
+                            ${testData.requestConfig?.temperature !== undefined ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">Temperature:</span>
+                                <span class="detail-value">${testData.requestConfig.temperature}</span>
+                            </div>` : ''}
+                            ${testData.requestConfig?.topP !== undefined ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">Top P:</span>
+                                <span class="detail-value">${testData.requestConfig.topP}</span>
+                            </div>` : ''}
+                            ${testData.requestConfig?.maxTokens !== undefined ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">Max Tokens:</span>
+                                <span class="detail-value">${testData.requestConfig.maxTokens}</span>
+                            </div>` : ''}
+                            ${testData.requestConfig?.numPredict !== undefined ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">Num Predict:</span>
+                                <span class="detail-value">${testData.requestConfig.numPredict}</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- 提示词内容 -->
+                    <div class="detail-section">
+                        <div class="detail-section-title">${t.detailSectionPrompt}</div>
+                        <div class="detail-content-block detail-prompt-content">
+                            <pre>${testData.promptText || t.detailNoData}</pre>
+                        </div>
+                        <button class="detail-copy-button" data-content="${testData.promptText?.replace(/"/g, '&quot;') || ''}">${t.detailBtnCopy}</button>
+                    </div>
+
+                    <!-- 输出内容 -->
+                    <div class="detail-section">
+                        <div class="detail-section-title">${t.detailSectionOutput}</div>
+                        ${testData.reasoningText ? `
+                        <div class="detail-subsection-title">${t.detailReasoningContent}:</div>
+                        <div class="detail-content-block detail-reasoning-content">
+                            <pre>${testData.reasoningText}</pre>
+                        </div>
+                        ` : ''}
+                        ${testData.completionText ? `
+                        <div class="detail-subsection-title">${t.detailCompletionContent}:</div>
+                        <div class="detail-content-block detail-output-content">
+                            <pre>${testData.completionText}</pre>
+                        </div>
+                        ` : ''}
+                        ${!testData.reasoningText && !testData.completionText && testData.outputText ? `
+                        <div class="detail-content-block detail-output-content">
+                            <pre>${testData.outputText}</pre>
+                        </div>
+                        ` : ''}
+                        ${!testData.outputText && !testData.reasoningText && !testData.completionText ? `
+                        <div class="detail-content-block">
+                            <pre>${t.detailNoData}</pre>
+                        </div>
+                        ` : ''}
+                        <button class="detail-copy-button" data-content="${(testData.outputText || testData.completionText || '').replace(/"/g, '&quot;')}">${t.detailBtnCopy}</button>
+                    </div>
+                </div>
+            `;
+
+            dialog.innerHTML = detailHTML;
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            // 关闭按钮事件
+            const closeBtn = dialog.querySelector('.detail-close-button');
+            closeBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.style.overflow = '';
+            };
+
+            // 点击遮罩层关闭
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    document.body.removeChild(overlay);
+                    document.body.style.overflow = '';
+                }
+            };
+
+            // 复制按钮事件
+            const copyButtons = dialog.querySelectorAll('.detail-copy-button');
+            copyButtons.forEach(btn => {
+                btn.onclick = () => {
+                    const content = btn.getAttribute('data-content');
+                    if (content) {
+                        navigator.clipboard.writeText(content).then(() => {
+                            const originalText = btn.textContent;
+                            btn.textContent = t.detailCopied || 'Copied!';
+                            setTimeout(() => {
+                                btn.textContent = originalText;
+                            }, 2000);
+                        });
+                    }
+                };
+            });
         }
 
         startTestBtn.addEventListener('click', async () => {
@@ -2466,7 +3030,8 @@
                 t.tableHeaderOutputLen,
                 t.tableHeaderOutputTime,
                 t.tableHeaderOutputSpeed,
-                t.tableHeaderStatus
+                t.tableHeaderStatus,
+                t.tableHeaderDetail
             ].forEach(text => {
                 const th = document.createElement('th');
                 th.innerHTML = text;
@@ -2495,7 +3060,7 @@
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
                 const errorRow = document.createElement('tr');
-                errorRow.innerHTML = `<td colspan="7" class="error">${t.msgTestUnexpectedTermination} ${e.message}</td>`;
+                errorRow.innerHTML = `<td colspan="8" class="error">${t.msgTestUnexpectedTermination} ${e.message}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(errorRow);
             }
 
@@ -2536,11 +3101,11 @@
             // 根据测试是否被手动停止来显示不同的最终消息
             if (wasManuallyStopped) {
                  const stopRow = document.createElement('tr');
-                stopRow.innerHTML = `<td colspan="7" class="info">${t.msgTestStopped}</td>`;
+                stopRow.innerHTML = `<td colspan="8" class="info">${t.msgTestStopped}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(stopRow);
             } else if (!testResultsData.some(r => r.status === t.statusSuccess)) {
                  const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="7" class="info">${t.msgTestCompleteNoData}</td>`;
+                noDataRow.innerHTML = `<td colspan="8" class="info">${t.msgTestCompleteNoData}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(noDataRow);
             }
 
