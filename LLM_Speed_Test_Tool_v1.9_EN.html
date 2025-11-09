@@ -1,21 +1,32 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v1.8 (chao魔改版):
-    可以在下面的github地址获取最新版的更新
+<html lang="en">
+<!-- Original Author: 纸鸢随风 (Bilibili), DeepSeek-R1-0528-->
+<!-- v1.9 (chao modded version):
+    Get the latest updates from:
     https://github.com/gengchaogit/llm_speedtest
-    1. (v1.8) 添加图表导出按钮
-    2. (v1.8) 添加多个CSV结果导入对比功能
-    3. (v1.8) 合并图表导出：将Prefill和Decode图表一键导出为一张图片
-    4. (v1.8) 对比标签：使用CSV文件名作为对比图表的图例标签
-    5. (v1.8) 对比导出：为对比图表也增加一键导出功能，并自动生成包含参数的文件名
-    6. (v1.8) 【重要修复】支持思考模型：解析usage字段获取准确token统计（reasoning_tokens + completion_tokens）
-    7. (v1.8) 添加token估算fallback：当API不返回usage时使用字符估算
-    8. (v1.8) 【关键修复】Prefill速度计算错误：现在使用API返回的实际prompt_tokens而非估算值（修复了约10%误差）
-    9. (v1.8) 【兼容性修复】支持多种流式响应格式：delta.reasoning_content（思考）/ delta.content / message.content / text
-    10. (v1.8) 自动保存/恢复所有配置参数：API地址、模型、温度、并发数等所有参数，下次打开自动恢复
-    11. (v1.8) 【思考模型修复】正确计算reasoning+completion总tokens：当usage不准时使用内容估算，确保decode速度准确
-    12. (v1.8) 【性能测量优化】优先使用服务器返回的真实GPU处理时间（prompt_eval_duration/eval_duration），消除网络延迟影响
+    1. (v1.9) [History Management] Auto-save test results to localStorage (up to 20 records)
+    2. (v1.9) [History Panel] Beautiful modal interface to view all historical tests
+    3. (v1.9) [Detail View] View complete configuration, statistics, and test results
+    4. (v1.9) [Individual Export] Export history records as CSV files
+    5. (v1.9) [Record Management] Delete individual records or clear all
+    6. (v1.9) [History Comparison] Select multiple history records and generate comparison charts
+    7. (v1.9) [Data Persistence] All history records saved in localStorage
+    8. (v1.9) [Full Bilingual] All history features fully support Chinese/English switching
+-->
+
+<!-- v1.8 (chao modded version):
+    1. (v1.8) Add chart export button
+    2. (v1.8) Add multiple CSV import for comparison
+    3. (v1.8) Combined chart export: Export Prefill and Decode charts as one image
+    4. (v1.8) Comparison labels: Use CSV filenames as legend labels
+    5. (v1.8) Comparison export: Export comparison charts with auto-generated filenames
+    6. (v1.8) [Important Fix] Support reasoning models: Parse usage field for accurate token stats
+    7. (v1.8) Add token estimation fallback: Use character estimation when API doesn't return usage
+    8. (v1.8) [Critical Fix] Prefill speed calculation error: Use actual prompt_tokens from API
+    9. (v1.8) [Compatibility Fix] Support multiple streaming response formats
+    10. (v1.8) Auto-save/restore all config parameters
+    11. (v1.8) [Reasoning Model Fix] Correctly calculate reasoning+completion total tokens
+    12. (v1.8) [Performance Optimization] Prioritize server-returned real GPU processing time
 -->
 
 <!-- v1.7 (chao基于原版魔改版-qq群:1028429001):
@@ -31,7 +42,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v1.8</title>
+    <title>Local LLM Inference Speed Test Tool v1.9</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
@@ -1129,7 +1140,7 @@
         };
 
         // 当前语言
-        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        let currentLang = localStorage.getItem('llmPerfTestLang') || 'en';
 
         // 切换语言函数
         function switchLanguage(lang) {

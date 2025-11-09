@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v1.8 (chao魔改版):
+<!-- v1.9 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
+    1. (v1.9) 【历史记录管理】测试完成后自动保存到localStorage（最多20条）
+    2. (v1.9) 【历史面板】美观的模态框界面，查看所有历史测试
+    3. (v1.9) 【详情查看】查看历史记录的完整配置、统计数据和测试结果
+    4. (v1.9) 【单个导出】将历史记录导出为CSV文件
+    5. (v1.9) 【记录管理】删除单条记录或清空全部
+    6. (v1.9) 【历史对比】勾选多条历史记录，一键生成对比图表
+    7. (v1.9) 【数据持久化】所有历史记录保存在localStorage，无需担心数据丢失
+    8. (v1.9) 【完整双语】所有历史记录功能完全支持中英文切换
+-->
+
+<!-- v1.8 (chao魔改版):
     1. (v1.8) 添加图表导出按钮
     2. (v1.8) 添加多个CSV结果导入对比功能
     3. (v1.8) 合并图表导出：将Prefill和Decode图表一键导出为一张图片
@@ -31,7 +42,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v1.8</title>
+    <title>本地大模型推理速度测试工具 v1.9</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
@@ -1129,7 +1140,7 @@
         };
 
         // 当前语言
-        let currentLang = localStorage.getItem('llmPerfTestLang') || 'en';
+        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
 
         // 切换语言函数
         function switchLanguage(lang) {

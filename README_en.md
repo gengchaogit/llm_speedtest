@@ -1,6 +1,6 @@
-# 🚀 Local LLM Inference Speed Test Tool v1.8 (Chao Modded Version)
+# 🚀 Local LLM Inference Speed Test Tool v1.9 (Chao Modded Version)
 
-![Version](https://img.shields.io/badge/version-1.8-blue.svg)
+![Version](https://img.shields.io/badge/version-1.9-blue.svg)
 
 ---
 
@@ -18,11 +18,26 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 
 <!-- Please note, the following changelog starts from v1.7. -->
 
+### v1.9 (Chao Enhanced Modded Version - History Feature)
+*   **📚 Automatic History Saving**: Test results automatically saved to browser localStorage (up to 20 records)
+*   **🗂️ History Management Panel**: Beautiful new history modal with easy-to-use interface
+    *   View test time, notes, configuration, and performance statistics at a glance
+    *   View complete test details (configuration, statistics, full result table)
+    *   Export individual history records as CSV
+    *   Delete individual records or clear all
+*   **📊 History Comparison Feature**: Select multiple history records and generate comparison charts with one click
+    *   Quick checkbox selection for multiple test records
+    *   Real-time display of selected count
+    *   Auto-scroll to comparison chart area
+    *   Fully compatible with CSV import feature
+*   **💾 Data Persistence**: All history records saved in localStorage, no data loss
+*   **🎨 Full Bilingual Support**: All history features fully support Chinese/English switching
+
 ### v1.8 (Chao Enhanced Modded Version)
 *   **🌐 Bilingual Support (Chinese/English)**: Added full bilingual support with a prominent language toggle button. The interface automatically switches between Chinese and English, with the selected language saved to localStorage.
 *   **📁 Dual Language File Versions**:
-    *   `本地大模型推理速度测试工具v1.8.html` - Chinese version (default Chinese UI)
-    *   `LLM_Speed_Test_Tool_v1.8_EN.html` - English version (default English UI)
+    *   `本地大模型推理速度测试工具v1.9.html` - Chinese version (default Chinese UI)
+    *   `LLM_Speed_Test_Tool_v1.9_EN.html` - English version (default English UI)
 *   **Export Charts Button**: Added a one-click button to export the current Prefill and Decode charts as a single image.
 *   **Import Multiple CSV Results for Comparison**: New feature allowing the import of multiple historical test CSV files for comparative analysis in the charts.
 *   **Combined Chart Export**: Export both Prefill and Decode charts as a single image for easy sharing and record-keeping.
@@ -55,12 +70,19 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 *   **Supports Multiple API Types**:
     *   **OpenAI Compatible API**: Works with all LLM services compatible with the OpenAI API, such as vLLM, TGI, FastChat, etc.
     *   **Ollama API**: Directly utilizes performance metrics provided by Ollama, simplifying testing.
-*   **Detailed Performance Metrics**: Measures prompt length, prefill duration, prefill speed, output token count, output duration, and output speed.
+*   **Detailed Performance Metrics**: Measures prompt length, prefill duration, prefill speed, output token count, output duration, and output speed, including P50/P90/P95 percentile statistics.
 *   **Concurrent Testing**: Supports setting the number of concurrent requests to simulate high-load scenarios.
 *   **Request Retry Mechanism**: Each request includes 3 retries (1.5-second intervals) to effectively filter out transient/occasional network or server failures.
 *   **Request Timeout Control**: Implemented with AbortController to prevent long waits for unresponsive requests.
 *   **Real-time Progress Bar & Result Display**: Visualizes test progress and updates results in real-time.
 *   **Automatic Chart Generation**: Automatically generates and updates Prefill and Decode throughput charts during testing, visually showing performance trends.
+*   **📚 History Management** (v1.9 New):
+    *   **Auto-save**: Test results automatically saved to localStorage (up to 20 records)
+    *   **History Panel**: Beautiful modal interface to view all historical tests
+    *   **Detail View**: View complete configuration, statistics, and test results for history records
+    *   **Individual Export**: Export history records as CSV files
+    *   **Record Management**: Delete individual records or clear all
+    *   **Comparison**: Select multiple history records and generate comparison charts with one click
 *   **Automatic Configuration Saving**: Automatically saves the current API address, model name, and API type to browser `localStorage`, loading them automatically next time.
 *   **Result Export**: Supports copying test results as a Markdown table or exporting them as a CSV file.
 *   **Chart Export**: Supports one-click export of generated Prefill and Decode throughput charts as an image.
@@ -79,8 +101,8 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 ### 1. Local Run
 
 1.  **Choose your preferred version**:
-    *   For English interface by default: Download `LLM_Speed_Test_Tool_v1.8_EN.html`
-    *   For Chinese interface by default: Download `本地大模型推理速度测试工具v1.8.html`
+    *   For English interface by default: Download `LLM_Speed_Test_Tool_v1.9_EN.html`
+    *   For Chinese interface by default: Download `本地大模型推理速度测试工具v1.9.html`
 2.  Open the HTML file with any modern browser (e.g., Chrome, Firefox, Edge). No additional installation or server is required.
 3.  **Language Toggle**: Click the language toggle button (with purple gradient) in the top-right corner to switch between English and Chinese at any time. Your preference is saved automatically.
 
@@ -145,6 +167,29 @@ Click the `Import CSV File` button, select one or more previously exported CSV f
 ### 10. Export Comparison Charts
 
 After importing CSV files and plotting comparison charts, click the `Export Comparison Charts` button above the charts to export the combined Prefill and Decode throughput charts, including all comparison data, as a single PNG image. The filename will automatically include current test parameters and imported filenames for easier management.
+
+### 11. View History Records (v1.9 New)
+
+Click the `📚 View History` button to open the history management panel. History records are automatically saved after each test completion (up to 20 records).
+
+In the history panel, you can:
+*   **View List**: Browse summary information of all historical tests (time, notes, model, configuration, performance statistics)
+*   **View Details**: Click the `View Details` button to see complete configuration, statistics, and test result table for a record
+*   **Export CSV**: Click the `Export CSV` button to export that history record as a CSV file
+*   **Delete Record**: Click the `Delete` button to remove unwanted history records
+*   **Clear All**: Click the `Clear All` button to remove all history records with one click
+
+### 12. History Comparison (v1.9 New)
+
+In the history panel, you can select multiple history records for comparison:
+
+1.  Check the records you want to compare in the history list (checkboxes on the left)
+2.  The top will show "Selected X records" in real-time
+3.  Click the `Generate Comparison Charts` button
+4.  The history panel automatically closes and the page scrolls to the comparison chart area
+5.  View Prefill and Decode performance comparison curves for multiple history records
+
+**Tip**: The history comparison feature is fully compatible with the CSV import feature, allowing you to use both methods for comparative analysis.
 
 ## Configuration Details
 
