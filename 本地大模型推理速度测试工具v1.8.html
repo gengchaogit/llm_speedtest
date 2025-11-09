@@ -656,7 +656,25 @@
                 alertMarkdownCopied: 'Markdown表格已复制到剪贴板！',
                 alertNoTestResults: '请先至少运行一次"开始测试"，以便将当前结果包含在对比中。',
                 btnTextStart: '开始测试',
-                btnTextStop: '停止'
+                btnTextStop: '停止',
+                // 测试状态
+                statusSuccess: '成功',
+                statusFailed: '失败',
+                statusStopping: '停止中...',
+                msgConcurrentSuccess: '并发成功',
+                msgTestStopped: '测试已手动停止。',
+                msgTestCompleteNoData: '测试完成，但没有收集到成功的数据。',
+                msgAllRequestsFailed: '所有并发请求失败',
+                msgParseFileFailed: '解析文件',
+                msgFailed2: '失败:',
+                // 测试进行中的状态
+                msgTesting: '测试中...',
+                msgConcurrentTesting: '并发测试中...',
+                msgTestUnexpectedTermination: '测试意外终止:',
+                // 备注信息
+                labelNotesPrefix: '备注：',
+                labelConcurrencyPrefix: '并发数:',
+                labelTimeoutPrefix: '超时:'
             },
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v1.8 (chao mod - charts + bugfix + autosave)',
@@ -741,7 +759,25 @@
                 alertMarkdownCopied: 'Markdown table copied to clipboard!',
                 alertNoTestResults: 'Please run "Start Test" at least once to include current results in comparison.',
                 btnTextStart: 'Start Test',
-                btnTextStop: 'Stop'
+                btnTextStop: 'Stop',
+                // Test status
+                statusSuccess: 'Success',
+                statusFailed: 'Failed',
+                statusStopping: 'Stopping...',
+                msgConcurrentSuccess: 'concurrent success',
+                msgTestStopped: 'Test manually stopped.',
+                msgTestCompleteNoData: 'Test completed, but no successful data collected.',
+                msgAllRequestsFailed: 'All concurrent requests failed',
+                msgParseFileFailed: 'Failed to parse file',
+                msgFailed2: 'failed:',
+                // Testing status
+                msgTesting: 'Testing...',
+                msgConcurrentTesting: 'concurrent testing...',
+                msgTestUnexpectedTermination: 'Test unexpectedly terminated:',
+                // Notes info
+                labelNotesPrefix: 'Notes:',
+                labelConcurrencyPrefix: 'Concurrency:',
+                labelTimeoutPrefix: 'Timeout:'
             }
         };
 
@@ -1066,12 +1102,12 @@
                 }
 
                 cells[0].textContent = length;
-                cells[1].textContent = "测试中...";
-                cells[2].textContent = "测试中...";
-                cells[3].textContent = "测试中...";
-                cells[4].textContent = "测试中...";
-                cells[5].textContent = "测试中...";
-                cells[6].textContent = `${concurrency}并发测试中...`;
+                cells[1].textContent = translations[currentLang].msgTesting;
+                cells[2].textContent = translations[currentLang].msgTesting;
+                cells[3].textContent = translations[currentLang].msgTesting;
+                cells[4].textContent = translations[currentLang].msgTesting;
+                cells[5].textContent = translations[currentLang].msgTesting;
+                cells[6].textContent = `${concurrency} ${translations[currentLang].msgConcurrentTesting}`;
                 row.classList.add('info');
                 resultsDiv.scrollTop = resultsDiv.scrollHeight;
 
@@ -1082,7 +1118,7 @@
                     outputTokens: 'N/A',
                     outputTimeMs: 'N/A',
                     outputSpeed: 'N/A',
-                    status: '失败',
+                    status: translations[currentLang].statusFailed,
                     concurrency: concurrency
                 };
 
@@ -1193,7 +1229,7 @@
                         outputTokens: avgOutputTokens.toFixed(0),
                         outputTimeMs: avgOutputTimeMs.toFixed(2),
                         outputSpeed: totalOutputSpeed.toFixed(2),
-                        status: '成功',
+                        status: translations[currentLang].statusSuccess,
                         concurrency: concurrency
                     };
 
@@ -1204,14 +1240,14 @@
                     cells[4].textContent = resultEntry.outputTimeMs;
                     cells[5].textContent = resultEntry.outputSpeed;
                     // 显示部分成功
-                    cells[6].textContent = `${concurrencyResults.length}/${concurrency}并发成功`;
+                    cells[6].textContent = `${concurrencyResults.length}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
                     row.classList.remove('info');
                     row.classList.add('success');
 
                 } catch (error) {
                     // F12控制台错误日志
                     console.error(`[Test] 提示词长度 ${length} 测试失败:`, error);
-                    resultEntry.status = `失败 (${error.message})`;
+                    resultEntry.status = `${translations[currentLang].statusFailed} (${error.message})`;
                     cells[1].textContent = 'N/A';
                     cells[2].textContent = 'N/A';
                     cells[3].textContent = 'N/A';
@@ -1470,12 +1506,12 @@
 
             // 重新从 testResultsData 计算平均值，确保准确性
             const allPrefillSpeeds = testResultsData
-                .filter(r => r.status === '成功' && r.prefillSpeed !== 'N/A')
+                .filter(r => (r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess) && r.prefillSpeed !== 'N/A')
                 .map(r => parseFloat(r.prefillSpeed));
             if (prefillSpeed) allPrefillSpeeds.push(prefillSpeed); // 包括当前批次的
 
             const allOutputSpeeds = testResultsData
-                .filter(r => r.status === '成功' && r.outputSpeed !== 'N/A')
+                .filter(r => (r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess) && r.outputSpeed !== 'N/A')
                 .map(r => parseFloat(r.outputSpeed));
             if (outputSpeed) allOutputSpeeds.push(outputSpeed); // 包括当前批次的
 
@@ -1542,12 +1578,12 @@
                 }
 
                 cells[0].textContent = length;
-                cells[1].textContent = "测试中...";
-                cells[2].textContent = "测试中...";
-                cells[3].textContent = "测试中...";
-                cells[4].textContent = "测试中...";
-                cells[5].textContent = "测试中...";
-                cells[6].textContent = `${concurrency}并发测试中...`;
+                cells[1].textContent = translations[currentLang].msgTesting;
+                cells[2].textContent = translations[currentLang].msgTesting;
+                cells[3].textContent = translations[currentLang].msgTesting;
+                cells[4].textContent = translations[currentLang].msgTesting;
+                cells[5].textContent = translations[currentLang].msgTesting;
+                cells[6].textContent = `${concurrency} ${translations[currentLang].msgConcurrentTesting}`;
                 row.classList.add('info');
                 resultsDiv.scrollTop = resultsDiv.scrollHeight;
 
@@ -1558,7 +1594,7 @@
                     outputTokens: 'N/A',
                     outputTimeMs: 'N/A',
                     outputSpeed: 'N/A',
-                    status: '失败',
+                    status: translations[currentLang].statusFailed,
                     concurrency: concurrency
                 };
 
@@ -1647,7 +1683,7 @@
                     }
 
                     if (concurrencyResults.length === 0) {
-                         throw new Error(`所有并发请求失败: ${failedMessages.join(', ')}`);
+                         throw new Error(`${translations[currentLang].msgAllRequestsFailed}: ${failedMessages.join(', ')}`);
                     }
 
                     const avgPrefillTimeMs = concurrencyResults.reduce((sum, res) => sum + res.prefillTimeMs, 0) / concurrencyResults.length;
@@ -1682,7 +1718,7 @@
                         outputTokens: avgOutputTokens.toFixed(0),
                         outputTimeMs: avgOutputTimeMs.toFixed(2),
                         outputSpeed: totalOutputSpeed.toFixed(2),
-                        status: '成功',
+                        status: translations[currentLang].statusSuccess,
                         concurrency: concurrency
                     };
 
@@ -1692,14 +1728,14 @@
                     cells[3].textContent = resultEntry.outputTokens;
                     cells[4].textContent = resultEntry.outputTimeMs;
                     cells[5].textContent = resultEntry.outputSpeed;
-                    cells[6].textContent = `${concurrencyResults.length}/${concurrency}并发成功`;
+                    cells[6].textContent = `${concurrencyResults.length}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
                     row.classList.remove('info');
                     row.classList.add('success');
 
                 } catch (error) {
                     // F12控制台错误日志
                     console.error(`[Test] 提示词长度 ${length} 测试失败:`, error);
-                    resultEntry.status = `失败 (${error.message})`;
+                    resultEntry.status = `${translations[currentLang].statusFailed} (${error.message})`;
                     cells[1].textContent = 'N/A';
                     cells[2].textContent = 'N/A';
                     cells[3].textContent = 'N/A';
@@ -1838,7 +1874,7 @@
             };
 
             startTestBtn.disabled = true;
-            startTestBtn.textContent = "测试中...";
+            startTestBtn.textContent = translations[currentLang].msgTesting;
             copyMarkdownBtn.style.display = 'none';
             exportCSVBtn.style.display = 'none';
             exportCombinedChartBtn.style.display = 'none'; // v1.8
@@ -1853,9 +1889,11 @@
             prefillChartInstance = null;
             outputChartInstance = null;
 
+            const t = translations[currentLang];
+
             const notesMessage = document.createElement('p');
             notesMessage.className = 'notes';
-            notesMessage.textContent = `备注：${notes} | 并发数: ${concurrency} | 超时: ${timeout/1000}s`;
+            notesMessage.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${concurrency} | ${t.labelTimeoutPrefix} ${timeout/1000}s`;
             resultsDiv.appendChild(notesMessage);
 
             const table = document.createElement('table');
@@ -1866,7 +1904,6 @@
             resultsDiv.appendChild(table);
 
             const headerRow = document.createElement('tr');
-            const t = translations[currentLang];
             [
                 t.tableHeaderPromptLen,
                 t.tableHeaderPrefillTime,
@@ -1891,7 +1928,7 @@
             stopTestBtn.onclick = () => {
                 isTestingRunning = false;
                 stopTestBtn.disabled = true;
-                stopTestBtn.textContent = "停止中...";
+                stopTestBtn.textContent = translations[currentLang].statusStopping;
             };
 
             try {
@@ -1903,7 +1940,7 @@
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
                 const errorRow = document.createElement('tr');
-                errorRow.innerHTML = `<td colspan="7" class="error">测试意外终止: ${e.message}</td>`;
+                errorRow.innerHTML = `<td colspan="7" class="error">${t.msgTestUnexpectedTermination} ${e.message}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(errorRow);
             }
 
@@ -1911,7 +1948,7 @@
             const wasManuallyStopped = !isTestingRunning;
 
             // 无论测试是完成还是被手动停止，只要有数据就显示统计
-            if (testResultsData.some(r => r.status === '成功')) {
+            if (testResultsData.some(r => r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess)) {
                 showConcurrencyStats();
                 // generateCharts(); //
             }
@@ -1919,11 +1956,11 @@
             // 根据测试是否被手动停止来显示不同的最终消息
             if (wasManuallyStopped) {
                  const stopRow = document.createElement('tr');
-                stopRow.innerHTML = `<td colspan="7" class="info">测试已手动停止。</td>`;
+                stopRow.innerHTML = `<td colspan="7" class="info">${t.msgTestStopped}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(stopRow);
-            } else if (!testResultsData.some(r => r.status === '成功')) {
+            } else if (!testResultsData.some(r => r.status === t.statusSuccess)) {
                  const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="7" class="info">测试完成，但没有收集到成功的数据。</td>`;
+                noDataRow.innerHTML = `<td colspan="7" class="info">${t.msgTestCompleteNoData}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(noDataRow);
             }
 
@@ -2107,8 +2144,8 @@
 
                     comparisonData.push(formatDataForComparison(parsedData.results, label));
                 } catch (error) {
-                    console.error(`解析文件 ${file.name} 失败:`, error);
-                    alert(`解析文件 ${file.name} 失败: ${error.message}`);
+                    console.error(`${translations[currentLang].msgParseFileFailed} ${file.name} ${translations[currentLang].msgFailed2}`, error);
+                    alert(`${translations[currentLang].msgParseFileFailed} ${file.name} ${translations[currentLang].msgFailed2} ${error.message}`);
                 }
             }
 
