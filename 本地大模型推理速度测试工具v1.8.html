@@ -463,8 +463,38 @@
 
         .history-actions {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 15px;
+        }
+
+        .history-actions-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .history-btn-primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .history-btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .history-btn-primary:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .history-btn-danger {
@@ -508,12 +538,31 @@
             margin-bottom: 15px;
             border-radius: 5px;
             transition: all 0.3s;
+            display: flex;
+            gap: 15px;
         }
 
         .history-record:hover {
             background: #e9ecef;
             transform: translateX(5px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .history-record-checkbox {
+            flex-shrink: 0;
+            display: flex;
+            align-items: flex-start;
+            padding-top: 5px;
+        }
+
+        .history-record-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .history-record-content {
+            flex: 1;
         }
 
         .history-record-header {
@@ -785,6 +834,10 @@
                 <div class="history-modal-body">
                     <div id="historyListView">
                         <div class="history-actions">
+                            <div class="history-actions-left">
+                                <button id="generateHistoryComparison" class="history-btn-primary" disabled>生成对比图表</button>
+                                <span id="selectedCount" style="color: #666; font-size: 14px;">已选择 0 条</span>
+                            </div>
                             <button id="clearAllHistory" class="history-btn-danger">清空全部</button>
                         </div>
                         <div id="historyList"></div>
@@ -931,7 +984,12 @@
                 historyViewTitle: '历史记录详情',
                 historyBtnClose: '关闭',
                 historyBtnBack: '返回列表',
-                historySaved: '✓ 测试结果已自动保存到历史记录'
+                historySaved: '✓ 测试结果已自动保存到历史记录',
+                historyBtnCompare: '生成对比图表',
+                historySelectedCount: '已选择',
+                historySelectedCountSuffix: '条',
+                historyCompareSuccess: '对比图表已生成！请向下滚动查看。',
+                historySelectAtLeastOne: '请至少选择一条历史记录进行对比'
             },
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v1.8 (chao mod - charts + bugfix + autosave)',
@@ -1061,7 +1119,12 @@
                 historyViewTitle: 'History Record Details',
                 historyBtnClose: 'Close',
                 historyBtnBack: 'Back to List',
-                historySaved: '✓ Test results automatically saved to history'
+                historySaved: '✓ Test results automatically saved to history',
+                historyBtnCompare: 'Generate Comparison Charts',
+                historySelectedCount: 'Selected',
+                historySelectedCountSuffix: 'records',
+                historyCompareSuccess: 'Comparison charts generated! Please scroll down to view.',
+                historySelectAtLeastOne: 'Please select at least one history record for comparison'
             }
         };
 
@@ -3073,12 +3136,15 @@
             // 更新模态框标题和按钮文本
             document.getElementById('historyModalTitle').textContent = t.historyModalTitle;
             clearAllHistoryBtn.textContent = t.historyBtnClearAll;
+            document.getElementById('generateHistoryComparison').textContent = t.historyBtnCompare;
+            updateSelectedCount(); // 更新选择计数
 
             historyListView.style.display = 'block';
             historyDetailView.style.display = 'none';
 
             if (history.length === 0) {
                 historyList.innerHTML = `<div class="history-empty">${t.historyEmpty}</div>`;
+                document.getElementById('generateHistoryComparison').disabled = true;
                 return;
             }
 
@@ -3090,19 +3156,24 @@
                 const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
 
                 recordDiv.innerHTML = `
-                    <div class="history-record-header">
-                        <div class="history-record-time">${record.timestamp}</div>
+                    <div class="history-record-checkbox">
+                        <input type="checkbox" class="history-checkbox" data-id="${record.id}" />
                     </div>
-                    <div class="history-record-info">
-                        <div><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</div>
-                        <div><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</div>
-                        <div><strong>${t.historyRecordConcurrency}</strong> ${record.config.concurrency} | <strong>${t.historyRecordPromptRange}</strong> ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}) | <strong>${t.historyRecordOutputLen}</strong> ${record.config.outputLength}</div>
-                        <div><strong>Stats:</strong> Prefill P50/P90/P95: ${record.stats.prefill.p50}/${record.stats.prefill.p90}/${record.stats.prefill.p95} | Decode P50/P90/P95: ${record.stats.decode.p50}/${record.stats.decode.p90}/${record.stats.decode.p95} tokens/s</div>
-                    </div>
-                    <div class="history-record-actions">
-                        <button class="history-record-btn history-record-btn-view" data-id="${record.id}">${t.historyBtnView}</button>
-                        <button class="history-record-btn history-record-btn-export" data-id="${record.id}">${t.historyBtnExport}</button>
-                        <button class="history-record-btn history-record-btn-delete" data-id="${record.id}">${t.historyBtnDelete}</button>
+                    <div class="history-record-content">
+                        <div class="history-record-header">
+                            <div class="history-record-time">${record.timestamp}</div>
+                        </div>
+                        <div class="history-record-info">
+                            <div><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</div>
+                            <div><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</div>
+                            <div><strong>${t.historyRecordConcurrency}</strong> ${record.config.concurrency} | <strong>${t.historyRecordPromptRange}</strong> ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}) | <strong>${t.historyRecordOutputLen}</strong> ${record.config.outputLength}</div>
+                            <div><strong>Stats:</strong> Prefill P50/P90/P95: ${record.stats.prefill.p50}/${record.stats.prefill.p90}/${record.stats.prefill.p95} | Decode P50/P90/P95: ${record.stats.decode.p50}/${record.stats.decode.p90}/${record.stats.decode.p95} tokens/s</div>
+                        </div>
+                        <div class="history-record-actions">
+                            <button class="history-record-btn history-record-btn-view" data-id="${record.id}">${t.historyBtnView}</button>
+                            <button class="history-record-btn history-record-btn-export" data-id="${record.id}">${t.historyBtnExport}</button>
+                            <button class="history-record-btn history-record-btn-delete" data-id="${record.id}">${t.historyBtnDelete}</button>
+                        </div>
                     </div>
                 `;
 
@@ -3129,6 +3200,11 @@
                     const recordId = parseInt(e.target.dataset.id);
                     deleteHistoryWithConfirm(recordId);
                 });
+            });
+
+            // 绑定复选框事件
+            document.querySelectorAll('.history-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelectedCount);
             });
         }
 
@@ -3292,11 +3368,76 @@
             }
         }
 
+        /**
+         * 更新选择计数显示
+         */
+        function updateSelectedCount() {
+            const t = translations[currentLang];
+            const checkboxes = document.querySelectorAll('.history-checkbox:checked');
+            const count = checkboxes.length;
+            const selectedCountSpan = document.getElementById('selectedCount');
+            const compareBtn = document.getElementById('generateHistoryComparison');
+
+            if (selectedCountSpan) {
+                selectedCountSpan.textContent = `${t.historySelectedCount} ${count} ${t.historySelectedCountSuffix}`;
+            }
+
+            if (compareBtn) {
+                compareBtn.disabled = count === 0;
+            }
+        }
+
+        /**
+         * 从勾选的历史记录生成对比图表
+         */
+        function generateHistoryComparisonCharts() {
+            const t = translations[currentLang];
+            const checkboxes = document.querySelectorAll('.history-checkbox:checked');
+
+            if (checkboxes.length === 0) {
+                alert(t.historySelectAtLeastOne);
+                return;
+            }
+
+            const history = loadHistoryFromStorage();
+            comparisonData = []; // 重置对比数据
+
+            // 获取勾选的记录ID
+            const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+
+            // 为每个选中的历史记录生成对比数据
+            selectedIds.forEach(id => {
+                const record = history.find(r => r.id === id);
+                if (record) {
+                    const label = `${record.config.modelName} - ${record.timestamp} (并发 ${record.config.concurrency})`;
+                    comparisonData.push(formatDataForComparison(record.results, label));
+                }
+            });
+
+            // 生成对比图表
+            if (comparisonData.length > 0) {
+                generateComparisonCharts();
+
+                // 关闭模态框并滚动到对比图表
+                closeHistoryModal();
+
+                // 延迟一下让模态框关闭动画完成
+                setTimeout(() => {
+                    const comparisonContainer = document.getElementById('comparisonChartContainer');
+                    if (comparisonContainer) {
+                        comparisonContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        alert(t.historyCompareSuccess);
+                    }
+                }, 300);
+            }
+        }
+
         // 事件监听器
         viewHistoryBtn.addEventListener('click', openHistoryModal);
         historyModalClose.addEventListener('click', closeHistoryModal);
         backToHistoryListBtn.addEventListener('click', showHistoryList);
         clearAllHistoryBtn.addEventListener('click', clearAllHistoryWithConfirm);
+        document.getElementById('generateHistoryComparison').addEventListener('click', generateHistoryComparisonCharts);
 
         // 点击模态框外部关闭
         window.addEventListener('click', (event) => {
