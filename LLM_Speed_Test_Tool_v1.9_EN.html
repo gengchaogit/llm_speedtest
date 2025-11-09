@@ -635,6 +635,17 @@
             box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
         }
 
+        .history-record-btn-load {
+            background: #9b59b6;
+            color: white;
+        }
+
+        .history-record-btn-load:hover {
+            background: #8e44ad;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(155, 89, 182, 0.3);
+        }
+
         .history-record-btn-export {
             background: #27ae60;
             color: white;
@@ -1256,6 +1267,7 @@
                 historyRecordPromptRange: '提示词范围:',
                 historyRecordOutputLen: '输出长度:',
                 historyBtnView: '查看详情',
+                historyBtnLoad: '加载',
                 historyBtnExport: '导出CSV',
                 historyBtnDelete: '删除',
                 historyBtnClearAll: '清空全部',
@@ -1429,6 +1441,7 @@
                 historyRecordPromptRange: 'Prompt Range:',
                 historyRecordOutputLen: 'Output Length:',
                 historyBtnView: 'View Details',
+                historyBtnLoad: 'Load',
                 historyBtnExport: 'Export CSV',
                 historyBtnDelete: 'Delete',
                 historyBtnClearAll: 'Clear All',
@@ -3747,6 +3760,7 @@
                         </div>
                         <div class="history-record-actions">
                             <button class="history-record-btn history-record-btn-view" data-id="${record.id}">${t.historyBtnView}</button>
+                            <button class="history-record-btn history-record-btn-load" data-id="${record.id}">${t.historyBtnLoad}</button>
                             <button class="history-record-btn history-record-btn-export" data-id="${record.id}">${t.historyBtnExport}</button>
                             <button class="history-record-btn history-record-btn-delete" data-id="${record.id}">${t.historyBtnDelete}</button>
                         </div>
@@ -3761,6 +3775,13 @@
                 btn.addEventListener('click', (e) => {
                     const recordId = parseInt(e.target.dataset.id);
                     viewHistoryDetail(recordId);
+                });
+            });
+
+            document.querySelectorAll('.history-record-btn-load').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const recordId = parseInt(e.target.dataset.id);
+                    loadHistoryRecord(recordId);
                 });
             });
 
@@ -3876,6 +3897,110 @@
             `;
 
             detailContent.innerHTML = html;
+        }
+
+        /**
+         * 加载历史记录到主界面
+         */
+        function loadHistoryRecord(recordId) {
+            const t = translations[currentLang];
+            const history = loadHistoryFromStorage();
+            const record = history.find(r => r.id === recordId);
+
+            if (!record) {
+                alert(t.historyRecordNotFound || '历史记录未找到');
+                return;
+            }
+
+            // 清空当前数据
+            testResultsData = [];
+
+            // 加载历史记录的结果数据
+            testResultsData = [...record.results];
+
+            // 清空并重新创建结果表格
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            // 创建备注信息
+            const notesMessage = document.createElement('p');
+            notesMessage.className = 'notes';
+            notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.concurrency} | ${t.labelTimeoutPrefix} ${record.timeout/1000}s`;
+            resultsDiv.appendChild(notesMessage);
+
+            // 创建表格
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            resultsDiv.appendChild(table);
+
+            // 创建表头
+            const headerRow = document.createElement('tr');
+            [
+                t.tableHeaderPromptLen,
+                t.tableHeaderPrefillTime,
+                t.tableHeaderPrefillSpeed,
+                t.tableHeaderOutputLen,
+                t.tableHeaderOutputTime,
+                t.tableHeaderOutputSpeed,
+                t.tableHeaderStatus,
+                t.tableHeaderDetail
+            ].forEach(text => {
+                const th = document.createElement('th');
+                th.innerHTML = text;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            // 渲染每一行数据
+            testResultsData.forEach(resultEntry => {
+                const row = document.createElement('tr');
+                const cells = [];
+                for (let i = 0; i < 8; i++) {
+                    const cell = document.createElement('td');
+                    cells.push(cell);
+                    row.appendChild(cell);
+                }
+
+                cells[0].textContent = resultEntry.promptLength;
+                cells[1].textContent = resultEntry.prefillTimeMs;
+                cells[2].textContent = resultEntry.prefillSpeed;
+                cells[3].textContent = resultEntry.outputTokens;
+                cells[4].textContent = resultEntry.outputTimeMs;
+                cells[5].textContent = resultEntry.outputSpeed;
+                cells[6].textContent = resultEntry.status;
+
+                // 添加详情按钮（如果有详情数据）
+                if (resultEntry.promptText || resultEntry.outputText) {
+                    const detailButton = document.createElement('button');
+                    detailButton.className = 'detail-button';
+                    detailButton.textContent = t.detailBtnView;
+                    detailButton.onclick = () => showTestDetail(resultEntry);
+                    cells[7].appendChild(detailButton);
+                } else {
+                    cells[7].textContent = '-';
+                }
+
+                // 根据状态设置行样式
+                if (resultEntry.status === t.statusSuccess || resultEntry.status.includes('成功') || resultEntry.status.includes('Success')) {
+                    row.classList.add('success');
+                } else {
+                    row.classList.add('error');
+                }
+
+                tbody.appendChild(row);
+            });
+
+            // 更新图表
+            generateCharts();
+
+            // 关闭历史记录面板
+            closeHistoryModal();
+
+            // 滚动到结果区域
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         /**
