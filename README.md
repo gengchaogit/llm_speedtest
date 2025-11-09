@@ -2,6 +2,12 @@
 
 ![Version](https://img.shields.io/badge/version-1.8-blue.svg)
 
+---
+
+🇬🇧 [**View in English (查看英文版)**](README_en.md) | 🇨🇳 [**查看中文版**](#)
+
+---
+
 ## 简介
 
 本项目是一个功能强大的浏览器端本地大模型推理性能测试工具，旨在帮助用户快速、便捷地测试本地部署的各种大模型推理服务的 Prefill（预填充）和 Decode（解码/输出）性能。它通过浏览器本地离线运行，无需服务器端部署，确保了数据的隐私性和测试的便捷性。
@@ -12,13 +18,19 @@
 
 <!-- 请注意，以下更新日志从v1.7开始列出。 -->
 
-### v1.8 (chao魔改版)
-
+### v1.8 (Chao 魔改增强版)
 *   **图表导出按钮**：添加一键导出按钮，方便将当前 Prefill 和 Decode 图表导出为一张图片。
 *   **多个CSV结果导入对比**：新增功能，允许导入多个历史测试的 CSV 文件，在图表中进行对比分析。
 *   **合并图表导出**：将 Prefill 和 Decode 图表一键导出为一张图片，方便分享和记录。
 *   **对比标签**：导入 CSV 文件后，使用 CSV 文件名作为对比图表的图例标签，更易于区分不同测试结果。
 *   **对比导出**：为对比图表也增加一键导出功能，并自动生成包含参数的文件名，便于管理。
+*   **【重要修复】支持思考模型**：解析 usage 字段获取准确 token 统计（reasoning_tokens + completion_tokens）。
+*   **添加token估算fallback**：当API不返回usage时使用字符估算。
+*   **【关键修复】Prefill速度计算错误**：现在使用API返回的实际prompt_tokens而非估算值（修复了约10%误差）。
+*   **【兼容性修复】支持多种流式响应格式**：delta.reasoning_content（思考）/ delta.content / message.content / text。
+*   **自动保存/恢复所有配置参数**：API地址、模型、温度、并发数等所有参数，下次打开自动恢复。
+*   **【思考模型修复】正确计算reasoning+completion总tokens**：当usage不准时使用内容估算，确保decode速度准确。
+*   **【性能测量优化】优先使用服务器返回的真实GPU处理时间**：(prompt_eval_duration/eval_duration），消除网络延迟影响。
 
 ### v1.7 (chao魔改版)
 
@@ -136,7 +148,7 @@
     *   **OpenAI 兼容**：你的服务所使用的模型 ID 或名称，例如 `qwen-7b-chat`，`mistral-7b-instruct`。
     *   **Ollama**：你在 Ollama 中拉取的模型名称，例如 `llama2`，`qwen`。
 *   **API-Key (`apiKey`)**：如果你的大模型服务设置了 API Key 认证，请在此处填写。否则可以留空。
-*   **备注 (`notes`)**：用于记录每次测试的环境信息，例如 `GeForce RTX 4090, vLLM 0.3.0, Qwen-7B-Chat-AWQ`。
+*   **备注 (`notes`)：** 用于记录每次测试的环境信息，例如 `GeForce RTX 4090, vLLM 0.3.0, Qwen-7B-Chat-AWQ`。
 *   **最小/最大提示词长度 (`minLength`, `maxLength`)**：定义测试的提示词 token 长度区间。
 *   **步长 (`step`)**：每次测试时提示词长度递增的数量。例如，`minLength=128, maxLength=1024, step=128` 会测试 128, 256, 384...1024 token 的提示词。
 *   **期望输出长度 (`outputLength`)**：模型每次请求预计生成的 token 数量。
@@ -173,10 +185,9 @@
 
 ---
 
-**原作者：纸鸢随风（B站）、DeepSeek-R1-0528
-基于原始作者的最新版改动，可查看
-https://www.bilibili.com/opus/1078272739661316119
-**
+**原作者：纸鸢随风（B站）、DeepSeek-R1-0528**
+**基于原始作者的最新版改动，可查看**
+**https://www.bilibili.com/opus/1078272739661316119**
 
 **魔改版维护者：chao (QQ群: 1028429001)**
 **最新版获取地址：https://github.com/gengchaogit/llm_speedtest**
