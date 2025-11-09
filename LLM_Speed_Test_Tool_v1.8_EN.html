@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v1.8 (chao魔改版):
-    可以在下面的github地址获取最新版的更新
+<html lang="en">
+<!-- Original Author: 纸鸢随风 (Bilibili) & DeepSeek-R1-0528-->
+<!-- v1.8 (chao's mod):
+    Get the latest updates from GitHub:
     https://github.com/gengchaogit/llm_speedtest
     1. (v1.8) 添加图表导出按钮
     2. (v1.8) 添加多个CSV结果导入对比功能
@@ -31,7 +31,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v1.8</title>
+    <title>LLM Inference Speed Test Tool v1.8</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
@@ -745,8 +745,8 @@
             }
         };
 
-        // 当前语言
-        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        // Current language (default: English)
+        let currentLang = localStorage.getItem('llmPerfTestLang') || 'en';
 
         // 切换语言函数
         function switchLanguage(lang) {

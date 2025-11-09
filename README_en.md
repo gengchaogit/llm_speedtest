@@ -19,6 +19,10 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 <!-- Please note, the following changelog starts from v1.7. -->
 
 ### v1.8 (Chao Enhanced Modded Version)
+*   **🌐 Bilingual Support (Chinese/English)**: Added full bilingual support with a prominent language toggle button. The interface automatically switches between Chinese and English, with the selected language saved to localStorage.
+*   **📁 Dual Language File Versions**:
+    *   `本地大模型推理速度测试工具v1.8.html` - Chinese version (default Chinese UI)
+    *   `LLM_Speed_Test_Tool_v1.8_EN.html` - English version (default English UI)
 *   **Export Charts Button**: Added a one-click button to export the current Prefill and Decode charts as a single image.
 *   **Import Multiple CSV Results for Comparison**: New feature allowing the import of multiple historical test CSV files for comparative analysis in the charts.
 *   **Combined Chart Export**: Export both Prefill and Decode charts as a single image for easy sharing and record-keeping.
@@ -31,6 +35,7 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 *   **Auto-save/Restore All Configuration Parameters**: API address, model, temperature, concurrency, and all other parameters are automatically saved and restored on next open.
 *   **【Reasoning Model Fix】Correctly Calculates Total Reasoning+Completion Tokens**: Uses content estimation when `usage` is inaccurate to ensure accurate decode speed.
 *   **【Performance Measurement Optimization】Prioritizes Server-Returned Real GPU Processing Time**: (`prompt_eval_duration`/`eval_duration`) to eliminate network latency impact.
+*   **【Prefix Cache Fix】Unique Prompts for Concurrent Tests**: Each concurrent request now gets a unique prompt prefix to prevent vLLM's prefix cache from artificially inflating performance metrics.
 
 ### v1.7 (Chao Modded Version)
 
@@ -45,6 +50,7 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 
 ## Features
 
+*   **🌐 Full Bilingual Support**: Complete Chinese/English interface with instant language switching. Language preference is automatically saved.
 *   **Browser-Side Local Execution**: Completely offline, data stays local, ensuring privacy and security.
 *   **Supports Multiple API Types**:
     *   **OpenAI Compatible API**: Works with all LLM services compatible with the OpenAI API, such as vLLM, TGI, FastChat, etc.
@@ -72,8 +78,11 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 
 ### 1. Local Run
 
-1.  Save the `index.html` file to your local computer.
-2.  Open the `index.html` file with any modern browser (e.g., Chrome, Firefox, Edge). No additional installation or server is required.
+1.  **Choose your preferred version**:
+    *   For English interface by default: Download `LLM_Speed_Test_Tool_v1.8_EN.html`
+    *   For Chinese interface by default: Download `本地大模型推理速度测试工具v1.8.html`
+2.  Open the HTML file with any modern browser (e.g., Chrome, Firefox, Edge). No additional installation or server is required.
+3.  **Language Toggle**: Click the language toggle button (with purple gradient) in the top-right corner to switch between English and Chinese at any time. Your preference is saved automatically.
 
 ### 2. Configure Parameters
 
