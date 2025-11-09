@@ -388,6 +388,212 @@
             color: #98c379;
         }
 
+        /* v1.9: 历史记录模态框样式 */
+        .history-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .history-modal-content {
+            background-color: #fefefe;
+            margin: 3% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1000px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .history-modal-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-modal-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+
+        .history-modal-close {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .history-modal-close:hover {
+            color: #ffeb3b;
+        }
+
+        .history-modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .history-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .history-btn-danger {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .history-btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+        }
+
+        .history-btn-back {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .history-btn-back:hover {
+            background: #7f8c8d;
+            transform: translateX(-3px);
+        }
+
+        .history-record {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .history-record:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .history-record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .history-record-time {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .history-record-info {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .history-record-info div {
+            margin-bottom: 5px;
+        }
+
+        .history-record-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .history-record-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .history-record-btn-view {
+            background: #3498db;
+            color: white;
+        }
+
+        .history-record-btn-view:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .history-record-btn-export {
+            background: #27ae60;
+            color: white;
+        }
+
+        .history-record-btn-export:hover {
+            background: #229954;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+        }
+
+        .history-record-btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .history-record-btn-delete:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+            font-size: 1.2em;
+        }
+
         #chartContainer {
             margin-top: 30px;
             background: #fff;
@@ -523,6 +729,8 @@
             <button id="exportCSV" style="display: none; background: #4eb8a6;">导出 CSV 数据</button>
             <!-- v1.8: 合并图表导出 -->
             <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
+            <!-- v1.9: 历史记录 -->
+            <button id="viewHistory" style="background: #9b59b6;">📚 查看历史记录</button>
         </div>
         <div class="progress-container">
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
@@ -566,6 +774,28 @@
 
 
         <textarea id="markdownOutputHidden"></textarea>
+
+        <!-- v1.9: 历史记录模态框 -->
+        <div id="historyModal" class="history-modal" style="display: none;">
+            <div class="history-modal-content">
+                <div class="history-modal-header">
+                    <h2 id="historyModalTitle">测试历史记录</h2>
+                    <span class="history-modal-close">&times;</span>
+                </div>
+                <div class="history-modal-body">
+                    <div id="historyListView">
+                        <div class="history-actions">
+                            <button id="clearAllHistory" class="history-btn-danger">清空全部</button>
+                        </div>
+                        <div id="historyList"></div>
+                    </div>
+                    <div id="historyDetailView" style="display: none;">
+                        <button id="backToHistoryList" class="history-btn-back">← 返回列表</button>
+                        <div id="historyDetailContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -679,7 +909,29 @@
                 // 备注信息
                 labelNotesPrefix: '备注：',
                 labelConcurrencyPrefix: '并发数:',
-                labelTimeoutPrefix: '超时:'
+                labelTimeoutPrefix: '超时:',
+                // v1.9: 历史记录功能
+                historyTitle: '📚 历史记录',
+                historyBtn: '查看历史记录',
+                historyModalTitle: '测试历史记录',
+                historyEmpty: '暂无历史记录',
+                historyRecordTime: '测试时间:',
+                historyRecordNotes: '备注:',
+                historyRecordConfig: '配置:',
+                historyRecordModel: '模型:',
+                historyRecordConcurrency: '并发:',
+                historyRecordPromptRange: '提示词范围:',
+                historyRecordOutputLen: '输出长度:',
+                historyBtnView: '查看详情',
+                historyBtnExport: '导出CSV',
+                historyBtnDelete: '删除',
+                historyBtnClearAll: '清空全部',
+                historyConfirmClear: '确定要清空所有历史记录吗？',
+                historyConfirmDelete: '确定要删除这条历史记录吗？',
+                historyViewTitle: '历史记录详情',
+                historyBtnClose: '关闭',
+                historyBtnBack: '返回列表',
+                historySaved: '✓ 测试结果已自动保存到历史记录'
             },
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v1.8 (chao mod - charts + bugfix + autosave)',
@@ -787,7 +1039,29 @@
                 // Notes info
                 labelNotesPrefix: 'Notes:',
                 labelConcurrencyPrefix: 'Concurrency:',
-                labelTimeoutPrefix: 'Timeout:'
+                labelTimeoutPrefix: 'Timeout:',
+                // v1.9: History feature
+                historyTitle: '📚 History',
+                historyBtn: 'View History',
+                historyModalTitle: 'Test History',
+                historyEmpty: 'No history records',
+                historyRecordTime: 'Time:',
+                historyRecordNotes: 'Notes:',
+                historyRecordConfig: 'Config:',
+                historyRecordModel: 'Model:',
+                historyRecordConcurrency: 'Concurrency:',
+                historyRecordPromptRange: 'Prompt Range:',
+                historyRecordOutputLen: 'Output Length:',
+                historyBtnView: 'View Details',
+                historyBtnExport: 'Export CSV',
+                historyBtnDelete: 'Delete',
+                historyBtnClearAll: 'Clear All',
+                historyConfirmClear: 'Are you sure you want to clear all history records?',
+                historyConfirmDelete: 'Are you sure you want to delete this record?',
+                historyViewTitle: 'History Record Details',
+                historyBtnClose: 'Close',
+                historyBtnBack: 'Back to List',
+                historySaved: '✓ Test results automatically saved to history'
             }
         };
 
@@ -1030,6 +1304,114 @@
             avgPrefillSpeed: 0,
             avgOutputSpeed: 0
         };
+
+        // ===============================================================================
+        // 历史记录功能 (History Feature) - v1.9
+        // ===============================================================================
+        const HISTORY_STORAGE_KEY = 'llmPerfTestHistory';
+        const MAX_HISTORY_RECORDS = 20; // 最多保存20条历史记录
+
+        /**
+         * 保存当前测试结果到历史记录
+         */
+        function saveTestToHistory(config, results, stats) {
+            try {
+                const history = loadHistoryFromStorage();
+
+                const historyRecord = {
+                    id: Date.now(),
+                    timestamp: new Date().toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    }),
+                    notes: config.notes || '',
+                    config: {
+                        apiUrl: config.apiUrl,
+                        modelName: config.modelName,
+                        apiType: config.apiType,
+                        minLength: config.minLength,
+                        maxLength: config.maxLength,
+                        step: config.step,
+                        outputLength: config.outputLength,
+                        concurrency: config.concurrency,
+                        temperature: config.temperature,
+                        topP: config.topP,
+                        presencePenalty: config.presencePenalty,
+                        frequencyPenalty: config.frequencyPenalty,
+                        timeout: config.timeout
+                    },
+                    results: results, // 完整的 testResultsData（包括并发详情）
+                    stats: stats // 统计信息（min/max/avg/P50/P90/P95）
+                };
+
+                // 添加到历史记录数组开头（最新的在最前面）
+                history.unshift(historyRecord);
+
+                // 限制历史记录数量
+                if (history.length > MAX_HISTORY_RECORDS) {
+                    history.splice(MAX_HISTORY_RECORDS);
+                }
+
+                // 保存到 localStorage
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+                console.log('[历史记录] 已保存测试结果，当前历史记录数:', history.length);
+
+                return true;
+            } catch (e) {
+                console.error('[历史记录] 保存失败:', e);
+                return false;
+            }
+        }
+
+        /**
+         * 从 localStorage 加载历史记录
+         */
+        function loadHistoryFromStorage() {
+            try {
+                const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY);
+                if (!historyJson) return [];
+
+                const history = JSON.parse(historyJson);
+                return Array.isArray(history) ? history : [];
+            } catch (e) {
+                console.error('[历史记录] 加载失败:', e);
+                return [];
+            }
+        }
+
+        /**
+         * 删除指定的历史记录
+         */
+        function deleteHistoryRecord(recordId) {
+            try {
+                const history = loadHistoryFromStorage();
+                const filteredHistory = history.filter(record => record.id !== recordId);
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(filteredHistory));
+                console.log('[历史记录] 已删除记录 ID:', recordId);
+                return true;
+            } catch (e) {
+                console.error('[历史记录] 删除失败:', e);
+                return false;
+            }
+        }
+
+        /**
+         * 清空所有历史记录
+         */
+        function clearAllHistory() {
+            try {
+                localStorage.removeItem(HISTORY_STORAGE_KEY);
+                console.log('[历史记录] 已清空所有历史记录');
+                return true;
+            } catch (e) {
+                console.error('[历史记录] 清空失败:', e);
+                return false;
+            }
+        }
 
         // 带重试的 fetch 辅助函数
         /**
@@ -1628,6 +2010,26 @@
                 </div>
             `;
             resultsDiv.appendChild(statsDiv);
+
+            // 返回统计数据（用于保存历史记录）
+            return {
+                prefill: {
+                    min: minP,
+                    max: maxP,
+                    avg: avgP,
+                    p50: prefillP50,
+                    p90: prefillP90,
+                    p95: prefillP95
+                },
+                decode: {
+                    min: minO,
+                    max: maxO,
+                    avg: avgO,
+                    p50: decodeP50,
+                    p90: decodeP90,
+                    p95: decodeP95
+                }
+            };
         }
 
         // 【修复】测试Ollama接口
@@ -2027,9 +2429,34 @@
             const wasManuallyStopped = !isTestingRunning;
 
             // 无论测试是完成还是被手动停止，只要有数据就显示统计
+            let statsData = null;
             if (testResultsData.some(r => r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess)) {
-                showConcurrencyStats();
+                statsData = showConcurrencyStats();
                 // generateCharts(); //
+
+                // v1.9: 保存历史记录
+                if (statsData && !wasManuallyStopped) {
+                    const currentConfig = {
+                        apiUrl: apiUrl,
+                        modelName: currentModelName,
+                        apiType: currentApiType,
+                        minLength: minLength,
+                        maxLength: maxLength,
+                        step: step,
+                        outputLength: outputLength,
+                        concurrency: concurrency,
+                        temperature: temperature,
+                        topP: top_p,
+                        presencePenalty: presence_penalty,
+                        frequencyPenalty: frequency_penalty,
+                        timeout: timeout,
+                        notes: notes
+                    };
+                    const saved = saveTestToHistory(currentConfig, testResultsData, statsData);
+                    if (saved) {
+                        console.log('[历史记录] 测试结果已自动保存');
+                    }
+                }
             }
 
             // 根据测试是否被手动停止来显示不同的最终消息
@@ -2606,8 +3033,294 @@
             }
         }
 
-        // 
-        window.onload = function () { setDefaultValues(); };
+        // ===============================================================================
+        // v1.9: 历史记录UI功能 (History UI Functions)
+        // ===============================================================================
+
+        const historyModal = document.getElementById('historyModal');
+        const historyModalClose = document.querySelector('.history-modal-close');
+        const viewHistoryBtn = document.getElementById('viewHistory');
+        const historyListView = document.getElementById('historyListView');
+        const historyDetailView = document.getElementById('historyDetailView');
+        const backToHistoryListBtn = document.getElementById('backToHistoryList');
+        const clearAllHistoryBtn = document.getElementById('clearAllHistory');
+
+        /**
+         * 打开历史记录模态框
+         */
+        function openHistoryModal() {
+            historyModal.style.display = 'block';
+            showHistoryList();
+        }
+
+        /**
+         * 关闭历史记录模态框
+         */
+        function closeHistoryModal() {
+            historyModal.style.display = 'none';
+            historyListView.style.display = 'block';
+            historyDetailView.style.display = 'none';
+        }
+
+        /**
+         * 显示历史记录列表
+         */
+        function showHistoryList() {
+            const t = translations[currentLang];
+            const history = loadHistoryFromStorage();
+            const historyList = document.getElementById('historyList');
+
+            // 更新模态框标题和按钮文本
+            document.getElementById('historyModalTitle').textContent = t.historyModalTitle;
+            clearAllHistoryBtn.textContent = t.historyBtnClearAll;
+
+            historyListView.style.display = 'block';
+            historyDetailView.style.display = 'none';
+
+            if (history.length === 0) {
+                historyList.innerHTML = `<div class="history-empty">${t.historyEmpty}</div>`;
+                return;
+            }
+
+            historyList.innerHTML = '';
+            history.forEach(record => {
+                const recordDiv = document.createElement('div');
+                recordDiv.className = 'history-record';
+
+                const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+
+                recordDiv.innerHTML = `
+                    <div class="history-record-header">
+                        <div class="history-record-time">${record.timestamp}</div>
+                    </div>
+                    <div class="history-record-info">
+                        <div><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</div>
+                        <div><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</div>
+                        <div><strong>${t.historyRecordConcurrency}</strong> ${record.config.concurrency} | <strong>${t.historyRecordPromptRange}</strong> ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}) | <strong>${t.historyRecordOutputLen}</strong> ${record.config.outputLength}</div>
+                        <div><strong>Stats:</strong> Prefill P50/P90/P95: ${record.stats.prefill.p50}/${record.stats.prefill.p90}/${record.stats.prefill.p95} | Decode P50/P90/P95: ${record.stats.decode.p50}/${record.stats.decode.p90}/${record.stats.decode.p95} tokens/s</div>
+                    </div>
+                    <div class="history-record-actions">
+                        <button class="history-record-btn history-record-btn-view" data-id="${record.id}">${t.historyBtnView}</button>
+                        <button class="history-record-btn history-record-btn-export" data-id="${record.id}">${t.historyBtnExport}</button>
+                        <button class="history-record-btn history-record-btn-delete" data-id="${record.id}">${t.historyBtnDelete}</button>
+                    </div>
+                `;
+
+                historyList.appendChild(recordDiv);
+            });
+
+            // 绑定按钮事件
+            document.querySelectorAll('.history-record-btn-view').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const recordId = parseInt(e.target.dataset.id);
+                    viewHistoryDetail(recordId);
+                });
+            });
+
+            document.querySelectorAll('.history-record-btn-export').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const recordId = parseInt(e.target.dataset.id);
+                    exportHistoryToCSV(recordId);
+                });
+            });
+
+            document.querySelectorAll('.history-record-btn-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const recordId = parseInt(e.target.dataset.id);
+                    deleteHistoryWithConfirm(recordId);
+                });
+            });
+        }
+
+        /**
+         * 查看历史记录详情
+         */
+        function viewHistoryDetail(recordId) {
+            const t = translations[currentLang];
+            const history = loadHistoryFromStorage();
+            const record = history.find(r => r.id === recordId);
+
+            if (!record) {
+                alert('历史记录未找到');
+                return;
+            }
+
+            historyListView.style.display = 'none';
+            historyDetailView.style.display = 'block';
+
+            // 更新返回按钮文本
+            backToHistoryListBtn.textContent = t.historyBtnBack;
+
+            const detailContent = document.getElementById('historyDetailContent');
+            const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+
+            // 创建详情HTML
+            let html = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <h3>${t.historyViewTitle}</h3>
+                    <p><strong>${t.historyRecordTime}</strong> ${record.timestamp}</p>
+                    <p><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</p>
+                    <p><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</p>
+                    <p><strong>${t.historyRecordConfig}</strong></p>
+                    <ul>
+                        <li>API URL: ${record.config.apiUrl}</li>
+                        <li>${t.historyRecordConcurrency} ${record.config.concurrency}</li>
+                        <li>${t.historyRecordPromptRange} ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step})</li>
+                        <li>${t.historyRecordOutputLen} ${record.config.outputLength}</li>
+                        <li>Temperature: ${record.config.temperature}, Top P: ${record.config.topP}</li>
+                        <li>Timeout: ${record.config.timeout}ms</li>
+                    </ul>
+                </div>
+
+                <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
+                    <h4 style="color: #61afef; margin-bottom: 10px;">${t.concurrentStatsTitle}</h4>
+                    <p><strong>${t.statTotalPrefillRange}</strong> ${record.stats.prefill.min} - ${record.stats.prefill.max} tokens/s</p>
+                    <p><strong>${t.statTotalDecodeRange}</strong> ${record.stats.decode.min} - ${record.stats.decode.max} tokens/s</p>
+                    <p><strong>${t.statAvgPrefill}</strong> ${record.stats.prefill.avg} tokens/s</p>
+                    <p><strong>${t.statAvgDecode}</strong> ${record.stats.decode.avg} tokens/s</p>
+                    <hr style="margin: 10px 0; border: none; border-top: 1px solid #555;">
+                    <h4 style="color: #61afef; margin: 10px 0;">${t.statPercentileTitle}</h4>
+                    <p><strong>${t.statPrefillPercentile}</strong> P50: ${record.stats.prefill.p50} | P90: ${record.stats.prefill.p90} | P95: ${record.stats.prefill.p95} tokens/s</p>
+                    <p><strong>${t.statDecodePercentile}</strong> P50: ${record.stats.decode.p50} | P90: ${record.stats.decode.p90} | P95: ${record.stats.decode.p95} tokens/s</p>
+                </div>
+
+                <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                    <h4>${t.mdTestResults}</h4>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <thead style="background: #2c3e50; color: white;">
+                                <tr>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPromptLen.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPrefillTime.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPrefillSpeed.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputLen.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputTime.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputSpeed.replace('<br>', ' ')}</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderStatus}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            record.results.forEach(res => {
+                html += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.promptLength}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.prefillTimeMs}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.prefillSpeed}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputTokens}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputTimeMs}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputSpeed}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.status}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            detailContent.innerHTML = html;
+        }
+
+        /**
+         * 导出历史记录为CSV
+         */
+        function exportHistoryToCSV(recordId) {
+            const t = translations[currentLang];
+            const history = loadHistoryFromStorage();
+            const record = history.find(r => r.id === recordId);
+
+            if (!record) {
+                alert('历史记录未找到');
+                return;
+            }
+
+            const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += `${apiTypeText}, ${record.config.modelName}\n`;
+            csvContent += `${t.mdNotes}, "${record.notes.replace(/"/g, '""')}"\n`;
+            csvContent += `${t.csvConcurrency}, ${record.config.concurrency}\n`;
+            csvContent += t.csvHeaders + "\n";
+
+            record.results.forEach(res => {
+                csvContent += `${res.promptLength},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+
+            const cleanNotes = record.notes
+                .replace(/[\s\t\n\r]+/g, '_')
+                .replace(/[^a-zA-Z0-9_\-\.]/g, '')
+                .substring(0, 30);
+
+            const filename = `history_${record.config.modelName}_${cleanNotes}_${record.id}.csv`;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        /**
+         * 删除历史记录（带确认）
+         */
+        function deleteHistoryWithConfirm(recordId) {
+            const t = translations[currentLang];
+            if (confirm(t.historyConfirmDelete)) {
+                const success = deleteHistoryRecord(recordId);
+                if (success) {
+                    showHistoryList();
+                }
+            }
+        }
+
+        /**
+         * 清空所有历史记录（带确认）
+         */
+        function clearAllHistoryWithConfirm() {
+            const t = translations[currentLang];
+            if (confirm(t.historyConfirmClear)) {
+                const success = clearAllHistory();
+                if (success) {
+                    showHistoryList();
+                }
+            }
+        }
+
+        // 事件监听器
+        viewHistoryBtn.addEventListener('click', openHistoryModal);
+        historyModalClose.addEventListener('click', closeHistoryModal);
+        backToHistoryListBtn.addEventListener('click', showHistoryList);
+        clearAllHistoryBtn.addEventListener('click', clearAllHistoryWithConfirm);
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', (event) => {
+            if (event.target === historyModal) {
+                closeHistoryModal();
+            }
+        });
+
+        // 更新语言切换函数中的按钮文本更新
+        const originalSwitchLanguage = switchLanguage;
+        switchLanguage = function(lang) {
+            originalSwitchLanguage(lang);
+            // 更新历史记录按钮文本
+            const t = translations[lang];
+            viewHistoryBtn.textContent = t.historyBtn;
+        };
+
+        //
+        window.onload = function () {
+            setDefaultValues();
+            // v1.9: 更新历史记录按钮文本
+            const t = translations[currentLang];
+            viewHistoryBtn.textContent = t.historyBtn;
+        };
     </script>
 </body>
 
