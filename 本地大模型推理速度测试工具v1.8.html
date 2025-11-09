@@ -624,6 +624,7 @@
                 concurrentLabel: '并发',
                 // 表格标题
                 tableHeaderPromptLen: '提示词长度<br>(tokens)',
+                tableHeaderTTFT: 'TTFT<br>(ms)',
                 tableHeaderPrefillTime: '预填充耗时<br>(ms)',
                 tableHeaderPrefillSpeed: '预填充速度<br>(tokens/s)',
                 tableHeaderOutputLen: '输出长度<br>(tokens)',
@@ -635,6 +636,10 @@
                 statTotalDecodeRange: '总输出吞吐范围:',
                 statAvgPrefill: '平均总预填充吞吐:',
                 statAvgDecode: '平均总输出吞吐:',
+                statPercentileTitle: '📊 百分位统计 (P50/P90/P95)',
+                statTtftPercentile: 'TTFT延迟:',
+                statPrefillPercentile: 'Prefill吞吐:',
+                statDecodePercentile: 'Decode吞吐:',
                 // 图表相关
                 chartLabelPrefillThroughput: '总预填充吞吐 (tokens/s)',
                 chartLabelDecodeThroughput: '总输出吞吐 (tokens/s)',
@@ -727,6 +732,7 @@
                 concurrentLabel: 'Concurrent',
                 // Table headers
                 tableHeaderPromptLen: 'Prompt Length<br>(tokens)',
+                tableHeaderTTFT: 'TTFT<br>(ms)',
                 tableHeaderPrefillTime: 'Prefill Time<br>(ms)',
                 tableHeaderPrefillSpeed: 'Prefill Speed<br>(tokens/s)',
                 tableHeaderOutputLen: 'Output Length<br>(tokens)',
@@ -738,6 +744,10 @@
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
                 statAvgPrefill: 'Avg Total Prefill Throughput:',
                 statAvgDecode: 'Avg Total Decode Throughput:',
+                statPercentileTitle: '📊 Percentile Statistics (P50/P90/P95)',
+                statTtftPercentile: 'TTFT Latency:',
+                statPrefillPercentile: 'Prefill Throughput:',
+                statDecodePercentile: 'Decode Throughput:',
                 // Chart related
                 chartLabelPrefillThroughput: 'Total Prefill Throughput (tokens/s)',
                 chartLabelDecodeThroughput: 'Total Decode Throughput (tokens/s)',
@@ -1113,6 +1123,7 @@
 
                 let resultEntry = {
                     promptLength: length,
+                    ttftMs: 'N/A',
                     prefillTimeMs: 'N/A',
                     prefillSpeed: 'N/A',
                     outputTokens: 'N/A',
@@ -1230,7 +1241,15 @@
                         outputTimeMs: avgOutputTimeMs.toFixed(2),
                         outputSpeed: totalOutputSpeed.toFixed(2),
                         status: translations[currentLang].statusSuccess,
-                        concurrency: concurrency
+                        concurrency: concurrency,
+                        // 保存并发详情（用于P50/P90/P95统计）
+                        concurrentDetails: concurrencyResults.map(res => ({
+                            prefillTimeMs: res.prefillTimeMs,
+                            prefillSpeed: res.prefillSpeed,
+                            outputTokens: res.outputTokens,
+                            outputTimeMs: res.outputTimeMs,
+                            outputSpeed: res.outputSpeed
+                        }))
                     };
 
                     cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
@@ -1523,6 +1542,23 @@
             }
         }
 
+        /**
+         * 计算百分位数
+         * @param {Array<number>} values - 数值数组
+         * @param {number} percentile - 百分位数 (0-100)
+         * @returns {number} - 百分位值
+         */
+        function calculatePercentile(values, percentile) {
+            if (values.length === 0) return null;
+            const sorted = values.slice().sort((a, b) => a - b);
+            const index = (percentile / 100) * (sorted.length - 1);
+            const lower = Math.floor(index);
+            const upper = Math.ceil(index);
+            const weight = index % 1;
+            if (lower === upper) return sorted[lower];
+            return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+        }
+
         function showConcurrencyStats() {
 
             const statsDiv = document.createElement('div');
@@ -1536,6 +1572,30 @@
             const avgP = isFinite(concurrencyStats.avgPrefillSpeed) && concurrencyStats.avgPrefillSpeed > 0 ? concurrencyStats.avgPrefillSpeed.toFixed(2) : 'N/A';
             const avgO = isFinite(concurrencyStats.avgOutputSpeed) && concurrencyStats.avgOutputSpeed > 0 ? concurrencyStats.avgOutputSpeed.toFixed(2) : 'N/A';
 
+            // 收集所有并发详情数据用于计算百分位数
+            const allPrefillSpeedValues = [];
+            const allDecodeSpeedValues = [];
+
+            testResultsData.forEach(res => {
+                if (res.concurrentDetails && Array.isArray(res.concurrentDetails)) {
+                    res.concurrentDetails.forEach(detail => {
+                        const prefillSpeed = parseFloat(detail.prefillSpeed);
+                        const decodeSpeed = parseFloat(detail.outputSpeed);
+
+                        if (!isNaN(prefillSpeed) && isFinite(prefillSpeed)) allPrefillSpeedValues.push(prefillSpeed);
+                        if (!isNaN(decodeSpeed) && isFinite(decodeSpeed)) allDecodeSpeedValues.push(decodeSpeed);
+                    });
+                }
+            });
+
+            // 计算百分位数
+            const prefillP50 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 50).toFixed(2) : 'N/A';
+            const prefillP90 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 90).toFixed(2) : 'N/A';
+            const prefillP95 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 95).toFixed(2) : 'N/A';
+
+            const decodeP50 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 50).toFixed(2) : 'N/A';
+            const decodeP90 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 90).toFixed(2) : 'N/A';
+            const decodeP95 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 95).toFixed(2) : 'N/A';
 
             const t = translations[currentLang];
             statsDiv.innerHTML = `
@@ -1555,6 +1615,16 @@
                 <div class="stat-item">
                     <span>${t.statAvgDecode}</span>
                     <span class="stat-value">${avgO} tokens/s</span>
+                </div>
+                <hr style="margin: 10px 0; border: none; border-top: 1px solid #ddd;">
+                <h4 style="margin: 10px 0; font-size: 14px; color: #555;">${t.statPercentileTitle}</h4>
+                <div class="stat-item">
+                    <span>${t.statPrefillPercentile}</span>
+                    <span class="stat-value">P50: ${prefillP50} | P90: ${prefillP90} | P95: ${prefillP95} tokens/s</span>
+                </div>
+                <div class="stat-item">
+                    <span>${t.statDecodePercentile}</span>
+                    <span class="stat-value">P50: ${decodeP50} | P90: ${decodeP90} | P95: ${decodeP95} tokens/s</span>
                 </div>
             `;
             resultsDiv.appendChild(statsDiv);
@@ -1589,6 +1659,7 @@
 
                 let resultEntry = {
                     promptLength: length,
+                    ttftMs: 'N/A',
                     prefillTimeMs: 'N/A',
                     prefillSpeed: 'N/A',
                     outputTokens: 'N/A',
@@ -1719,7 +1790,15 @@
                         outputTimeMs: avgOutputTimeMs.toFixed(2),
                         outputSpeed: totalOutputSpeed.toFixed(2),
                         status: translations[currentLang].statusSuccess,
-                        concurrency: concurrency
+                        concurrency: concurrency,
+                        // 保存并发详情（用于P50/P90/P95统计）
+                        concurrentDetails: concurrencyResults.map(res => ({
+                            prefillTimeMs: res.prefillTimeMs,
+                            prefillSpeed: res.prefillSpeed,
+                            outputTokens: res.outputTokens,
+                            outputTimeMs: res.outputTimeMs,
+                            outputSpeed: res.outputSpeed
+                        }))
                     };
 
                     cells[0].textContent = resultEntry.promptLength; //  更新为实际token数
@@ -2212,13 +2291,18 @@
             const headerLine = cleanLines[3];
             const headers = headerLine.split(',').map(h => h.trim());
 
-            // 查找列索引
-            const lenIdx = headers.indexOf("提示词长度(tokens)");
-            const prefillSpdIdx = headers.indexOf("预填充速度(tokens/s)");
-            const outputSpdIdx = headers.indexOf("输出速度(tokens/s)");
+            // 查找列索引（支持中英文列名）
+            let lenIdx = headers.indexOf("提示词长度(tokens)");
+            if (lenIdx === -1) lenIdx = headers.indexOf("Prompt Length(tokens)");
+
+            let prefillSpdIdx = headers.indexOf("预填充速度(tokens/s)");
+            if (prefillSpdIdx === -1) prefillSpdIdx = headers.indexOf("Prefill Speed(tokens/s)");
+
+            let outputSpdIdx = headers.indexOf("输出速度(tokens/s)");
+            if (outputSpdIdx === -1) outputSpdIdx = headers.indexOf("Output Speed(tokens/s)");
 
             if (lenIdx === -1 || prefillSpdIdx === -1 || outputSpdIdx === -1) {
-                throw new Error("CSV文件缺少必要的列 (提示词长度, 预填充速度, 输出速度)");
+                throw new Error(translations[currentLang].errMissingColumns);
             }
 
             const results = [];
