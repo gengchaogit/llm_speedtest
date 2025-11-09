@@ -3915,6 +3915,34 @@
             // 清空当前数据
             testResultsData = [];
 
+            // 填充表单参数
+            if (record.config) {
+                // 设置 API 类型（通过按钮选择）
+                const apiType = record.config.apiType || 'openai';
+                document.querySelectorAll('.api-option').forEach(o => o.classList.remove('active'));
+                const activeOption = document.querySelector(`.api-option[data-type="${apiType}"]`);
+                if (activeOption) {
+                    activeOption.classList.add('active');
+                }
+                updateApiDescription(apiType);
+
+                // 填充其他字段
+                document.getElementById('apiUrl').value = record.config.apiUrl || '';
+                document.getElementById('modelName').value = record.config.modelName || '';
+                document.getElementById('minLength').value = record.config.minLength || '';
+                document.getElementById('maxLength').value = record.config.maxLength || '';
+                document.getElementById('step').value = record.config.step || '';
+                document.getElementById('outputLength').value = record.config.outputLength || '';
+                document.getElementById('concurrency').value = record.config.concurrency || '';
+                document.getElementById('temperatureInput').value = record.config.temperature || '';
+                document.getElementById('topPInput').value = record.config.topP || '';
+                document.getElementById('presencePenaltyInput').value = record.config.presencePenalty || '';
+                document.getElementById('frequencyPenaltyInput').value = record.config.frequencyPenalty || '';
+                document.getElementById('timeout').value = record.config.timeout || '';
+            }
+            // 填充备注字段
+            document.getElementById('notes').value = record.notes || '';
+
             // 加载历史记录的结果数据
             testResultsData = [...record.results];
 
