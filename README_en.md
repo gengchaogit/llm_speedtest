@@ -18,6 +18,15 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 
 <!-- Please note, the following changelog starts from v1.7. -->
 
+### v1.9.1 (Chao Enhanced Modded Version - Speed Test Optimization)
+*   **🔧 Fixed Model Refusal Issues**: Added `system prompt` ("You are a helpful assistant.") to all requests to prevent models from refusing to execute user prompts.
+*   **🎯 Optimized Prompt Generation**:
+    *   Simplified word library from 48 complex English words to 10 simple number words (one, two, three...), reducing model processing burden.
+    *   Changed test instruction to philosophical thinking question: "think about the meaning of the existence of the universe, and whether human consciousness exists", avoiding inaccurate speed tests caused by simple repetition.
+*   **⚙️ Fixed Sampling Parameters**:
+    *   Corrected `presence_penalty` and `frequency_penalty` from `-1.0` to `0.0`.
+    *   Negative penalty values encourage the model to repeat the same word, causing the model to "freeze", now fixed.
+
 ### v1.9 (Chao Enhanced Modded Version - History & Detail View)
 *   **📚 Automatic History Saving**: Test results automatically saved to browser localStorage (up to 20 records)
 *   **🗂️ History Management Panel**: Beautiful new history modal with easy-to-use interface

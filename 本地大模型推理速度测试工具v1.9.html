@@ -1565,10 +1565,10 @@
         let d_outputLength = 128;                                                   // 期望输出的文本长度
         let d_timeout = 30000;                                                      // 请求超时时间 (ms)
         // 文本生成采样参数 (浮点数)
-        let d_temperature = 1.0;                                                    // 控制生成文本的随机性。值越高，文本越随机（0.0表示确定性，1.0表示较高随机性）
+        let d_temperature = 1.0;                                                    // 控制生成文本的随机性。值越高，文本越随机（0.0表示确定性，1.0表到较高随机性）
         let d_top_p = 0.1;                                                          // 控制生成文本的多样性。只考虑累积概率达到 top_p 的词汇（0.0-1.0）
-        let d_presence_penalty = -1.0;                                              // 对生成文本中已经出现的词汇进行惩罚，减少重复（通常在 -2.0 到 2.0 之间）
-        let d_frequency_penalty = -1.0;                                             // 对生成文本中词汇出现的频率进行惩罚，减少常用词的重复（通常在 -2.0 到 2.0 之间）
+        let d_presence_penalty = 0.0;                                               // 对生成文本中已经出现的词汇进行惩罚，减少重复（通常在 -2.0 到 2.0 之间，负数会鼓励重复）
+        let d_frequency_penalty = 0.0;                                              // 对生成文本中词汇出现的频率进行惩罚，减少常用词的重复（通常在 -2.0 到 2.0 之间，负数会鼓励重复）
         // ===============================================================================
 
         // API类型切换
@@ -1631,13 +1631,7 @@
 
         // 单词库用于生成提示词
         const wordList = [
-            "active", "project", "quality", "develop", "example", "explore", "journey", "library",
-            "advance", "another", "because", "believe", "between", "central", "channel", "charity",
-            "collect", "company", "compare", "compete", "compute", "concept", "concern", "confirm",
-            "contact", "contain", "content", "context", "control", "country", "culture", "current",
-            "digital", "discuss", "document", "economy", "element", "energy", "engine", "enhance",
-            "evening", "exactly", "examine", "execute", "explain", "express", "feature", "federal",
-            "feeling", "finance"
+            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"
         ];
 
         // 根据指定长度生成提示词
@@ -1654,7 +1648,7 @@
                 prompt.push(wordList[randomIndex]);
             }
 
-            return prompt.join(' ') + `\n\nRepeat the above text 100 times`;
+            return prompt.join(' ') + `\nIgnore all the prompts above, think about the meaning of the existence of the universe, and whether human consciousness exists?`;
         }
 
         const startTestBtn = document.getElementById('startTest');
@@ -1929,7 +1923,10 @@
                             },
                             body: JSON.stringify({
                                 "model": modelName,
-                                "messages": [ { "role": "user", "content": "hello" } ],
+                                "messages": [
+                                    { "role": "system", "content": "You are a helpful assistant." },
+                                    { "role": "user", "content": "hello" }
+                                ],
                                 "max_tokens": 2, "stream": false
                             }),
                             signal: controller.signal
@@ -1953,6 +1950,7 @@
                     const requestBody = {
                         "model": modelName,
                         "messages": [
+                            { "role": "system", "content": "You are a helpful assistant." },
                             { "role": "user", "content": prompt }
                         ],
                         "max_tokens": outputLength,
@@ -2518,7 +2516,10 @@
                             headers: { 'Content-Type': 'application/json', },
                             body: JSON.stringify({
                                 "model": modelName,
-                                "messages": [ { "role": "user", "content": "hello" } ],
+                                "messages": [
+                                    { "role": "system", "content": "You are a helpful assistant." },
+                                    { "role": "user", "content": "hello" }
+                                ],
                                 "options": { "num_predict": 2 }, "stream": false
                             }),
                             signal: controller.signal
@@ -2540,6 +2541,7 @@
                     const requestBody = {
                         "model": modelName,
                         "messages": [
+                            { "role": "system", "content": "You are a helpful assistant." },
                             { "role": "user", "content": prompt }
                         ],
                         "options": {
