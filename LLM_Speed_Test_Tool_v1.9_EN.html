@@ -1740,23 +1740,6 @@
             try {
                 const history = loadHistoryFromStorage();
 
-                // Clean results, remove large text fields to save space
-                const cleanedResults = results.map(r => ({
-                    promptLength: r.promptLength,
-                    prefillTimeMs: r.prefillTimeMs,
-                    prefillSpeed: r.prefillSpeed,
-                    outputTokens: r.outputTokens,
-                    outputTimeMs: r.outputTimeMs,
-                    outputSpeed: r.outputSpeed,
-                    status: r.status,
-                    concurrency: r.concurrency,
-                    timestamp: r.timestamp,
-                    // Remove large fields: promptText, outputText, reasoningText, completionText
-                    // Only keep usageInfo (if exists and small)
-                    usageInfo: r.usageInfo || null,
-                    requestConfig: r.requestConfig
-                }));
-
                 const historyRecord = {
                     id: Date.now(),
                     timestamp: new Date().toLocaleString('zh-CN', {
@@ -1783,7 +1766,7 @@
                         frequencyPenalty: config.frequencyPenalty,
                         timeout: config.timeout
                     },
-                    results: cleanedResults, // Cleaned results (without large text)
+                    results: results, // Complete results (including promptText, etc.)
                     stats: stats // Statistics (min/max/avg/P50/P90/P95)
                 };
 
@@ -1802,6 +1785,16 @@
                 return true;
             } catch (e) {
                 console.error('[历史记录] 保存失败:', e);
+
+                // If quota exceeded error, show friendly message to user
+                if (e.name === 'QuotaExceededError') {
+                    const t = translations[currentLang];
+                    const msg = currentLang === 'zh'
+                        ? '⚠️ 历史记录存储空间已满！\n\n当前测试结果无法保存到历史记录。\n\n建议：\n1. 点击"查看历史记录"按钮\n2. 删除一些旧的历史记录\n3. 或点击"清空全部"释放空间\n\n注意：当前测试结果仍然显示在页面上，不会丢失。'
+                        : '⚠️ History storage is full!\n\nCurrent test results cannot be saved to history.\n\nSuggestions:\n1. Click "View History" button\n2. Delete some old history records\n3. Or click "Clear All" to free up space\n\nNote: Current test results are still displayed on the page and won\'t be lost.';
+                    alert(msg);
+                }
+
                 return false;
             }
         }
@@ -4116,7 +4109,7 @@
             // 创建备注信息
             const notesMessage = document.createElement('p');
             notesMessage.className = 'notes';
-            notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.concurrency} | ${t.labelTimeoutPrefix} ${record.timeout/1000}s`;
+            notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.config.concurrency} | ${t.labelTimeoutPrefix} ${record.config.timeout/1000}s`;
             resultsDiv.appendChild(notesMessage);
 
             // 创建表格
