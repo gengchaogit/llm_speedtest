@@ -1,6 +1,6 @@
-# 🚀 Local LLM Inference Speed Test Tool v1.9 (Chao Modded Version)
+# 🚀 Local LLM Inference Speed Test Tool v2.0 (Chao Modded Version)
 
-![Version](https://img.shields.io/badge/version-1.9-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0-blue.svg)
 
 ---
 
@@ -17,6 +17,16 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 ## Changelog
 
 <!-- Please note, the following changelog starts from v1.7. -->
+
+### v2.0 (Chao Enhanced Modded Version - API Statistics Enhancement & Fixes)
+*   **📊 API Statistics Enhancement**: Display complete usage statistics in test details (prompt_tokens, completion_tokens, reasoning_tokens, etc.)
+*   **🔄 Streaming Usage Support**: Added stream_options parameter to get usage information in streaming responses
+*   **🧠 Reasoning Model Optimization**: Automatically detect reasoning content and estimate reasoning_tokens (when API doesn't provide it)
+*   **⏱️ Timing Information**: Support displaying detailed timing statistics from llama.cpp/Ollama (prompt_eval_duration, eval_duration, etc.)
+*   **🎯 Dynamic Field Display**: Automatically display all available statistics fields returned by the API (timings, cached_tokens, etc.)
+*   **💾 Storage Optimization**: Provide friendly prompts when history storage is full, guiding users to clean old records
+*   **🔧 Fix**: Fixed history loading issue where concurrency and timeout showed undefined/NaN
+*   **🔧 Fix**: Fixed saveCurrentConfig undefined error
 
 ### v1.9.1 (Chao Enhanced Modded Version - Speed Test Optimization)
 *   **🔧 Fixed Model Refusal Issues**: Added `system prompt` ("You are a helpful assistant.") to all requests to prevent models from refusing to execute user prompts.

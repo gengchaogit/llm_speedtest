@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <!-- Original Author: 纸鸢随风 (Bilibili), DeepSeek-R1-0528-->
-<!-- v1.9 (chao modded version):
+<!-- v2.0 (chao modded version):
     Get the latest updates from:
     https://github.com/gengchaogit/llm_speedtest
+    1. (v2.0) [API Stats Enhancement] Display complete usage statistics in test details (prompt_tokens, completion_tokens, reasoning_tokens, etc.)
+    2. (v2.0) [Streaming Usage Support] Add stream_options parameter to get usage info in streaming responses
+    3. (v2.0) [Reasoning Model Optimization] Auto-detect reasoning content and estimate reasoning_tokens (when API doesn't provide)
+    4. (v2.0) [Timing Info] Support displaying llama.cpp/Ollama detailed timing stats (prompt_eval_duration, eval_duration, etc.)
+    5. (v2.0) [Dynamic Field Display] Auto-display all available stat fields returned by API (timings, cached_tokens, etc.)
+    6. (v2.0) [Storage Optimization] Friendly prompt when history storage is full, guide users to clean old records
+    7. (v2.0) [Fix] Fixed concurrency and timeout showing undefined/NaN when loading history records
+    8. (v2.0) [Fix] Fixed saveCurrentConfig undefined error
+-->
+
+<!-- v1.9 (chao modded version):
     1. (v1.9) [History Management] Auto-save test results to localStorage (up to 20 records)
     2. (v1.9) [History Panel] Beautiful modal interface to view all historical tests
     3. (v1.9) [Detail View] View complete configuration, statistics, and test results
@@ -42,7 +53,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local LLM Inference Speed Test Tool v1.9</title>
+    <title>Local LLM Inference Speed Test Tool v2.0</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>

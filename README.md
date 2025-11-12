@@ -1,6 +1,6 @@
-# 🚀 本地大模型推理速度测试工具 v1.9 (chao魔改版)
+# 🚀 本地大模型推理速度测试工具 v2.0 (chao魔改版)
 
-![Version](https://img.shields.io/badge/version-1.9-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0-blue.svg)
 
 ---
 
@@ -17,6 +17,16 @@
 ## 更新日志
 
 <!-- 请注意，以下更新日志从v1.7开始列出。 -->
+
+### v2.0 (Chao 魔改增强版 - API统计增强与修复)
+*   **📊 API统计增强**：在测试详情中展示完整的usage统计信息（prompt_tokens、completion_tokens、reasoning_tokens等）
+*   **🔄 流式usage支持**：添加stream_options参数以获取流式响应中的usage信息
+*   **🧠 思考模型优化**：自动检测reasoning内容并估算reasoning_tokens（当API不提供时）
+*   **⏱️ timing信息**：支持显示llama.cpp/Ollama的详细timing统计（prompt_eval_duration、eval_duration等）
+*   **🎯 动态字段展示**：自动显示API返回的所有可用统计字段（timings、cached_tokens等）
+*   **💾 存储优化**：历史记录满时提供友好提示，引导用户清理旧记录
+*   **🔧 修复**：修复历史记录加载时并发数和超时显示undefined/NaN的问题
+*   **🔧 修复**：修复saveCurrentConfig未定义错误
 
 ### v1.9.1 (Chao 魔改增强版 - 测速优化)
 *   **🔧 修复模型拒绝回答问题**：为所有请求添加 `system prompt`（"You are a helpful assistant."），避免模型拒绝执行用户提示词。
