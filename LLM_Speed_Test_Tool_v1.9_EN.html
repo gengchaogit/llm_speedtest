@@ -1033,6 +1033,8 @@
             <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
             <!-- v1.9: 历史记录 -->
             <button id="viewHistory" style="background: #9b59b6;">📚 查看历史记录</button>
+            <!-- v1.9.1: 重置参数 -->
+            <button id="resetParams" style="background: #e67e22;">🔄 重置参数</button>
         </div>
         <div class="progress-container">
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
@@ -1146,6 +1148,7 @@
                 btnCopyMarkdown: '复制 Markdown 表格',
                 btnExportCSV: '导出 CSV 数据',
                 btnExportCombinedChart: '导出一张图表',
+                btnResetParams: '🔄 重置参数',
                 sectionComparison: '多结果对比',
                 labelImportFiles: '导入CSV结果文件 (可多选)',
                 btnStartComparison: '生成对比图表',
@@ -1320,6 +1323,7 @@
                 btnCopyMarkdown: 'Copy Markdown Table',
                 btnExportCSV: 'Export CSV Data',
                 btnExportCombinedChart: 'Export Combined Chart',
+                btnResetParams: '🔄 Reset Parameters',
                 sectionComparison: 'Multi-Result Comparison',
                 labelImportFiles: 'Import CSV result files (multiple selection)',
                 btnStartComparison: 'Generate Comparison Charts',
@@ -1510,6 +1514,7 @@
             document.getElementById('copyMarkdown').textContent = t.btnCopyMarkdown;
             document.getElementById('exportCSV').textContent = t.btnExportCSV;
             document.getElementById('exportCombinedChart').textContent = t.btnExportCombinedChart;
+            document.getElementById('resetParams').textContent = t.btnResetParams;
             document.getElementById('startComparison').textContent = t.btnStartComparison;
             document.getElementById('exportComparisonChart').textContent = t.btnExportComparisonChart;
 
@@ -4168,6 +4173,25 @@
         historyModalClose.addEventListener('click', closeHistoryModal);
         backToHistoryListBtn.addEventListener('click', showHistoryList);
         clearAllHistoryBtn.addEventListener('click', clearAllHistoryWithConfirm);
+
+        // v1.9.1: 重置参数按钮
+        const resetParamsBtn = document.getElementById('resetParams');
+        resetParamsBtn.addEventListener('click', function() {
+            // 只重置测试参数配置，不重置API配置
+            document.getElementById('minLength').value = d_minLength;
+            document.getElementById('maxLength').value = d_maxLength;
+            document.getElementById('step').value = d_step;
+            document.getElementById('outputLength').value = d_outputLength;
+            document.getElementById('concurrency').value = 1;
+            document.getElementById('timeout').value = d_timeout;
+            document.getElementById('temperatureInput').value = d_temperature;
+            document.getElementById('topPInput').value = d_top_p;
+            document.getElementById('presencePenaltyInput').value = d_presence_penalty;
+            document.getElementById('frequencyPenaltyInput').value = d_frequency_penalty;
+
+            // 保存到localStorage
+            saveCurrentConfig();
+        });
         document.getElementById('generateHistoryComparison').addEventListener('click', generateHistoryComparisonCharts);
 
         // 点击模态框外部关闭
