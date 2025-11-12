@@ -999,6 +999,17 @@
                     <input type="text" id="notes" value="" placeholder="请填写设备信息、模型信息、模型推理框架，以便在结果中显示">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="saveDetailContent" style="margin-right: 8px; width: auto;">
+                        <span>保存测试详情（提示词和输出内容）</span>
+                    </label>
+                    <p class="notes" style="margin-top: 5px; font-size: 12px; color: #666;">
+                        💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。
+                    </p>
+                </div>
+            </div>
         </div>
 
         <div class="config-section">
@@ -1811,6 +1822,18 @@
             try {
                 const history = loadHistoryFromStorage();
 
+                // v2.0: 检查是否保存详情内容
+                const saveDetailContent = document.getElementById('saveDetailContent').checked;
+                let resultsToSave = results;
+
+                // 如果不保存详情，则移除 promptText 和 outputText
+                if (!saveDetailContent) {
+                    resultsToSave = results.map(result => {
+                        const { promptText, outputText, reasoningContent, ...restResult } = result;
+                        return restResult;
+                    });
+                }
+
                 const historyRecord = {
                     id: Date.now(),
                     timestamp: new Date().toLocaleString('zh-CN', {
@@ -1837,7 +1860,7 @@
                         frequencyPenalty: config.frequencyPenalty,
                         timeout: config.timeout
                     },
-                    results: results, // 完整的结果（包括promptText等）
+                    results: resultsToSave, // 根据设置保存完整或简化的结果
                     stats: stats // 统计信息（min/max/avg/P50/P90/P95）
                 };
 
@@ -3313,8 +3336,8 @@
                 statsData = showConcurrencyStats();
                 // generateCharts(); //
 
-                // v1.9: 保存历史记录
-                if (statsData && !wasManuallyStopped) {
+                // v2.0: 保存历史记录（无论是否手动停止）
+                if (statsData) {
                     const currentConfig = {
                         apiUrl: apiUrl,
                         modelName: currentModelName,
@@ -3333,7 +3356,8 @@
                     };
                     const saved = saveTestToHistory(currentConfig, testResultsData, statsData);
                     if (saved) {
-                        console.log('[历史记录] 测试结果已自动保存');
+                        const stopInfo = wasManuallyStopped ? '(手动停止)' : '';
+                        console.log(`[历史记录] 测试结果已自动保存 ${stopInfo}`);
                     }
                 }
             }
