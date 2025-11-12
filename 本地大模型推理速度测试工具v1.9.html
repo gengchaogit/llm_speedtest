@@ -1634,9 +1634,38 @@
         // 初始化
         updateApiDescription('openai');
 
-        // 单词库用于生成提示词
+        // 单词库用于生成提示词（丰富多样的词汇，涵盖不同主题和词性）
         const wordList = [
-            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"
+            // 科技与创新
+            "algorithm", "artificial", "automation", "blockchain", "compute", "digital", "innovation",
+            "quantum", "robotics", "software", "technology", "virtual", "network", "database",
+            // 自然与环境
+            "mountain", "ocean", "forest", "planet", "climate", "wildlife", "ecosystem", "atmosphere",
+            "renewable", "sustainable", "biological", "natural", "organic", "environment",
+            // 社会与人文
+            "community", "society", "culture", "tradition", "diversity", "equality", "justice",
+            "democracy", "freedom", "humanity", "civilization", "education", "heritage", "philosophy",
+            // 商业与经济
+            "economy", "finance", "market", "investment", "enterprise", "commerce", "industry",
+            "revenue", "strategy", "competition", "management", "resource", "capital", "prosperity",
+            // 科学与知识
+            "research", "science", "discovery", "experiment", "theory", "hypothesis", "evidence",
+            "analysis", "knowledge", "wisdom", "intelligence", "learning", "academic", "scholarship",
+            // 艺术与创造
+            "creative", "artistic", "imagination", "aesthetic", "expression", "inspiration", "design",
+            "architecture", "literature", "poetry", "painting", "sculpture", "performance", "melody",
+            // 情感与心理
+            "emotion", "passion", "empathy", "compassion", "mindfulness", "awareness", "consciousness",
+            "perception", "intuition", "reflection", "meditation", "happiness", "serenity", "gratitude",
+            // 时间与空间
+            "moment", "eternal", "temporal", "spatial", "dimension", "horizon", "infinity",
+            "universe", "cosmos", "reality", "existence", "journey", "destiny", "evolution",
+            // 行动与发展
+            "action", "progress", "development", "advancement", "achievement", "success", "excellence",
+            "improvement", "transformation", "revolution", "growth", "expansion", "breakthrough", "pioneer",
+            // 关系与连接
+            "connection", "relationship", "interaction", "collaboration", "communication", "cooperation",
+            "harmony", "unity", "solidarity", "partnership", "network", "community", "integration", "bond"
         ];
 
         // 根据指定长度生成提示词
@@ -1653,7 +1682,7 @@
                 prompt.push(wordList[randomIndex]);
             }
 
-            return prompt.join(' ') + `\nConvert each number word above to its corresponding binary representation and output them. At the same time, think about the meaning of the existence of the universe, and whether human consciousness exists?`;
+            return prompt.join(' ') + `\nBased on the words above, write a short philosophical essay discussing the meaning of existence, the nature of consciousness, and humanity's place in the universe. Use clear, coherent sentences.`;
         }
 
         const startTestBtn = document.getElementById('startTest');
