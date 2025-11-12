@@ -546,6 +546,23 @@
             box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
         }
 
+        .history-btn-secondary {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .history-btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(149, 165, 166, 0.3);
+        }
+
         .history-btn-back {
             background: #95a5a6;
             color: white;
@@ -1102,7 +1119,9 @@
                         <div class="history-actions">
                             <div class="history-actions-left">
                                 <button id="generateHistoryComparison" class="history-btn-primary" disabled>生成对比图表</button>
-                                <span id="selectedCount" style="color: #666; font-size: 14px;">已选择 0 条</span>
+                                <button id="selectAllHistory" class="history-btn-secondary" style="margin-left: 10px;">全选</button>
+                                <button id="deselectAllHistory" class="history-btn-secondary">反选</button>
+                                <span id="selectedCount" style="color: #666; font-size: 14px; margin-left: 10px;">已选择 0 条</span>
                             </div>
                             <button id="clearAllHistory" class="history-btn-danger">清空全部</button>
                         </div>
@@ -3893,6 +3912,8 @@
             document.getElementById('historyModalTitle').textContent = t.historyModalTitle;
             clearAllHistoryBtn.textContent = t.historyBtnClearAll;
             document.getElementById('generateHistoryComparison').textContent = t.historyBtnCompare;
+            document.getElementById('selectAllHistory').textContent = t.historyBtnSelectAll;
+            document.getElementById('deselectAllHistory').textContent = t.historyBtnDeselectAll;
             updateSelectedCount(); // 更新选择计数
 
             historyListView.style.display = 'block';
@@ -4305,7 +4326,9 @@
             selectedIds.forEach(id => {
                 const record = history.find(r => r.id === id);
                 if (record) {
-                    const label = `${record.config.modelName} - ${record.timestamp} (并发 ${record.config.concurrency})`;
+                    // v2.0: 使用模型名、备注和并发数，不包含时间
+                    const notesText = record.notes || 'N/A';
+                    const label = `${record.config.modelName} - ${notesText} (并发 ${record.config.concurrency})`;
                     comparisonData.push(formatDataForComparison(record.results, label));
                 }
             });
@@ -4328,11 +4351,37 @@
             }
         }
 
+        /**
+         * 全选历史记录
+         */
+        function selectAllHistoryRecords() {
+            const checkboxes = document.querySelectorAll('.history-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+            });
+            updateSelectedCount();
+        }
+
+        /**
+         * 反选历史记录
+         */
+        function deselectAllHistoryRecords() {
+            const checkboxes = document.querySelectorAll('.history-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = !cb.checked;
+            });
+            updateSelectedCount();
+        }
+
         // 事件监听器
         viewHistoryBtn.addEventListener('click', openHistoryModal);
         historyModalClose.addEventListener('click', closeHistoryModal);
         backToHistoryListBtn.addEventListener('click', showHistoryList);
         clearAllHistoryBtn.addEventListener('click', clearAllHistoryWithConfirm);
+
+        // v2.0: 全选/反选按钮
+        document.getElementById('selectAllHistory').addEventListener('click', selectAllHistoryRecords);
+        document.getElementById('deselectAllHistory').addEventListener('click', deselectAllHistoryRecords);
 
         // v1.9.1: 重置参数按钮
         const resetParamsBtn = document.getElementById('resetParams');
