@@ -1003,9 +1003,9 @@
                 <div class="form-group">
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="checkbox" id="saveDetailContent" style="margin-right: 8px; width: auto;">
-                        <span>保存测试详情（提示词和输出内容）</span>
+                        <span id="labelSaveDetail">保存测试详情（提示词和输出内容）</span>
                     </label>
-                    <p class="notes" style="margin-top: 5px; font-size: 12px; color: #666;">
+                    <p id="noteSaveDetail" class="notes" style="margin-top: 5px; font-size: 12px; color: #666;">
                         💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。
                     </p>
                 </div>
@@ -1177,6 +1177,8 @@
                 placeholderApiKey: '未设置 API-Key 则留空',
                 labelNotes: '备注',
                 placeholderNotes: '请填写设备信息、模型信息、模型推理框架，以便在结果中显示',
+                labelSaveDetail: '保存测试详情（提示词和输出内容）',
+                noteSaveDetail: '💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。',
                 sectionTestParams: '测试参数配置',
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
@@ -1373,6 +1375,8 @@
                 placeholderApiKey: 'Leave empty if no API key is required',
                 labelNotes: 'Notes',
                 placeholderNotes: 'Fill in device info, model info, inference framework for display in results',
+                labelSaveDetail: 'Save Test Details (Prompts and Outputs)',
+                noteSaveDetail: '💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.',
                 sectionTestParams: 'Test Parameters',
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
@@ -1584,6 +1588,8 @@
             document.getElementById('apiKey').placeholder = t.placeholderApiKey;
             document.querySelector('label[for="notes"]').textContent = t.labelNotes;
             document.getElementById('notes').placeholder = t.placeholderNotes;
+            document.getElementById('labelSaveDetail').textContent = t.labelSaveDetail;
+            document.getElementById('noteSaveDetail').textContent = t.noteSaveDetail;
             document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
             document.querySelector('label[for="maxLength"]').textContent = t.labelMaxLength;
             document.querySelector('label[for="step"]').textContent = t.labelStep;
