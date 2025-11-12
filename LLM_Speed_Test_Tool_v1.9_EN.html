@@ -1121,6 +1121,7 @@
                                 <button id="generateHistoryComparison" class="history-btn-primary" disabled>生成对比图表</button>
                                 <button id="selectAllHistory" class="history-btn-secondary" style="margin-left: 10px;">全选</button>
                                 <button id="deselectAllHistory" class="history-btn-secondary">反选</button>
+                                <button id="deleteSelectedHistory" class="history-btn-danger" style="margin-left: 10px;" disabled>删除选中</button>
                                 <span id="selectedCount" style="color: #666; font-size: 14px; margin-left: 10px;">已选择 0 条</span>
                             </div>
                             <button id="clearAllHistory" class="history-btn-danger">清空全部</button>
@@ -3914,6 +3915,7 @@
             document.getElementById('generateHistoryComparison').textContent = t.historyBtnCompare;
             document.getElementById('selectAllHistory').textContent = t.historyBtnSelectAll;
             document.getElementById('deselectAllHistory').textContent = t.historyBtnDeselectAll;
+            document.getElementById('deleteSelectedHistory').textContent = t.historyBtnDeleteSelected;
             updateSelectedCount(); // 更新选择计数
 
             historyListView.style.display = 'block';
@@ -4122,10 +4124,10 @@
                 document.getElementById('step').value = record.config.step || '';
                 document.getElementById('outputLength').value = record.config.outputLength || '';
                 document.getElementById('concurrency').value = record.config.concurrency || '';
-                document.getElementById('temperatureInput').value = record.config.temperature || '';
-                document.getElementById('topPInput').value = record.config.topP || '';
-                document.getElementById('presencePenaltyInput').value = record.config.presencePenalty || '';
-                document.getElementById('frequencyPenaltyInput').value = record.config.frequencyPenalty || '';
+                document.getElementById('temperatureInput').value = record.config.temperature !== undefined ? record.config.temperature : '';
+                document.getElementById('topPInput').value = record.config.topP !== undefined ? record.config.topP : '';
+                document.getElementById('presencePenaltyInput').value = record.config.presencePenalty !== undefined ? record.config.presencePenalty : '';
+                document.getElementById('frequencyPenaltyInput').value = record.config.frequencyPenalty !== undefined ? record.config.frequencyPenalty : '';
                 document.getElementById('timeout').value = record.config.timeout || '';
             }
             // 填充备注字段
@@ -4294,6 +4296,7 @@
             const count = checkboxes.length;
             const selectedCountSpan = document.getElementById('selectedCount');
             const compareBtn = document.getElementById('generateHistoryComparison');
+            const deleteSelectedBtn = document.getElementById('deleteSelectedHistory');
 
             if (selectedCountSpan) {
                 selectedCountSpan.textContent = `${t.historySelectedCount} ${count} ${t.historySelectedCountSuffix}`;
@@ -4301,6 +4304,11 @@
 
             if (compareBtn) {
                 compareBtn.disabled = count === 0;
+            }
+
+            // v2.0: 更新删除选中按钮状态
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.disabled = count === 0;
             }
         }
 
@@ -4373,15 +4381,52 @@
             updateSelectedCount();
         }
 
+        /**
+         * 删除选中的历史记录
+         */
+        function deleteSelectedHistoryRecords() {
+            const t = translations[currentLang];
+            const checkboxes = document.querySelectorAll('.history-checkbox:checked');
+
+            if (checkboxes.length === 0) {
+                alert(t.historySelectAtLeastOne);
+                return;
+            }
+
+            const count = checkboxes.length;
+            const confirmMessage = t.historyConfirmDeleteSelected.replace('{count}', count);
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+            let history = loadHistoryFromStorage();
+
+            // 过滤掉选中的记录
+            history = history.filter(record => !selectedIds.includes(record.id));
+
+            // 保存更新后的历史记录
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+
+            // 刷新列表显示
+            showHistoryList();
+
+            // 显示成功消息
+            const successMessage = t.historyDeletedSuccess.replace('{count}', count);
+            alert(successMessage);
+        }
+
         // 事件监听器
         viewHistoryBtn.addEventListener('click', openHistoryModal);
         historyModalClose.addEventListener('click', closeHistoryModal);
         backToHistoryListBtn.addEventListener('click', showHistoryList);
         clearAllHistoryBtn.addEventListener('click', clearAllHistoryWithConfirm);
 
-        // v2.0: 全选/反选按钮
+        // v2.0: 全选/反选/删除选中按钮
         document.getElementById('selectAllHistory').addEventListener('click', selectAllHistoryRecords);
         document.getElementById('deselectAllHistory').addEventListener('click', deselectAllHistoryRecords);
+        document.getElementById('deleteSelectedHistory').addEventListener('click', deleteSelectedHistoryRecords);
 
         // v1.9.1: 重置参数按钮
         const resetParamsBtn = document.getElementById('resetParams');
