@@ -1154,7 +1154,7 @@
         // ===============================================================================
         const translations = {
             'zh': {
-                pageTitle: '大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)',
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v2.0 (chao魔改版)',
                 langToggle: 'English',
                 apiOpenAI: 'OpenAI兼容接口',
                 apiOllama: 'Ollama接口',
@@ -1331,10 +1331,11 @@
                 historyCompareSuccess: '对比图表已生成！请向下滚动查看。',
                 historySelectAtLeastOne: '请至少选择一条历史记录进行对比',
                 historyConfirmDeleteSelected: '确定要删除选中的 {count} 条历史记录吗？',
-                historyDeletedSuccess: '已成功删除 {count} 条历史记录'
+                historyDeletedSuccess: '已成功删除 {count} 条历史记录',
+                historyRecordNotFound: '历史记录未找到'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v1.8 (chao mod - charts + bugfix + autosave)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.0 (chao mod)',
                 langToggle: '中文',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',
@@ -1400,6 +1401,7 @@
                 detailBtnCopy: 'Copy Content',
                 detailSectionBasic: 'Basic Information',
                 detailSectionPerformance: 'Performance Metrics',
+                detailSectionUsage: 'API Usage Statistics',
                 detailSectionPrompt: 'Prompt Content',
                 detailSectionOutput: 'Output Content',
                 detailSectionConcurrent: 'Concurrent Details',
@@ -1430,6 +1432,20 @@
                 detailServerTiming: 'Server Processing Time:',
                 detailNetworkTime: 'Network Latency:',
                 detailCopied: 'Content copied to clipboard!',
+                // Usage statistics fields
+                detailUsagePromptTokens: 'Prompt Tokens',
+                detailUsageCompletionTokens: 'Completion Tokens',
+                detailUsageTotalTokens: 'Total Tokens',
+                detailUsageReasoningTokens: 'Reasoning Tokens',
+                detailUsagePromptEvalCount: 'Prompt Eval Count',
+                detailUsageEvalCount: 'Eval Count',
+                detailUsagePromptEvalDuration: 'Prompt Eval Duration',
+                detailUsageEvalDuration: 'Eval Duration',
+                detailUsagePromptTime: 'Prompt Time',
+                detailUsageCompletionTime: 'Completion Time',
+                detailUsageQueueTime: 'Queue Time',
+                detailUsagePromptPerSec: 'Prompt Tokens/Sec',
+                detailUsageCompletionPerSec: 'Completion Tokens/Sec',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -1511,7 +1527,8 @@
                 historyCompareSuccess: 'Comparison charts generated! Please scroll down to view.',
                 historySelectAtLeastOne: 'Please select at least one history record for comparison',
                 historyConfirmDeleteSelected: 'Are you sure you want to delete {count} selected record(s)?',
-                historyDeletedSuccess: 'Successfully deleted {count} record(s)'
+                historyDeletedSuccess: 'Successfully deleted {count} record(s)',
+                historyRecordNotFound: 'History record not found'
             }
         };
 
