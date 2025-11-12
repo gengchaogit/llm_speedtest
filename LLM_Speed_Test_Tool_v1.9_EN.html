@@ -3248,7 +3248,7 @@
                 prefillChartCanvas,
                 outputChartCanvas,
                 `Perf_Chart_${modelName}.png`,
-                `性能测试图表 - ${currentModelName}` // 大标题
+                `性能测试图表 - ${currentModelName} - ${notes}` // 大标题
             );
         });
 
@@ -3562,7 +3562,7 @@
                             },
                             title: {
                                 display: true,
-                                text: `${t.chartTitlePrefillThroughput} - ${currentModelName}`
+                                text: `${t.chartTitlePrefillThroughput} - ${currentModelName} - ${notes}`
                             }
                         },
                         scales: {
@@ -3615,7 +3615,7 @@
                             },
                             title: {
                                 display: true,
-                                text: `${t.chartTitleDecodeThroughput} - ${currentModelName}`
+                                text: `${t.chartTitleDecodeThroughput} - ${currentModelName} - ${notes}`
                             }
                         },
                         scales: {
