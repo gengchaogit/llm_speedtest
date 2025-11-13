@@ -2929,10 +2929,28 @@
         // 显示测试详情弹窗
         function showTestDetail(testData) {
             const t = translations[currentLang];
+            
+            // 预先获取所有需要的翻译文本，避免在嵌套模板字符串中访问
+            const usageLabels = {
+                promptTokens: t.detailUsagePromptTokens,
+                completionTokens: t.detailUsageCompletionTokens,
+                totalTokens: t.detailUsageTotalTokens,
+                reasoningTokens: t.detailUsageReasoningTokens,
+                promptEvalCount: t.detailUsagePromptEvalCount,
+                evalCount: t.detailUsageEvalCount,
+                promptEvalDuration: t.detailUsagePromptEvalDuration,
+                evalDuration: t.detailUsageEvalDuration,
+                promptTime: t.detailUsagePromptTime,
+                completionTime: t.detailUsageCompletionTime,
+                queueTime: t.detailUsageQueueTime
+            };
 
             // 调试：输出testData和usageInfo
             console.log('[Debug] testData:', testData);
             console.log('[Debug] usageInfo:', testData.usageInfo);
+            console.log('[Debug] currentLang:', currentLang);
+            console.log('[Debug] t:', t);
+            console.log('[Debug] usageLabels:', usageLabels);
 
             // 禁止页面滚动
             document.body.style.overflow = 'hidden';
@@ -2944,6 +2962,106 @@
             // 创建对话框
             const dialog = document.createElement('div');
             dialog.className = 'detail-dialog';
+
+            // 预先构建 Usage 部分的 HTML
+            let usageHTML = '';
+            if (testData.usageInfo) {
+                let usageItems = '';
+                
+                if (testData.usageInfo.prompt_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.completionTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.completion_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.total_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.totalTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.total_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.reasoning_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.reasoningTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.reasoning_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_eval_count !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptEvalCount}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_eval_count}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.eval_count !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.evalCount}:</span>
+                        <span class="detail-value">${testData.usageInfo.eval_count}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_eval_duration !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptEvalDuration}:</span>
+                        <span class="detail-value">${(testData.usageInfo.prompt_eval_duration / 1000000).toFixed(2)} ms</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.eval_duration !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.evalDuration}:</span>
+                        <span class="detail-value">${(testData.usageInfo.eval_duration / 1000000).toFixed(2)} ms</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.completionTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.completion_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.queue_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.queueTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.queue_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_tokens_details?.cached_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">Cached Tokens:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_tokens_details.cached_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_tokens_details?.reasoning_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">Reasoning Tokens (detail):</span>
+                        <span class="detail-value">${testData.usageInfo.completion_tokens_details.reasoning_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.timings) {
+                    Object.keys(testData.usageInfo.timings).forEach(key => {
+                        usageItems += `<div class="detail-info-item">
+                            <span class="detail-label">Timings.${key}:</span>
+                            <span class="detail-value">${typeof testData.usageInfo.timings[key] === 'number' ? testData.usageInfo.timings[key].toFixed(2) : testData.usageInfo.timings[key]}</span>
+                        </div>`;
+                    });
+                }
+                
+                usageHTML = `<div class="detail-section">
+                    <div class="detail-section-title">${t.detailSectionUsage}</div>
+                    <div class="detail-info-grid">
+                        ${usageItems}
+                    </div>
+                </div>`;
+            }
 
             // 构建详情内容
             let detailHTML = `
@@ -3011,83 +3129,7 @@
                     </div>
 
                     <!-- API使用统计 -->
-                    ${testData.usageInfo ? `
-                    <div class="detail-section">
-                        <div class="detail-section-title">${t.detailSectionUsage}</div>
-                        <div class="detail-info-grid">
-                            ${testData.usageInfo.prompt_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageCompletionTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.completion_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.total_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageTotalTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.total_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.reasoning_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageReasoningTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.reasoning_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_eval_count !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptEvalCount}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_eval_count}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.eval_count !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageEvalCount}:</span>
-                                <span class="detail-value">${testData.usageInfo.eval_count}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_eval_duration !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptEvalDuration}:</span>
-                                <span class="detail-value">${(testData.usageInfo.prompt_eval_duration / 1000000).toFixed(2)} ms</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.eval_duration !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageEvalDuration}:</span>
-                                <span class="detail-value">${(testData.usageInfo.eval_duration / 1000000).toFixed(2)} ms</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageCompletionTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.completion_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.queue_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageQueueTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.queue_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_tokens_details?.cached_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Cached Tokens:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_tokens_details.cached_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_tokens_details?.reasoning_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Reasoning Tokens (detail):</span>
-                                <span class="detail-value">${testData.usageInfo.completion_tokens_details.reasoning_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.timings ? Object.keys(testData.usageInfo.timings).map(key => `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Timings.${key}:</span>
-                                <span class="detail-value">${typeof testData.usageInfo.timings[key] === 'number' ? testData.usageInfo.timings[key].toFixed(2) : testData.usageInfo.timings[key]}</span>
-                            </div>`).join('') : ''}
-                        </div>
-                    </div>
-                    ` : ''}
+                    ${usageHTML}
 
                     <!-- 请求配置 -->
                     <div class="detail-section">
