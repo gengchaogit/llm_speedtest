@@ -1,43 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
-<!-- Original Author: 纸鸢随风 (Bilibili), DeepSeek-R1-0528-->
-<!-- v2.0 (chao modded version):
-    Get the latest updates from:
+<html lang="zh-CN">
+<!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
+<!-- v2.0 (chao魔改版):
+    可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
-    1. (v2.0) [API Stats Enhancement] Display complete usage statistics in test details (prompt_tokens, completion_tokens, reasoning_tokens, etc.)
-    2. (v2.0) [Streaming Usage Support] Add stream_options parameter to get usage info in streaming responses
-    3. (v2.0) [Reasoning Model Optimization] Auto-detect reasoning content and estimate reasoning_tokens (when API doesn't provide)
-    4. (v2.0) [Timing Info] Support displaying llama.cpp/Ollama detailed timing stats (prompt_eval_duration, eval_duration, etc.)
-    5. (v2.0) [Dynamic Field Display] Auto-display all available stat fields returned by API (timings, cached_tokens, etc.)
-    6. (v2.0) [Storage Optimization] Friendly prompt when history storage is full, guide users to clean old records
-    7. (v2.0) [Fix] Fixed concurrency and timeout showing undefined/NaN when loading history records
-    8. (v2.0) [Fix] Fixed saveCurrentConfig undefined error
+    1. (v2.0) 【API统计增强】在测试详情中展示完整的usage统计信息（prompt_tokens、completion_tokens、reasoning_tokens等）
+    2. (v2.0) 【流式usage支持】添加stream_options参数以获取流式响应中的usage信息
+    3. (v2.0) 【思考模型优化】自动检测reasoning内容并估算reasoning_tokens（当API不提供时）
+    4. (v2.0) 【timing信息】支持显示llama.cpp/Ollama的详细timing统计（prompt_eval_duration、eval_duration等）
+    5. (v2.0) 【动态字段展示】自动显示API返回的所有可用统计字段（timings、cached_tokens等）
+    6. (v2.0) 【存储优化】历史记录满时提供友好提示，引导用户清理旧记录
+    7. (v2.0) 【修复】修复历史记录加载时并发数和超时显示undefined/NaN的问题
+    8. (v2.0) 【修复】修复saveCurrentConfig未定义错误
 -->
 
-<!-- v1.9 (chao modded version):
-    1. (v1.9) [History Management] Auto-save test results to localStorage (up to 20 records)
-    2. (v1.9) [History Panel] Beautiful modal interface to view all historical tests
-    3. (v1.9) [Detail View] View complete configuration, statistics, and test results
-    4. (v1.9) [Individual Export] Export history records as CSV files
-    5. (v1.9) [Record Management] Delete individual records or clear all
-    6. (v1.9) [History Comparison] Select multiple history records and generate comparison charts
-    7. (v1.9) [Data Persistence] All history records saved in localStorage
-    8. (v1.9) [Full Bilingual] All history features fully support Chinese/English switching
+<!-- v1.9 (chao魔改版):
+    1. (v1.9) 【历史记录管理】测试完成后自动保存到localStorage（最多20条）
+    2. (v1.9) 【历史面板】美观的模态框界面，查看所有历史测试
+    3. (v1.9) 【详情查看】查看历史记录的完整配置、统计数据和测试结果
+    4. (v1.9) 【单个导出】将历史记录导出为CSV文件
+    5. (v1.9) 【记录管理】删除单条记录或清空全部
+    6. (v1.9) 【历史对比】勾选多条历史记录，一键生成对比图表
+    7. (v1.9) 【数据持久化】所有历史记录保存在localStorage，无需担心数据丢失
+    8. (v1.9) 【完整双语】所有历史记录功能完全支持中英文切换
 -->
 
-<!-- v1.8 (chao modded version):
-    1. (v1.8) Add chart export button
-    2. (v1.8) Add multiple CSV import for comparison
-    3. (v1.8) Combined chart export: Export Prefill and Decode charts as one image
-    4. (v1.8) Comparison labels: Use CSV filenames as legend labels
-    5. (v1.8) Comparison export: Export comparison charts with auto-generated filenames
-    6. (v1.8) [Important Fix] Support reasoning models: Parse usage field for accurate token stats
-    7. (v1.8) Add token estimation fallback: Use character estimation when API doesn't return usage
-    8. (v1.8) [Critical Fix] Prefill speed calculation error: Use actual prompt_tokens from API
-    9. (v1.8) [Compatibility Fix] Support multiple streaming response formats
-    10. (v1.8) Auto-save/restore all config parameters
-    11. (v1.8) [Reasoning Model Fix] Correctly calculate reasoning+completion total tokens
-    12. (v1.8) [Performance Optimization] Prioritize server-returned real GPU processing time
+<!-- v1.8 (chao魔改版):
+    1. (v1.8) 添加图表导出按钮
+    2. (v1.8) 添加多个CSV结果导入对比功能
+    3. (v1.8) 合并图表导出：将Prefill和Decode图表一键导出为一张图片
+    4. (v1.8) 对比标签：使用CSV文件名作为对比图表的图例标签
+    5. (v1.8) 对比导出：为对比图表也增加一键导出功能，并自动生成包含参数的文件名
+    6. (v1.8) 【重要修复】支持思考模型：解析usage字段获取准确token统计（reasoning_tokens + completion_tokens）
+    7. (v1.8) 添加token估算fallback：当API不返回usage时使用字符估算
+    8. (v1.8) 【关键修复】Prefill速度计算错误：现在使用API返回的实际prompt_tokens而非估算值（修复了约10%误差）
+    9. (v1.8) 【兼容性修复】支持多种流式响应格式：delta.reasoning_content（思考）/ delta.content / message.content / text
+    10. (v1.8) 自动保存/恢复所有配置参数：API地址、模型、温度、并发数等所有参数，下次打开自动恢复
+    11. (v1.8) 【思考模型修复】正确计算reasoning+completion总tokens：当usage不准时使用内容估算，确保decode速度准确
+    12. (v1.8) 【性能测量优化】优先使用服务器返回的真实GPU处理时间（prompt_eval_duration/eval_duration），消除网络延迟影响
 -->
 
 <!-- v1.7 (chao基于原版魔改版-qq群:1028429001):
@@ -53,7 +53,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local LLM Inference Speed Test Tool v2.0</title>
+    <title>本地大模型推理速度测试工具 v2.0</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
@@ -1003,10 +1003,10 @@
                 <div class="form-group">
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="checkbox" id="saveDetailContent" style="margin-right: 8px; width: auto;">
-                        <span id="labelSaveDetail">Save Test Details (Prompts and Outputs)</span>
+                        <span id="labelSaveDetail">保存测试详情（提示词和输出内容）</span>
                     </label>
                     <p id="noteSaveDetail" class="notes" style="margin-top: 5px; font-size: 12px; color: #666;">
-                        💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.
+                        💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。
                     </p>
                 </div>
             </div>
@@ -1222,6 +1222,7 @@
                 detailBtnCopy: '复制内容',
                 detailSectionBasic: '基本信息',
                 detailSectionPerformance: '性能指标',
+                detailSectionUsage: 'API使用统计',
                 detailSectionPrompt: '提示词内容',
                 detailSectionOutput: '输出内容',
                 detailSectionConcurrent: '并发详情',
@@ -1252,6 +1253,20 @@
                 detailServerTiming: '服务器处理时间:',
                 detailNetworkTime: '网络延迟:',
                 detailCopied: '内容已复制到剪贴板！',
+                // Usage统计字段
+                detailUsagePromptTokens: 'Prompt Tokens',
+                detailUsageCompletionTokens: 'Completion Tokens',
+                detailUsageTotalTokens: 'Total Tokens',
+                detailUsageReasoningTokens: 'Reasoning Tokens',
+                detailUsagePromptEvalCount: 'Prompt Eval Count',
+                detailUsageEvalCount: 'Eval Count',
+                detailUsagePromptEvalDuration: 'Prompt Eval Duration',
+                detailUsageEvalDuration: 'Eval Duration',
+                detailUsagePromptTime: 'Prompt Time',
+                detailUsageCompletionTime: 'Completion Time',
+                detailUsageQueueTime: 'Queue Time',
+                detailUsagePromptPerSec: 'Prompt Tokens/Sec',
+                detailUsageCompletionPerSec: 'Completion Tokens/Sec',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1536,7 +1551,7 @@
             }
         };
 
-        // 当前语言
+        // 当前语言 (English version defaults to 'en')
         let currentLang = localStorage.getItem('llmPerfTestLang') || 'en';
 
         // 切换语言函数
@@ -1645,7 +1660,7 @@
         let d_outputLength = 128;                                                   // 期望输出的文本长度
         let d_timeout = 30000;                                                      // 请求超时时间 (ms)
         // 文本生成采样参数 (浮点数)
-        let d_temperature = 1.0;                                                    // 控制生成文本的随机性。值越高，文本越随机（0.0表示确定性，1.0表示较高随机性）
+        let d_temperature = 1.0;                                                    // 控制生成文本的随机性。值越高，文本越随机（0.0表示确定性，1.0表到较高随机性）
         let d_top_p = 0.1;                                                          // 控制生成文本的多样性。只考虑累积概率达到 top_p 的词汇（0.0-1.0）
         let d_presence_penalty = 0.0;                                               // 对生成文本中已经出现的词汇进行惩罚，减少重复（通常在 -2.0 到 2.0 之间，负数会鼓励重复）
         let d_frequency_penalty = 0.0;                                              // 对生成文本中词汇出现的频率进行惩罚，减少常用词的重复（通常在 -2.0 到 2.0 之间，负数会鼓励重复）
@@ -1854,7 +1869,7 @@
                         timeout: config.timeout
                     },
                     results: resultsToSave, // 根据设置保存完整或简化的结果
-                    stats: stats // Statistics (min/max/avg/P50/P90/P95)
+                    stats: stats // 统计信息（min/max/avg/P50/P90/P95）
                 };
 
                 // 添加到历史记录数组开头（最新的在最前面）
@@ -1873,7 +1888,7 @@
             } catch (e) {
                 console.error('[历史记录] 保存失败:', e);
 
-                // If quota exceeded error, show friendly message to user
+                // 如果是配额超出错误，给用户友好提示
                 if (e.name === 'QuotaExceededError') {
                     const t = translations[currentLang];
                     const msg = currentLang === 'zh'
@@ -2090,7 +2105,7 @@
                         "presence_penalty": presence_penalty,
                         "frequency_penalty": frequency_penalty,
                         "stream": true,
-                        "stream_options": { "include_usage": true }  // Request usage information
+                        "stream_options": { "include_usage": true }  // 请求usage信息
                     };
 
                     const fetchOptions = {
@@ -2170,7 +2185,7 @@
                         outputText: concurrencyResults[0]?.outputContent || '',
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
-                        usageInfo: concurrencyResults[0]?.usageInfo || null,  // Save usage info
+                        usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
                         requestConfig: {
                             apiType: 'OpenAI Compatible',
                             model: modelName,
@@ -2243,7 +2258,7 @@
             let contentChunkCount = 0;   //  统计content chunk数量（用于fallback）
             let serverPrefillTimeMs = null; //  服务器返回的prefill真实处理时间
             let serverDecodeTimeMs = null;  //  服务器返回的decode真实处理时间
-            let usageInfo = null; // Save complete usage object for detail display
+            let usageInfo = null; // 保存完整的usage对象用于详情展示
 
             const response = await createFetchPromiseWithRetry(apiUrl, fetchOptions, timeout, 3, 1500);
 
@@ -2282,13 +2297,13 @@
                                 actualOutputTokensFromUsage = completion + reasoning;
                                 actualPromptTokensFromUsage = prompt;
 
-                                // Save complete usage object for detail display (include all possible fields)
+                                // 保存完整的usage对象用于详情展示（包含所有可能的字段）
                                 usageInfo = { ...data.usage };
-                                // If timings field exists, merge it in
+                                // 如果存在timings字段，也合并进去
                                 if (data.timings) {
                                     usageInfo.timings = { ...data.timings };
                                 }
-                                console.log('[Debug] Captured usageInfo:', JSON.stringify(usageInfo, null, 2));
+                                console.log('[Debug] 捕获到usageInfo:', JSON.stringify(usageInfo, null, 2));
 
                                 console.log(`[Token统计] prompt: ${prompt}, completion: ${completion}, reasoning: ${reasoning}, 输出总计: ${actualOutputTokensFromUsage}`);
 
@@ -2463,7 +2478,7 @@
                     outputContent: outputContent + reasoningContent,  // 完整输出内容（思考+答案）
                     reasoningContent: reasoningContent,  // 单独的思考内容
                     completionContent: outputContent,  // 单独的答案内容
-                    usageInfo: usageInfo  // Complete usage information returned by API
+                    usageInfo: usageInfo  // API返回的完整usage信息
                 };
             } catch (error) {
                 console.error(`[Error] executeAndMeasureRequest异常:`, error);
@@ -2792,7 +2807,7 @@
                         outputText: concurrencyResults[0]?.outputContent || '',
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
-                        usageInfo: concurrencyResults[0]?.usageInfo || null,  // Save usage info
+                        usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
                         requestConfig: {
                             apiType: 'Ollama',
                             model: modelName,
@@ -2888,7 +2903,7 @@
             // 提取输出内容
             const outputText = data.message?.content || '';
 
-            // Construct usageInfo object (Ollama format)
+            // 构建usageInfo对象（Ollama格式）
             const usageInfo = {
                 prompt_eval_count: data.prompt_eval_count,
                 eval_count: data.eval_count,
@@ -2907,17 +2922,35 @@
                 outputContent: outputText,  // 完整输出内容
                 reasoningContent: '',  // Ollama目前不单独区分思考内容
                 completionContent: outputText,  // 答案内容
-                usageInfo: usageInfo  // Complete usage information returned by API
+                usageInfo: usageInfo  // API返回的完整usage信息
             };
         }
 
         // 显示测试详情弹窗
         function showTestDetail(testData) {
             const t = translations[currentLang];
+            
+            // 预先获取所有需要的翻译文本，避免在嵌套模板字符串中访问
+            const usageLabels = {
+                promptTokens: t.detailUsagePromptTokens,
+                completionTokens: t.detailUsageCompletionTokens,
+                totalTokens: t.detailUsageTotalTokens,
+                reasoningTokens: t.detailUsageReasoningTokens,
+                promptEvalCount: t.detailUsagePromptEvalCount,
+                evalCount: t.detailUsageEvalCount,
+                promptEvalDuration: t.detailUsagePromptEvalDuration,
+                evalDuration: t.detailUsageEvalDuration,
+                promptTime: t.detailUsagePromptTime,
+                completionTime: t.detailUsageCompletionTime,
+                queueTime: t.detailUsageQueueTime
+            };
 
-            // Debug: output testData and usageInfo
+            // 调试：输出testData和usageInfo
             console.log('[Debug] testData:', testData);
             console.log('[Debug] usageInfo:', testData.usageInfo);
+            console.log('[Debug] currentLang:', currentLang);
+            console.log('[Debug] t:', t);
+            console.log('[Debug] usageLabels:', usageLabels);
 
             // 禁止页面滚动
             document.body.style.overflow = 'hidden';
@@ -2929,6 +2962,106 @@
             // 创建对话框
             const dialog = document.createElement('div');
             dialog.className = 'detail-dialog';
+
+            // 预先构建 Usage 部分的 HTML
+            let usageHTML = '';
+            if (testData.usageInfo) {
+                let usageItems = '';
+                
+                if (testData.usageInfo.prompt_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.completionTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.completion_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.total_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.totalTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.total_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.reasoning_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.reasoningTokens}:</span>
+                        <span class="detail-value">${testData.usageInfo.reasoning_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_eval_count !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptEvalCount}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_eval_count}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.eval_count !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.evalCount}:</span>
+                        <span class="detail-value">${testData.usageInfo.eval_count}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_eval_duration !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptEvalDuration}:</span>
+                        <span class="detail-value">${(testData.usageInfo.prompt_eval_duration / 1000000).toFixed(2)} ms</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.eval_duration !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.evalDuration}:</span>
+                        <span class="detail-value">${(testData.usageInfo.eval_duration / 1000000).toFixed(2)} ms</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.promptTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.completionTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.completion_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.queue_time !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">${usageLabels.queueTime}:</span>
+                        <span class="detail-value">${testData.usageInfo.queue_time.toFixed(2)} s</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.prompt_tokens_details?.cached_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">Cached Tokens:</span>
+                        <span class="detail-value">${testData.usageInfo.prompt_tokens_details.cached_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.completion_tokens_details?.reasoning_tokens !== undefined) {
+                    usageItems += `<div class="detail-info-item">
+                        <span class="detail-label">Reasoning Tokens (detail):</span>
+                        <span class="detail-value">${testData.usageInfo.completion_tokens_details.reasoning_tokens}</span>
+                    </div>`;
+                }
+                if (testData.usageInfo.timings) {
+                    Object.keys(testData.usageInfo.timings).forEach(key => {
+                        usageItems += `<div class="detail-info-item">
+                            <span class="detail-label">Timings.${key}:</span>
+                            <span class="detail-value">${typeof testData.usageInfo.timings[key] === 'number' ? testData.usageInfo.timings[key].toFixed(2) : testData.usageInfo.timings[key]}</span>
+                        </div>`;
+                    });
+                }
+                
+                usageHTML = `<div class="detail-section">
+                    <div class="detail-section-title">${t.detailSectionUsage}</div>
+                    <div class="detail-info-grid">
+                        ${usageItems}
+                    </div>
+                </div>`;
+            }
 
             // 构建详情内容
             let detailHTML = `
@@ -2995,84 +3128,8 @@
                         </div>
                     </div>
 
-                    <!-- API Usage Statistics -->
-                    ${testData.usageInfo ? `
-                    <div class="detail-section">
-                        <div class="detail-section-title">${t.detailSectionUsage}</div>
-                        <div class="detail-info-grid">
-                            ${testData.usageInfo.prompt_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageCompletionTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.completion_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.total_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageTotalTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.total_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.reasoning_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageReasoningTokens}:</span>
-                                <span class="detail-value">${testData.usageInfo.reasoning_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_eval_count !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptEvalCount}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_eval_count}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.eval_count !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageEvalCount}:</span>
-                                <span class="detail-value">${testData.usageInfo.eval_count}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_eval_duration !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptEvalDuration}:</span>
-                                <span class="detail-value">${(testData.usageInfo.prompt_eval_duration / 1000000).toFixed(2)} ms</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.eval_duration !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageEvalDuration}:</span>
-                                <span class="detail-value">${(testData.usageInfo.eval_duration / 1000000).toFixed(2)} ms</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsagePromptTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageCompletionTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.completion_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.queue_time !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">${t.detailUsageQueueTime}:</span>
-                                <span class="detail-value">${testData.usageInfo.queue_time.toFixed(2)} s</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.prompt_tokens_details?.cached_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Cached Tokens:</span>
-                                <span class="detail-value">${testData.usageInfo.prompt_tokens_details.cached_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.completion_tokens_details?.reasoning_tokens !== undefined ? `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Reasoning Tokens (detail):</span>
-                                <span class="detail-value">${testData.usageInfo.completion_tokens_details.reasoning_tokens}</span>
-                            </div>` : ''}
-                            ${testData.usageInfo.timings ? Object.keys(testData.usageInfo.timings).map(key => `
-                            <div class="detail-info-item">
-                                <span class="detail-label">Timings.${key}:</span>
-                                <span class="detail-value">${typeof testData.usageInfo.timings[key] === 'number' ? testData.usageInfo.timings[key].toFixed(2) : testData.usageInfo.timings[key]}</span>
-                            </div>`).join('') : ''}
-                        </div>
-                    </div>
-                    ` : ''}
+                    <!-- API使用统计 -->
+                    ${usageHTML}
 
                     <!-- 请求配置 -->
                     <div class="detail-section">
@@ -3349,7 +3406,7 @@
                     };
                     const saved = saveTestToHistory(currentConfig, testResultsData, statsData);
                     if (saved) {
-                        const stopInfo = wasManuallyStopped ? '(manually stopped)' : '';
+                        const stopInfo = wasManuallyStopped ? '(手动停止)' : '';
                         console.log(`[历史记录] 测试结果已自动保存 ${stopInfo}`);
                     }
                 }
