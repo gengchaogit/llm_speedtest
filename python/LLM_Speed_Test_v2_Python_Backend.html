@@ -3123,6 +3123,18 @@ async function processOllamaResponse(response, promptLength) {
                 detailButton.className = 'detail-button';
                 detailButton.textContent = t.detailBtnView;
 
+                // 检查是否保存详情内容
+                const saveDetailContent = document.getElementById('saveDetailContent').checked;
+
+                // 如果不保存详情，清理concurrentDetails中的文本内容以节省存储空间
+                let concurrentDetailsToSave = message.concurrent_details;
+                if (!saveDetailContent) {
+                    concurrentDetailsToSave = message.concurrent_details.map(detail => {
+                        const { prompt_text, output_content, reasoning_content, ...rest } = detail;
+                        return rest;
+                    });
+                }
+
                 // Prepare result entry for detail view
                 const resultEntry = {
                     promptLength: message.prompt_length,
@@ -3133,10 +3145,10 @@ async function processOllamaResponse(response, promptLength) {
                     outputSpeed: totalOutputSpeed.toFixed(2),  // 修复：使用总吞吐而不是平均值
                     status: t.statusSuccess,
                     concurrency: message.concurrency,
-                    concurrentDetails: message.concurrent_details,
-                    promptText: message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length),
-                    outputText: message.concurrent_details[0]?.output_content || '',
-                    reasoningText: message.concurrent_details[0]?.reasoning_content || '',
+                    concurrentDetails: concurrentDetailsToSave,
+                    promptText: saveDetailContent ? (message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length)) : '',
+                    outputText: saveDetailContent ? (message.concurrent_details[0]?.output_content || '') : '',
+                    reasoningText: saveDetailContent ? (message.concurrent_details[0]?.reasoning_content || '') : '',
                     usageInfo: message.concurrent_details[0]?.usage_info || null,
                     tokenSource: message.concurrent_details[0]?.token_source || 'Unknown',
                     requestConfig: {
