@@ -1294,6 +1294,12 @@
                 detailUsageQueueTime: 'Queue Time',
                 detailUsagePromptPerSec: 'Prompt Tokens/Sec',
                 detailUsageCompletionPerSec: 'Completion Tokens/Sec',
+                detailTokenSource: 'Token统计来源:',
+                tokenSourceAPI: 'API',
+                tokenSourceLocalEstimation: '本地估算',
+                tokenSourceUnknown: '未知',
+                tokenSourceAPINote: '✓ 使用API返回的准确统计',
+                tokenSourceEstimationNote: '⚠ 本地估算值，可能不准确',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1493,6 +1499,12 @@
                 detailUsageQueueTime: 'Queue Time',
                 detailUsagePromptPerSec: 'Prompt Tokens/Sec',
                 detailUsageCompletionPerSec: 'Completion Tokens/Sec',
+                detailTokenSource: 'Token Statistics Source:',
+                tokenSourceAPI: 'API',
+                tokenSourceLocalEstimation: 'Local Estimation',
+                tokenSourceUnknown: 'Unknown',
+                tokenSourceAPINote: '✓ Using accurate API statistics',
+                tokenSourceEstimationNote: '⚠ Local estimation, may be inaccurate',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -2215,6 +2227,7 @@
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
                         usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
+                        tokenSource: concurrencyResults[0]?.tokenSource || 'Unknown',  // 保存token来源
                         requestConfig: {
                             apiType: 'OpenAI Compatible',
                             model: modelName,
@@ -2461,18 +2474,23 @@
 
                 //  Token统计：优先使用usage中的准确值
                 let receivedTokens;
+                let tokenSource = ''; // 记录token统计来源
 
                 if (actualOutputTokensFromUsage && actualOutputTokensFromUsage > 0) {
                     // 优先使用API返回的usage
                     receivedTokens = actualOutputTokensFromUsage;
+                    tokenSource = 'API';
+                    console.log(`[Token统计] 来源: API usage (${receivedTokens} tokens)`);
                 } else if (reasoningContent.length > 0 || outputContent.length > 0) {
                     // Fallback: 估算
                     const reasoningTokens = estimateTokenCount(reasoningContent);
                     const completionTokens = estimateTokenCount(outputContent);
                     receivedTokens = reasoningTokens + completionTokens;
-                    console.log(`[Token估算] reasoning: ${reasoningTokens}, completion: ${completionTokens}, 总计: ${receivedTokens}`);
+                    tokenSource = '本地估算';
+                    console.log(`[Token估算] 来源: 本地估算 - reasoning: ${reasoningTokens}, completion: ${completionTokens}, 总计: ${receivedTokens}`);
                 } else {
                     receivedTokens = 0;
+                    tokenSource = '无数据';
                 }
 
                 //  计算时间：优先使用服务器真实处理时间，否则使用端到端测量
@@ -2507,7 +2525,8 @@
                     outputContent: outputContent + reasoningContent,  // 完整输出内容（思考+答案）
                     reasoningContent: reasoningContent,  // 单独的思考内容
                     completionContent: outputContent,  // 单独的答案内容
-                    usageInfo: usageInfo  // API返回的完整usage信息
+                    usageInfo: usageInfo,  // API返回的完整usage信息
+                    tokenSource: tokenSource  // Token统计来源（API/本地估算/无数据）
                 };
             } catch (error) {
                 console.error(`[Error] executeAndMeasureRequest异常:`, error);
@@ -2837,6 +2856,7 @@
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
                         usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
+                        tokenSource: concurrencyResults[0]?.tokenSource || 'Unknown',  // 保存token来源
                         requestConfig: {
                             apiType: 'Ollama',
                             model: modelName,
@@ -2951,7 +2971,8 @@
                 outputContent: outputText,  // 完整输出内容
                 reasoningContent: '',  // Ollama目前不单独区分思考内容
                 completionContent: outputText,  // 答案内容
-                usageInfo: usageInfo  // API返回的完整usage信息
+                usageInfo: usageInfo,  // API返回的完整usage信息
+                tokenSource: 'API'  // Ollama总是返回准确的token统计
             };
         }
 
@@ -2995,7 +3016,27 @@
             // 预先构建 Usage 部分的 HTML
             let usageHTML = '';
             if (testData.usageInfo) {
-                let usageItems = '';
+                // 添加统计来源标识
+                const sourceRaw = testData.tokenSource || 'Unknown';
+                let sourceLabel, sourceNote;
+                if (sourceRaw === 'API') {
+                    sourceLabel = t.tokenSourceAPI;
+                    sourceNote = t.tokenSourceAPINote;
+                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
+                    sourceLabel = t.tokenSourceLocalEstimation;
+                    sourceNote = t.tokenSourceEstimationNote;
+                } else {
+                    sourceLabel = t.tokenSourceUnknown;
+                    sourceNote = t.tokenSourceEstimationNote;
+                }
+                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                let sourceHTML = `<div class="detail-info-item" style="grid-column: 1 / -1;">
+                    <span class="detail-label">${t.detailTokenSource}</span>
+                    <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
+                    <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                </div>`;
+
+                let usageItems = sourceHTML;
 
                 if (testData.usageInfo.prompt_tokens !== undefined) {
                     usageItems += `<div class="detail-info-item">
@@ -3088,6 +3129,31 @@
                     <div class="detail-section-title">${t.detailSectionUsage}</div>
                     <div class="detail-info-grid">
                         ${usageItems}
+                    </div>
+                </div>`;
+            } else if (testData.tokenSource) {
+                // 即使没有usageInfo，也显示tokenSource
+                const sourceRaw = testData.tokenSource;
+                let sourceLabel, sourceNote;
+                if (sourceRaw === 'API') {
+                    sourceLabel = t.tokenSourceAPI;
+                    sourceNote = t.tokenSourceAPINote;
+                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
+                    sourceLabel = t.tokenSourceLocalEstimation;
+                    sourceNote = t.tokenSourceEstimationNote;
+                } else {
+                    sourceLabel = t.tokenSourceUnknown;
+                    sourceNote = t.tokenSourceEstimationNote;
+                }
+                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                usageHTML = `<div class="detail-section">
+                    <div class="detail-section-title">${t.detailSectionUsage}</div>
+                    <div class="detail-info-grid">
+                        <div class="detail-info-item" style="grid-column: 1 / -1;">
+                            <span class="detail-label">${t.detailTokenSource}</span>
+                            <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
+                            <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                        </div>
                     </div>
                 </div>`;
             }
