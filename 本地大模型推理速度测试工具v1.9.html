@@ -2189,9 +2189,21 @@
                         return sum + tokens;
                     }, 0) / concurrencyResults.length;
 
-                    // 计算总吞吐
-                    const totalPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0);
-                    const totalOutputSpeed = concurrencyResults.reduce((sum, res) => sum + res.outputSpeed, 0);
+                    // 计算真实的总吞吐（基于时间戳）
+                    const minStartTime = Math.min(...concurrencyResults.map(r => r.startTimestamp));
+                    const maxFirstTokenTime = Math.max(...concurrencyResults.map(r => r.firstTokenTimestamp));
+                    const prefillDurationMs = maxFirstTokenTime - minStartTime;
+                    const totalPromptTokens = concurrencyResults.reduce((sum, r) => sum + r.actualPromptTokens, 0);
+                    const totalPrefillSpeed = prefillDurationMs > 0 ? (totalPromptTokens / (prefillDurationMs / 1000)) : 0;
+
+                    const minFirstTokenTime = Math.min(...concurrencyResults.map(r => r.firstTokenTimestamp));
+                    const maxEndTime = Math.max(...concurrencyResults.map(r => r.endTimestamp));
+                    const decodeDurationMs = maxEndTime - minFirstTokenTime;
+                    const totalOutputTokens = concurrencyResults.reduce((sum, r) => sum + r.outputTokens, 0);
+                    const totalOutputSpeed = decodeDurationMs > 0 ? (totalOutputTokens / (decodeDurationMs / 1000)) : 0;
+
+                    console.log(`[并发总吞吐] Prefill: ${totalPromptTokens} tokens / ${prefillDurationMs.toFixed(2)}ms = ${totalPrefillSpeed.toFixed(2)} t/s`);
+                    console.log(`[并发总吞吐] Decode: ${totalOutputTokens} tokens / ${decodeDurationMs.toFixed(2)}ms = ${totalOutputSpeed.toFixed(2)} t/s`);
 
                     // 仅在成功时更新统计
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
@@ -2526,7 +2538,11 @@
                     reasoningContent: reasoningContent,  // 单独的思考内容
                     completionContent: outputContent,  // 单独的答案内容
                     usageInfo: usageInfo,  // API返回的完整usage信息
-                    tokenSource: tokenSource  // Token统计来源（API/本地估算/无数据）
+                    tokenSource: tokenSource,  // Token统计来源（API/本地估算/无数据）
+                    // 添加时间戳用于计算并发总吞吐
+                    startTimestamp: startTime,
+                    firstTokenTimestamp: firstTokenTime,
+                    endTimestamp: endTime
                 };
             } catch (error) {
                 console.error(`[Error] executeAndMeasureRequest异常:`, error);
@@ -2819,9 +2835,21 @@
                         return sum + tokens;
                     }, 0) / concurrencyResults.length;
 
-                    //
-                    const totalPrefillSpeed = concurrencyResults.reduce((sum, res) => sum + res.prefillSpeed, 0);
-                    const totalOutputSpeed = concurrencyResults.reduce((sum, res) => sum + res.outputSpeed, 0);
+                    // 计算真实的总吞吐（基于时间戳）
+                    const minStartTime = Math.min(...concurrencyResults.map(r => r.startTimestamp));
+                    const maxFirstTokenTime = Math.max(...concurrencyResults.map(r => r.firstTokenTimestamp));
+                    const prefillDurationMs = maxFirstTokenTime - minStartTime;
+                    const totalPromptTokens = concurrencyResults.reduce((sum, r) => sum + r.actualPromptTokens, 0);
+                    const totalPrefillSpeed = prefillDurationMs > 0 ? (totalPromptTokens / (prefillDurationMs / 1000)) : 0;
+
+                    const minFirstTokenTime = Math.min(...concurrencyResults.map(r => r.firstTokenTimestamp));
+                    const maxEndTime = Math.max(...concurrencyResults.map(r => r.endTimestamp));
+                    const decodeDurationMs = maxEndTime - minFirstTokenTime;
+                    const totalOutputTokens = concurrencyResults.reduce((sum, r) => sum + r.outputTokens, 0);
+                    const totalOutputSpeed = decodeDurationMs > 0 ? (totalOutputTokens / (decodeDurationMs / 1000)) : 0;
+
+                    console.log(`[Ollama 并发总吞吐] Prefill: ${totalPromptTokens} tokens / ${prefillDurationMs.toFixed(2)}ms = ${totalPrefillSpeed.toFixed(2)} t/s`);
+                    console.log(`[Ollama 并发总吞吐] Decode: ${totalOutputTokens} tokens / ${decodeDurationMs.toFixed(2)}ms = ${totalOutputSpeed.toFixed(2)} t/s`);
 
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
 

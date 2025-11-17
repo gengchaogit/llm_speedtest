@@ -328,21 +328,27 @@ async def execute_single_request(
         print(f"[Timing] Server Prefill: {server_prefill_time_ms}ms, Server Decode: {server_decode_time_ms}ms")
         
         # Token统计
+        token_source = ''
         if actual_prompt_tokens is None:
             # Fallback: 使用prompt_length作为估算（因为我们控制了prompt生成）
             actual_prompt_tokens = prompt_length
             print(f"[Token] Prompt估算: {actual_prompt_tokens} (使用设定长度)")
         else:
             print(f"[Token] Prompt来自usage: {actual_prompt_tokens}")
-        
+
         if actual_output_tokens is None:
             # 使用精确的token估算函数
             reasoning_tokens = estimate_token_count(reasoning_content)
             completion_tokens = estimate_token_count(output_content)
             actual_output_tokens = reasoning_tokens + completion_tokens
+            token_source = 'Local Estimation'
             print(f"[Token] Output估算: {actual_output_tokens} (reasoning: {reasoning_tokens}, completion: {completion_tokens})")
         else:
+            token_source = 'API'
             print(f"[Token] Output来自usage: {actual_output_tokens}")
+
+        if not token_source:
+            token_source = 'Unknown'
         
         # 计算时间：完全使用端到端测量
         # vLLM的timing字段（prompt_ms/predicted_ms）不可靠，与实际差异很大
@@ -375,10 +381,16 @@ async def execute_single_request(
             "output_time_ms": round(output_time_ms, 2),
             "output_speed": round(output_speed, 2),
             "total_time_ms": round(total_time_ms, 2),
+            "prompt_text": prompt_text,  # 添加实际的提示词文本
             "output_content": output_content,
             "reasoning_content": reasoning_content,
             "usage_info": usage_info,
-            "server_timing_used": server_prefill_time_ms is not None
+            "server_timing_used": server_prefill_time_ms is not None,
+            # 添加绝对时间戳用于并发总吞吐计算
+            "start_timestamp": start_time,
+            "first_token_timestamp": first_token_time,
+            "end_timestamp": end_time,
+            "token_source": token_source  # 添加token来源
         }
     
     except Exception as e:

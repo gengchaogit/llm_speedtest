@@ -1294,6 +1294,12 @@
                 detailUsageQueueTime: 'Queue Time',
                 detailUsagePromptPerSec: 'Prompt Tokens/Sec',
                 detailUsageCompletionPerSec: 'Completion Tokens/Sec',
+                detailTokenSource: 'Token统计来源:',
+                tokenSourceAPI: 'API',
+                tokenSourceLocalEstimation: '本地估算',
+                tokenSourceUnknown: '未知',
+                tokenSourceAPINote: '✓ 使用API返回的准确统计',
+                tokenSourceEstimationNote: '⚠ 本地估算值，可能不准确',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1493,6 +1499,12 @@
                 detailUsageQueueTime: 'Queue Time',
                 detailUsagePromptPerSec: 'Prompt Tokens/Sec',
                 detailUsageCompletionPerSec: 'Completion Tokens/Sec',
+                detailTokenSource: 'Token Statistics Source:',
+                tokenSourceAPI: 'API',
+                tokenSourceLocalEstimation: 'Local Estimation',
+                tokenSourceUnknown: 'Unknown',
+                tokenSourceAPINote: '✓ Using accurate API statistics',
+                tokenSourceEstimationNote: '⚠ Local estimation, may be inaccurate',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -2582,8 +2594,9 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
             testResultsData.forEach(res => {
                 if (res.concurrentDetails && Array.isArray(res.concurrentDetails)) {
                     res.concurrentDetails.forEach(detail => {
-                        const prefillSpeed = parseFloat(detail.prefillSpeed);
-                        const decodeSpeed = parseFloat(detail.outputSpeed);
+                        // 后端返回的是下划线格式字段名
+                        const prefillSpeed = parseFloat(detail.prefill_speed);
+                        const decodeSpeed = parseFloat(detail.output_speed);
 
                         if (!isNaN(prefillSpeed) && isFinite(prefillSpeed)) allPrefillSpeedValues.push(prefillSpeed);
                         if (!isNaN(decodeSpeed) && isFinite(decodeSpeed)) allDecodeSpeedValues.push(decodeSpeed);
@@ -3071,56 +3084,78 @@ async function processOllamaResponse(response, promptLength) {
             }
             
             const cells = row.querySelectorAll('td');
-            
+
             if (message.status === '成功' || message.status === 'Success') {
+                // Calculate true total throughput based on timestamps
+                const details = message.concurrent_details;
+
+                // 调试：查看第一个请求的时间戳字段
+                console.log('[Debug] First detail item:', JSON.stringify(details[0], null, 2));
+
+                // Prefill: 从最早开始到最晚的first_token
+                const minStartTime = Math.min(...details.map(r => r.start_timestamp));
+                const maxFirstTokenTime = Math.max(...details.map(r => r.first_token_timestamp));
+                const prefillDurationSec = maxFirstTokenTime - minStartTime;
+                const totalPromptTokens = details.reduce((sum, r) => sum + r.prompt_tokens, 0);
+                const totalPrefillSpeed = prefillDurationSec > 0 ? totalPromptTokens / prefillDurationSec : 0;
+
+                // Decode: 从最早的first_token到最晚的end
+                const minFirstTokenTime = Math.min(...details.map(r => r.first_token_timestamp));
+                const maxEndTime = Math.max(...details.map(r => r.end_timestamp));
+                const decodeDurationSec = maxEndTime - minFirstTokenTime;
+                const totalOutputTokens = details.reduce((sum, r) => sum + r.output_tokens, 0);
+                const totalOutputSpeed = decodeDurationSec > 0 ? totalOutputTokens / decodeDurationSec : 0;
+
+                console.log(`[Throughput] Prefill: ${totalPromptTokens} tokens / ${prefillDurationSec.toFixed(3)}s = ${totalPrefillSpeed.toFixed(2)} t/s`);
+                console.log(`[Throughput] Decode: ${totalOutputTokens} tokens / ${decodeDurationSec.toFixed(3)}s = ${totalOutputSpeed.toFixed(2)} t/s`);
+
                 cells[0].textContent = message.prompt_length;
                 cells[1].textContent = message.avg_ttft_ms.toFixed(2);
-                cells[2].textContent = message.avg_prefill_speed.toFixed(2);
+                cells[2].textContent = totalPrefillSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
                 cells[3].textContent = message.concurrent_details[0]?.output_tokens || 'N/A';
                 cells[4].textContent = message.concurrent_details[0]?.output_time_ms.toFixed(2) || 'N/A';
-                cells[5].textContent = message.avg_output_speed.toFixed(2);
+                cells[5].textContent = totalOutputSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
                 cells[6].textContent = `${message.successful}/${message.concurrency} ${t.msgConcurrentSuccess}`;
-                
+
                 // Create detail button
                 cells[7].textContent = '';
                 const detailButton = document.createElement('button');
                 detailButton.className = 'detail-button';
                 detailButton.textContent = t.detailBtnView;
-                
+
                 // Prepare result entry for detail view
                 const resultEntry = {
                     promptLength: message.prompt_length,
                     prefillTimeMs: message.concurrent_details[0]?.prefill_time_ms.toFixed(2) || 'N/A',
-                    prefillSpeed: message.avg_prefill_speed.toFixed(2),
+                    prefillSpeed: totalPrefillSpeed.toFixed(2),  // 修复：使用总吞吐而不是平均值
                     outputTokens: message.concurrent_details[0]?.output_tokens || 'N/A',
                     outputTimeMs: message.concurrent_details[0]?.output_time_ms.toFixed(2) || 'N/A',
-                    outputSpeed: message.avg_output_speed.toFixed(2),
+                    outputSpeed: totalOutputSpeed.toFixed(2),  // 修复：使用总吞吐而不是平均值
                     status: t.statusSuccess,
                     concurrency: message.concurrency,
                     concurrentDetails: message.concurrent_details,
-                    promptText: 'a'.repeat(message.prompt_length),
+                    promptText: message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length),
                     outputText: message.concurrent_details[0]?.output_content || '',
                     reasoningText: message.concurrent_details[0]?.reasoning_content || '',
                     usageInfo: message.concurrent_details[0]?.usage_info || null,
+                    tokenSource: message.concurrent_details[0]?.token_source || 'Unknown',
                     requestConfig: {
                         apiType: currentApiType === 'openai' ? 'OpenAI Compatible' : 'Ollama',
                         model: currentModelName
                     },
                     timestamp: new Date().toISOString()
                 };
-                
+
                 detailButton.onclick = () => showTestDetail(resultEntry);
                 cells[7].appendChild(detailButton);
-                
+
                 row.classList.remove('info', 'error');
                 row.classList.add('success');
-                
+
                 // Add to results data
                 testResultsData.push(resultEntry);
-                
+
                 // Update charts and stats
-                const totalPrefillSpeed = message.concurrent_details.reduce((sum, r) => sum + r.prefill_speed, 0);
-                const totalOutputSpeed = message.concurrent_details.reduce((sum, r) => sum + r.output_speed, 0);
                 updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
                 generateCharts();
                 
@@ -3194,8 +3229,26 @@ async function processOllamaResponse(response, promptLength) {
             // 预先构建 Usage 部分的 HTML
             let usageHTML = '';
             if (testData.usageInfo) {
-                let usageItems = '';
-                
+                // 添加统计来源标识
+                const sourceRaw = testData.tokenSource || 'Unknown';
+                let sourceLabel, sourceNote;
+                if (sourceRaw === 'API') {
+                    sourceLabel = t.tokenSourceAPI;
+                    sourceNote = t.tokenSourceAPINote;
+                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
+                    sourceLabel = t.tokenSourceLocalEstimation;
+                    sourceNote = t.tokenSourceEstimationNote;
+                } else {
+                    sourceLabel = t.tokenSourceUnknown;
+                    sourceNote = t.tokenSourceEstimationNote;
+                }
+                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                let usageItems = `<div class="detail-info-item" style="grid-column: 1 / -1;">
+                    <span class="detail-label">${t.detailTokenSource}</span>
+                    <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
+                    <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                </div>`;
+
                 if (testData.usageInfo.prompt_tokens !== undefined) {
                     usageItems += `<div class="detail-info-item">
                         <span class="detail-label">${usageLabels.promptTokens}:</span>
@@ -3287,6 +3340,31 @@ async function processOllamaResponse(response, promptLength) {
                     <div class="detail-section-title">${t.detailSectionUsage}</div>
                     <div class="detail-info-grid">
                         ${usageItems}
+                    </div>
+                </div>`;
+            } else if (testData.tokenSource) {
+                // 即使没有usageInfo，也显示tokenSource
+                const sourceRaw = testData.tokenSource;
+                let sourceLabel, sourceNote;
+                if (sourceRaw === 'API') {
+                    sourceLabel = t.tokenSourceAPI;
+                    sourceNote = t.tokenSourceAPINote;
+                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
+                    sourceLabel = t.tokenSourceLocalEstimation;
+                    sourceNote = t.tokenSourceEstimationNote;
+                } else {
+                    sourceLabel = t.tokenSourceUnknown;
+                    sourceNote = t.tokenSourceEstimationNote;
+                }
+                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                usageHTML = `<div class="detail-section">
+                    <div class="detail-section-title">${t.detailSectionUsage}</div>
+                    <div class="detail-info-grid">
+                        <div class="detail-info-item" style="grid-column: 1 / -1;">
+                            <span class="detail-label">${t.detailTokenSource}</span>
+                            <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
+                            <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                        </div>
                     </div>
                 </div>`;
             }
@@ -3556,12 +3634,7 @@ async function processOllamaResponse(response, promptLength) {
             notesMessage.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${concurrency} | ${t.labelTimeoutPrefix} ${timeout/1000}s`;
             resultsDiv.appendChild(notesMessage);
 
-            if (concurrency > 6) {
-                const warningDiv = document.createElement('div');
-                warningDiv.className = 'concurrency-warning';
-                warningDiv.textContent = t.warningConcurrency;
-                resultsDiv.appendChild(warningDiv);
-            }
+            // Python后端版本不受浏览器并发连接限制，无需警告
 
             const table = document.createElement('table');
             const thead = document.createElement('thead');
