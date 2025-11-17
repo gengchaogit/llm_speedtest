@@ -1,6 +1,6 @@
-# 🚀 Local LLM Inference Speed Test Tool v2.0 (Chao Modded Version)
+# 🚀 Local LLM Inference Speed Test Tool v2.1 (Chao Modded Version)
 
-![Version](https://img.shields.io/badge/version-2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1-blue.svg)
 
 ---
 
@@ -10,13 +10,26 @@
 
 ## Introduction
 
-This project is a powerful browser-side local large language model (LLM) inference performance testing tool. It aims to help users quickly and conveniently test the Prefill (prompt processing) and Decode (token generation/output) performance of various locally deployed LLM inference services. It runs offline directly in the browser, requiring no server-side deployment, thus ensuring data privacy and testing convenience.
+This project is a powerful local large language model (LLM) inference performance testing tool designed to help users quickly and conveniently test the Prefill (prompt processing) and Decode (token generation/output) performance of various locally deployed LLM inference services.
 
-This tool is a modified version based on the original work by "Zhiyuan Suifeng" (Bilibili/DeepSeek-R1-0528), adding several practical features and optimizations. These include a retry mechanism, automatic chart display, separation of Prefill and Decode speeds, fixes for concurrency issues, request timeout control, and automatic configuration saving.
+**Two versions available:**
+- **Browser Version**: Runs offline directly in browser with no server deployment needed, ensuring data privacy and testing convenience
+- **Python Backend Version** (New in v2.1): Uses Python backend to send requests, breaking through browser's 6-connection limit, supporting true high concurrency testing (50+ concurrent)
+
+This tool is a modified version based on the original work by "Zhiyuan Suifeng" (Bilibili/DeepSeek-R1-0528), adding practical features and optimizations including retry mechanism, automatic chart display, Prefill/Decode speed separation, concurrency fixes, request timeout control, auto-save configuration, concurrent throughput fixes, and token source tracking.
 
 ## Changelog
 
 <!-- Please note, the following changelog starts from v1.7. -->
+
+### v2.1 (Chao Enhanced Modded Version - Python Backend & Concurrent Throughput Fix)
+*   **🐍 Python Backend Version**: New Python backend version breaks through browser 6-connection limit, supports true high concurrency testing (50+ concurrent)
+*   **🔍 Token Source Tracking**: Test details show token statistics source (API/Local Estimation/Unknown), with ⚠ warning for local estimations
+*   **🔧 Concurrent Throughput Fix**: Fixed concurrent throughput calculation error - now uses real wall-clock time (total tokens / total elapsed time) instead of incorrectly summing individual request throughputs
+*   **📊 Percentile Statistics**: Display P50/P90/P95 percentile statistics for more accurate performance distribution assessment
+*   **💾 Enhanced Storage Optimization**: When "save test details" is unchecked, prompt/output text is not saved, dramatically reducing storage usage (98% reduction for 50 concurrent tests)
+*   **🚀 One-Click Launch Scripts**: Python version provides launch scripts (Chinese/English) that auto-start backend server and open frontend page
+*   **📖 Python Version Documentation**: Added dedicated README for Python backend version with detailed installation, configuration and usage instructions
 
 ### v2.0 (Chao Enhanced Modded Version - API Statistics Enhancement & Fixes)
 *   **📊 API Statistics Enhancement**: Display complete usage statistics in test details (prompt_tokens, completion_tokens, reasoning_tokens, etc.)

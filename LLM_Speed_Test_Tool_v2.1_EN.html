@@ -1,9 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v2.0 (chao魔改版):
+<!-- v2.1 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
+    1. (v2.1) 【Token来源追踪】测试详情显示token统计来源（API/本地估算/未知），并对本地估算值加⚠标记
+    2. (v2.1) 【并发吞吐修复】修复并发测试吞吐量计算错误：使用真实墙上时间（总tokens/总耗时）而非错误的单请求吞吐求和
+    3. (v2.1) 【百分位统计】显示P50/P90/P95百分位统计，更准确评估性能分布
+    4. (v2.1) 【存储优化】未勾选"保存测试详情"时不保存prompt和output文本，大幅减少存储占用
+    5. (v2.1) 【Python后端版本】新增Python后端版本，突破浏览器6并发限制，支持真正的高并发测试
+-->
+
+<!-- v2.0 (chao魔改版):
     1. (v2.0) 【API统计增强】在测试详情中展示完整的usage统计信息（prompt_tokens、completion_tokens、reasoning_tokens等）
     2. (v2.0) 【流式usage支持】添加stream_options参数以获取流式响应中的usage信息
     3. (v2.0) 【思考模型优化】自动检测reasoning内容并估算reasoning_tokens（当API不提供时）
@@ -53,7 +61,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v2.0</title>
+    <title>本地大模型推理速度测试工具 v2.1</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
