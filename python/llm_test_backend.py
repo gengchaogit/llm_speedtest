@@ -199,7 +199,7 @@ async def execute_single_request(
     
     try:
         print(f"[Request] 发送请求到 {api_url}")
-        async with httpx.AsyncClient(timeout=timeout/1000.0) as client:
+        async with httpx.AsyncClient(timeout=timeout/1000.0, verify=False) as client:
             async with client.stream("POST", api_url, headers=headers, json=payload) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
