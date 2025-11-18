@@ -1336,6 +1336,8 @@
                 chartLabelDecodeThroughput: '总输出吞吐 (tokens/s)',
                 chartTitlePrefillThroughput: '总预填充 (Prefill) 吞吐',
                 chartTitleDecodeThroughput: '总输出 (Decode) 吞吐',
+                chartConcurrency: '并发',
+                chartExportTitle: '性能测试图表',
                 chartAxisPromptLen: '提示词长度 (tokens)',
                 chartAxisThroughput: '吞吐 (tokens/s)',
                 chartComparisonPrefillThroughput: '对比 - 总预填充 (Prefill) 吞吐',
@@ -1543,6 +1545,8 @@
                 chartLabelDecodeThroughput: 'Total Decode Throughput (tokens/s)',
                 chartTitlePrefillThroughput: 'Total Prefill Throughput',
                 chartTitleDecodeThroughput: 'Total Decode Throughput',
+                chartConcurrency: 'Concurrency',
+                chartExportTitle: 'Performance Test Chart',
                 chartAxisPromptLen: 'Prompt Length (tokens)',
                 chartAxisThroughput: 'Throughput (tokens/s)',
                 chartComparisonPrefillThroughput: 'Comparison - Total Prefill Throughput',
@@ -1876,6 +1880,7 @@
         let currentModelName = '/model';
         let api_key = '';
         let notes = '';
+        let currentConcurrency = 1;
         let concurrencyStats = {
             minPrefillSpeed: Infinity,
             maxPrefillSpeed: 0,
@@ -3157,7 +3162,12 @@ async function processOllamaResponse(response, promptLength) {
                 const saveDetailContent = document.getElementById('saveDetailContent').checked;
 
                 // 如果不保存详情，清理concurrentDetails中的文本内容以节省存储空间
+                // 但保留第一个请求的prompt/output作为示例
                 let concurrentDetailsToSave = message.concurrent_details;
+                const firstPromptSample = message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length);
+                const firstOutputSample = message.concurrent_details[0]?.output_content || '';
+                const firstReasoningSample = message.concurrent_details[0]?.reasoning_content || '';
+                
                 if (!saveDetailContent) {
                     concurrentDetailsToSave = message.concurrent_details.map(detail => {
                         const { prompt_text, output_content, reasoning_content, ...rest } = detail;
@@ -3176,9 +3186,9 @@ async function processOllamaResponse(response, promptLength) {
                     status: t.statusSuccess,
                     concurrency: message.concurrency,
                     concurrentDetails: concurrentDetailsToSave,
-                    promptText: saveDetailContent ? (message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length)) : '',
-                    outputText: saveDetailContent ? (message.concurrent_details[0]?.output_content || '') : '',
-                    reasoningText: saveDetailContent ? (message.concurrent_details[0]?.reasoning_content || '') : '',
+                    promptText: firstPromptSample,  // 始终保存第一个请求的prompt作为示例
+                    outputText: firstOutputSample,  // 始终保存第一个请求的output作为示例
+                    reasoningText: firstReasoningSample,  // 始终保存第一个请求的reasoning作为示例
                     usageInfo: message.concurrent_details[0]?.usage_info || null,
                     tokenSource: message.concurrent_details[0]?.token_source || 'Unknown',
                     requestConfig: {
@@ -3602,6 +3612,8 @@ async function processOllamaResponse(response, promptLength) {
             const maxLength = parseInt(document.getElementById('maxLength').value, 10);
             const baseStep = parseInt(document.getElementById('step').value, 10);
             const stepMultiplier = parseInt(document.getElementById('stepMultiplier').value, 10) || 1;
+            const concurrency = parseInt(document.getElementById('concurrency').value, 10) || 1;
+            currentConcurrency = concurrency;
             
             // 计算测试点列表（指数增长）
             const testLengths = [];
@@ -3629,7 +3641,6 @@ async function processOllamaResponse(response, promptLength) {
             console.log(`[步长计算] 基础步长: ${baseStep}, 倍数: ${stepMultiplier}, 测试点: ${testLengths.join(', ')}`);
             
             const outputLength = parseInt(document.getElementById('outputLength').value, 10);
-            const concurrency = parseInt(document.getElementById('concurrency').value, 10) || 1;
             const timeout = parseInt(document.getElementById('timeout').value, 10);
             const temperature = parseFloat(document.getElementById('temperatureInput').value);
             const top_p = parseFloat(document.getElementById('topPInput').value);
@@ -3772,7 +3783,7 @@ async function processOllamaResponse(response, promptLength) {
                         apiType: currentApiType,
                         minLength: minLength,
                         maxLength: maxLength,
-                        step: step,
+                        step: baseStep,
                         stepMultiplier: stepMultiplier,
                         outputLength: outputLength,
                         concurrency: concurrency,
@@ -3926,7 +3937,7 @@ async function processOllamaResponse(response, promptLength) {
                 prefillChartCanvas,
                 outputChartCanvas,
                 `Perf_Chart_${modelName}.png`,
-                `性能测试图表 - ${currentModelName} - ${notes}` // 大标题
+                `${t.chartExportTitle} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}` // 大标题
             );
         });
 
@@ -4240,7 +4251,7 @@ async function processOllamaResponse(response, promptLength) {
                             },
                             title: {
                                 display: true,
-                                text: `${t.chartTitlePrefillThroughput} - ${currentModelName} - ${notes}`
+                                text: `${t.chartTitlePrefillThroughput} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
                             }
                         },
                         scales: {
@@ -4293,7 +4304,7 @@ async function processOllamaResponse(response, promptLength) {
                             },
                             title: {
                                 display: true,
-                                text: `${t.chartTitleDecodeThroughput} - ${currentModelName} - ${notes}`
+                                text: `${t.chartTitleDecodeThroughput} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
                             }
                         },
                         scales: {
