@@ -1071,6 +1071,10 @@
                     <input type="number" id="step" value="" step="128">
                 </div>
                 <div class="form-group">
+                    <label for="stepMultiplier">步长倍数</label>
+                    <input type="number" id="stepMultiplier" value="" min="1" step="1">
+                </div>
+                <div class="form-group">
                     <label for="outputLength">期望输出长度</label>
                     <input type="number" id="outputLength" value="" min="1">
                 </div>
@@ -1227,6 +1231,7 @@
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
                 labelStep: '步长',
+                labelStepMultiplier: '步长倍数',
                 labelOutputLength: '期望输出长度',
                 labelConcurrency: '并发数',
                 labelTimeout: '请求超时 (ms)',
@@ -1433,6 +1438,7 @@
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
                 labelStep: 'Step Size',
+                labelStepMultiplier: 'Step Multiplier',
                 labelOutputLength: 'Expected Output Length',
                 labelConcurrency: 'Concurrency',
                 labelTimeout: 'Request Timeout (ms)',
@@ -1653,6 +1659,7 @@
             document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
             document.querySelector('label[for="maxLength"]').textContent = t.labelMaxLength;
             document.querySelector('label[for="step"]').textContent = t.labelStep;
+            document.querySelector('label[for="stepMultiplier"]').textContent = t.labelStepMultiplier;
             document.querySelector('label[for="outputLength"]').textContent = t.labelOutputLength;
             document.querySelector('label[for="concurrency"]').textContent = t.labelConcurrency;
             document.querySelector('label[for="timeout"]').textContent = t.labelTimeout;
@@ -1717,6 +1724,7 @@
         let d_minLength = 512;                                                      // 生成文本的最小长度（例如，token 或字符数）
         let d_maxLength = 8192;                                                     // 生成文本的最大长度（例如，token 或字符数）
         let d_step = 512;                                                           // 每次提示词长度增加的步长
+        let d_stepMultiplier = 1;                                                   // 步长倍数（所有步长相关参数的系数）
         let d_outputLength = 128;                                                   // 期望输出的文本长度
         let d_timeout = 30000;                                                      // 请求超时时间 (ms)
         // 文本生成采样参数 (浮点数)
@@ -1920,6 +1928,7 @@
                         minLength: config.minLength,
                         maxLength: config.maxLength,
                         step: config.step,
+                        stepMultiplier: config.stepMultiplier,
                         outputLength: config.outputLength,
                         concurrency: config.concurrency,
                         temperature: config.temperature,
@@ -3590,7 +3599,10 @@ async function processOllamaResponse(response, promptLength) {
             notes = document.getElementById('notes').value.trim() || `无用户备注，接口: ${currentApiType === 'openai' ? 'OpenAI兼容接口' : 'Ollama接口'} ，模型: ${currentModelName}`;
             const minLength = parseInt(document.getElementById('minLength').value, 10);
             const maxLength = parseInt(document.getElementById('maxLength').value, 10);
-            const step = parseInt(document.getElementById('step').value, 10);
+            const baseStep = parseInt(document.getElementById('step').value, 10);
+            const stepMultiplier = parseInt(document.getElementById('stepMultiplier').value, 10) || 1;
+            const step = baseStep * stepMultiplier;  // 应用步长倍数
+            console.log(`[步长计算] 基础步长: ${baseStep}, 倍数: ${stepMultiplier}, 实际步长: ${step}`);
             const outputLength = parseInt(document.getElementById('outputLength').value, 10);
             const concurrency = parseInt(document.getElementById('concurrency').value, 10) || 1;
             const timeout = parseInt(document.getElementById('timeout').value, 10);
@@ -3608,7 +3620,8 @@ async function processOllamaResponse(response, promptLength) {
                 localStorage.setItem('llmPerfTestNotes', notes);
                 localStorage.setItem('llmPerfTestMinLength', minLength);
                 localStorage.setItem('llmPerfTestMaxLength', maxLength);
-                localStorage.setItem('llmPerfTestStep', step);
+                localStorage.setItem('llmPerfTestStep', baseStep);
+                localStorage.setItem('llmPerfTestStepMultiplier', stepMultiplier);
                 localStorage.setItem('llmPerfTestOutputLength', outputLength);
                 localStorage.setItem('llmPerfTestConcurrency', concurrency);
                 localStorage.setItem('llmPerfTestTimeout', timeout);
@@ -3735,6 +3748,7 @@ async function processOllamaResponse(response, promptLength) {
                         minLength: minLength,
                         maxLength: maxLength,
                         step: step,
+                        stepMultiplier: stepMultiplier,
                         outputLength: outputLength,
                         concurrency: concurrency,
                         temperature: temperature,
@@ -4288,6 +4302,7 @@ async function processOllamaResponse(response, promptLength) {
             const savedMinLength = localStorage.getItem('llmPerfTestMinLength');
             const savedMaxLength = localStorage.getItem('llmPerfTestMaxLength');
             const savedStep = localStorage.getItem('llmPerfTestStep');
+            const savedStepMultiplier = localStorage.getItem('llmPerfTestStepMultiplier');
             const savedOutputLength = localStorage.getItem('llmPerfTestOutputLength');
             const savedConcurrency = localStorage.getItem('llmPerfTestConcurrency');
             const savedTimeout = localStorage.getItem('llmPerfTestTimeout');
@@ -4312,6 +4327,7 @@ async function processOllamaResponse(response, promptLength) {
             document.getElementById('minLength').value = savedMinLength || d_minLength;
             document.getElementById('maxLength').value = savedMaxLength || d_maxLength;
             document.getElementById('step').value = savedStep || d_step;
+            document.getElementById('stepMultiplier').value = savedStepMultiplier || d_stepMultiplier;
             document.getElementById('outputLength').value = savedOutputLength || d_outputLength;
             document.getElementById('concurrency').value = savedConcurrency || 1;
             document.getElementById('timeout').value = savedTimeout || d_timeout;
@@ -4576,6 +4592,7 @@ async function processOllamaResponse(response, promptLength) {
                 document.getElementById('minLength').value = record.config.minLength || '';
                 document.getElementById('maxLength').value = record.config.maxLength || '';
                 document.getElementById('step').value = record.config.step || '';
+                document.getElementById('stepMultiplier').value = record.config.stepMultiplier || 1;
                 document.getElementById('outputLength').value = record.config.outputLength || '';
                 document.getElementById('concurrency').value = record.config.concurrency || '';
                 document.getElementById('temperatureInput').value = record.config.temperature !== undefined ? record.config.temperature : '';
@@ -4889,6 +4906,7 @@ async function processOllamaResponse(response, promptLength) {
             document.getElementById('minLength').value = d_minLength;
             document.getElementById('maxLength').value = d_maxLength;
             document.getElementById('step').value = d_step;
+            document.getElementById('stepMultiplier').value = d_stepMultiplier;
             document.getElementById('outputLength').value = d_outputLength;
             document.getElementById('concurrency').value = 1;
             document.getElementById('timeout').value = d_timeout;

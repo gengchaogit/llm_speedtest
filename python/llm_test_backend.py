@@ -418,6 +418,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
     
     try:
         config_data = await websocket.receive_json()
+        print(f"[WebSocket] 收到原始数据: {config_data}")
         config = TestConfig(**config_data)
         
         print(f"[Config] 接收配置 - API: {config.api_type}, 模型: {config.model_name}, 并发: {config.concurrency}")
@@ -430,6 +431,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
         
         # 计算测试点
         test_lengths = list(range(config.min_length, config.max_length + 1, config.step))
+        print(f"[TestLengths] 测试点列表: {test_lengths}")
         total_tests = len(test_lengths)
         completed = 0
         
