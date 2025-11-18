@@ -17,10 +17,22 @@ REM Change to script directory
 cd /d "%~dp0"
 
 echo [1/3] Checking dependencies...
+REM Check all dependencies in requirements.txt
+set MISSING_DEPS=0
 pip show fastapi >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show uvicorn >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show httpx >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show websockets >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show pydantic >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+
+if %MISSING_DEPS%==1 (
     echo [INFO] Installing dependencies...
-    pip install fastapi uvicorn httpx
+    pip install -r requirements.txt
 )
 
 echo [2/3] Starting Python backend server...

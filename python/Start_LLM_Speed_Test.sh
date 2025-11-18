@@ -15,9 +15,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "[1/3] Checking dependencies..."
-if ! python3 -c "import fastapi" &> /dev/null; then
+# Check all dependencies in requirements.txt
+MISSING_DEPS=0
+for pkg in fastapi uvicorn httpx websockets pydantic; do
+    if ! python3 -c "import ${pkg/uvicorn/uvicorn}" &> /dev/null; then
+        MISSING_DEPS=1
+        break
+    fi
+done
+
+if [ $MISSING_DEPS -eq 1 ]; then
     echo "[Info] Installing dependencies..."
-    pip3 install fastapi uvicorn httpx
+    pip3 install -r requirements.txt
 fi
 
 echo "[2/3] Starting Python backend server..."

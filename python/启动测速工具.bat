@@ -17,10 +17,22 @@ REM 获取当前脚本所在目录
 cd /d "%~dp0"
 
 echo [1/3] 检查依赖...
+REM 检查requirements.txt中的所有依赖
+set MISSING_DEPS=0
 pip show fastapi >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show uvicorn >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show httpx >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show websockets >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show pydantic >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+
+if %MISSING_DEPS%==1 (
     echo [提示] 正在安装依赖包...
-    pip install fastapi uvicorn httpx -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 )
 
 echo [2/3] 启动Python后端服务器...

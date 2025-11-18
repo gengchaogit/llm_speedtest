@@ -15,9 +15,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "[1/3] 检查依赖..."
-if ! python3 -c "import fastapi" &> /dev/null; then
+# 检查requirements.txt中的所有依赖
+MISSING_DEPS=0
+for pkg in fastapi uvicorn httpx websockets pydantic; do
+    if ! python3 -c "import ${pkg/uvicorn/uvicorn}" &> /dev/null; then
+        MISSING_DEPS=1
+        break
+    fi
+done
+
+if [ $MISSING_DEPS -eq 1 ]; then
     echo "[提示] 正在安装依赖包..."
-    pip3 install fastapi uvicorn httpx -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 fi
 
 echo "[2/3] 启动Python后端服务器..."
