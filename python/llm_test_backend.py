@@ -149,9 +149,11 @@ async def execute_single_request(
     
     if api_type == "openai":
         headers = {
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+        # 只有当api_key非空时才添加Authorization头
+        if api_key and api_key.strip():
+            headers["Authorization"] = f"Bearer {api_key}"
         payload = {
             "model": model_name,
             "messages": [
