@@ -1016,6 +1016,12 @@
             <h2>API 信息</h2>
             <div class="form-row">
                 <div class="form-group">
+                    <label for="backendUrl">Python后端地址</label>
+                    <input type="text" id="backendUrl" value="" placeholder="ws://localhost:18000">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
                     <label for="apiUrl">API 地址</label>
                     <input type="text" id="apiUrl" value="">
                 </div>
@@ -1208,6 +1214,7 @@
                 apiDescOllama4: '输出速度 = 输出token数 / (eval_duration / 1000)',
                 apiDescOllama5: '<strong> 支持思考模型</strong>：eval_count自动包含所有输出tokens',
                 sectionApiInfo: 'API 信息',
+                labelBackendUrl: 'Python后端地址',
                 labelApiUrl: 'API 地址',
                 labelModelName: '模型名称',
                 labelApiKey: 'API-Key',
@@ -1413,6 +1420,7 @@
                 apiDescOllama4: 'Decode speed = output tokens / (eval_duration / 1000)',
                 apiDescOllama5: '<strong> Supports thinking models</strong>: eval_count automatically includes all output tokens',
                 sectionApiInfo: 'API Information',
+                labelBackendUrl: 'Python Backend URL',
                 labelApiUrl: 'API URL',
                 labelModelName: 'Model Name',
                 labelApiKey: 'API Key',
@@ -1633,6 +1641,7 @@
             sections[3].textContent = t.sectionComparison;
 
             // 更新标签
+            document.querySelector('label[for="backendUrl"]').textContent = t.labelBackendUrl;
             document.querySelector('label[for="apiUrl"]').textContent = t.labelApiUrl;
             document.querySelector('label[for="modelName"]').textContent = t.labelModelName;
             document.querySelector('label[for="apiKey"]').textContent = t.labelApiKey;
@@ -2999,7 +3008,8 @@ async function processOllamaResponse(response, promptLength) {
             const t = translations[currentLang];
             
             // Connect to Python backend WebSocket
-            const wsUrl = 'ws://localhost:8000/ws/test';
+            const backendUrl = document.getElementById('backendUrl').value.trim() || 'ws://localhost:18000';
+            const wsUrl = backendUrl.endsWith('/ws/test') ? backendUrl : `${backendUrl}/ws/test`;
             console.log(`[WebSocket] Connecting to ${wsUrl}...`);
             
             const ws = new WebSocket(wsUrl);
@@ -4906,7 +4916,47 @@ async function processOllamaResponse(response, promptLength) {
         };
 
         //
-        window.onload = function () {
+        async function loadBackendPort() {
+            // 方法1: 从当前页面的location获取端口（如果是从后端served）
+            if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                const currentPort = window.location.port || '80';
+                console.log(`[Init] Backend port from window.location: ${currentPort}`);
+                return currentPort;
+            }
+            
+            // 方法2: 从URL参数获取端口号（bat脚本传递）
+            const urlParams = new URLSearchParams(window.location.search);
+            let port = urlParams.get('port');
+            
+            if (port) {
+                console.log(`[Init] Backend port from URL parameter: ${port}`);
+                return port;
+            }
+            
+            // 方法3: 尝试从后端API获取端口
+            try {
+                const response = await fetch('http://localhost:18000/api/port');
+                if (response.ok) {
+                    const data = await response.json();
+                    port = data.port.toString();
+                    console.log(`[Init] Backend port from API: ${port}`);
+                    return port;
+                }
+            } catch (e) {
+                console.log('[Init] Failed to fetch port from API:', e);
+            }
+            
+            // 方法4: 使用默认端口
+            console.log('[Init] Using default port: 18000');
+            return '18000';
+        }
+        
+        window.onload = async function () {
+            // 加载后端端口
+            const port = await loadBackendPort();
+            const backendUrlInput = document.getElementById('backendUrl');
+            backendUrlInput.value = `ws://localhost:${port}`;
+            
             setDefaultValues();
             // v1.9: 更新历史记录按钮文本
             const t = translations[currentLang];

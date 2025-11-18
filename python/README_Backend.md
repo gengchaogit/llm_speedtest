@@ -67,7 +67,7 @@ cd python
 python llm_test_backend.py
 ```
 
-后端服务将运行在 `http://localhost:8000`
+后端服务将运行在 `http://localhost:18000` (默认端口，可自动调整)
 
 #### 2. 打开前端页面
 
@@ -77,12 +77,21 @@ python llm_test_backend.py
 
 ### 后端配置
 
-编辑 `llm_test_backend.py` 中的配置（如需修改）：
+#### 端口配置
+
+后端服务会**自动选择一个未占用的随机端口**，避免端口冲突。端口信息会自动传递给前端HTML页面。
+
+如需手动指定端口，可以在启动时传递端口参数：
+
+```bash
+python llm_test_backend.py 8080  # 使用指定端口8080
+```
+
+#### CORS配置
+
+编辑 `llm_test_backend.py` 中的CORS配置（如需修改）：
 
 ```python
-# 端口配置
-port = 8000  # 默认端口
-
 # CORS配置（跨域）
 app.add_middleware(
     CORSMiddleware,
@@ -93,7 +102,10 @@ app.add_middleware(
 
 ### 前端配置
 
+前端页面会自动从URL参数接收后端端口信息。如需手动修改后端地址，可以在页面顶部的**"Python后端地址"**输入框中修改。
+
 前端页面的所有功能与浏览器版本相同，包括：
+- 后端地址配置（支持手动修改）
 - API地址、模型名称、并发数等参数配置
 - 历史记录管理
 - 图表导出
@@ -152,12 +164,16 @@ app.add_middleware(
 **错误**: `Address already in use`
 
 **解决方法**:
-```bash
-# 查找占用端口的进程
-netstat -ano | findstr :8000  # Windows
-lsof -i :8000  # Linux/macOS
 
-# 修改端口或关闭占用进程
+v2.2版本已自动使用随机未占用端口，默认优先使用端口**18000**。一般不会遇到端口冲突。如果仍然遇到，可以：
+
+```bash
+# 手动指定一个空闲端口
+python llm_test_backend.py 8080
+
+# 或查找占用端口的进程
+netstat -ano | findstr :18000  # Windows
+lsof -i :18000  # Linux/macOS
 ```
 
 ### 2. 前端连接失败
@@ -167,8 +183,9 @@ lsof -i :8000  # Linux/macOS
 **检查步骤**:
 1. 确认后端已启动且运行正常
 2. 检查浏览器控制台(F12)查看错误信息
-3. 确认后端URL正确（默认：`ws://localhost:8000/ws/test`）
-4. 检查防火墙设置
+3. 确认页面顶部的"Python后端地址"是否正确（一般会自动设置）
+4. 如需手动修改，格式为：`ws://localhost:端口号`（无需添加/ws/test后缀）
+5. 检查防火墙设置
 
 ### 3. 并发测试结果异常
 
@@ -222,7 +239,14 @@ pip install -i https://pypi.mirrors.ustc.edu.cn/simple fastapi uvicorn httpx
 
 ## 更新日志
 
-### v2.1 (当前版本)
+### v2.2 (当前版本)
+- ✅ **智能端口选择**：默认使用端口18000（避开常见端口），被占用时自动选择随机端口
+- ✅ **端口自动传递**：启动脚本自动捕获端口并传递给HTML前端
+- ✅ **前端显示配置**：HTML页面可显示和修改后端地址
+- ✅ **手动端口指定**：支持通过命令行参数手动指定端口
+- ✅ **历史记录保持**：使用固定默认端口，确保localStorage历史记录不丢失
+
+### v2.1
 - ✅ 初始发布Python后端版本
 - ✅ 支持50+真实高并发测试
 - ✅ 修复并发吞吐量计算错误
@@ -244,5 +268,5 @@ pip install -i https://pypi.mirrors.ustc.edu.cn/simple fastapi uvicorn httpx
 ---
 
 **开发者**: chao (魔改版维护者)
-**版本**: v2.1
+**版本**: v2.2
 **最后更新**: 2025-11-18

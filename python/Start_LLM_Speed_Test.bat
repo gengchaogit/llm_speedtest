@@ -24,18 +24,43 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/3] Starting Python backend server...
-start "LLM Speed Test Backend" cmd /k "python llm_test_backend.py"
 
-echo [3/3] Waiting for server to start...
-timeout /t 3 /nobreak >nul
+REM Delete old port config file
+if exist ".backend_port" del ".backend_port"
+
+REM Start Python backend in new window (backend will write .backend_port file)
+start "" python llm_test_backend.py
+
+echo [INFO] Waiting for backend to start...
+REM Wait for port config file to be created (max 10 seconds)
+set /a count=0
+:wait_port
+timeout /t 1 /nobreak >nul
+if exist ".backend_port" (
+    set /p BACKEND_PORT=<.backend_port
+    if not "%BACKEND_PORT%"=="" goto port_found
+)
+set /a count+=1
+if %count% lss 10 goto wait_port
+
+echo [WARNING] Could not detect backend port, using default port 18000
+set BACKEND_PORT=18000
+goto port_done
+
+:port_found
+echo [3/3] Detected backend port: %BACKEND_PORT%
+goto port_done
+
+:port_done
 
 echo [DONE] Opening test page...
-start "" "LLM_Speed_Test_v2_Python_Backend.html"
+REM Open backend URL with default browser (backend will serve HTML)
+start "" "http://localhost:%BACKEND_PORT%/"
 
 echo.
 echo ====================================
-echo    Startup Complete!
-echo    Backend running at http://localhost:8000
+echo    Startup Complete
+echo    Test page: http://localhost:%BACKEND_PORT%/
 echo    Close backend window to stop service
 echo ====================================
 echo.

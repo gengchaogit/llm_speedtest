@@ -60,12 +60,19 @@ app.add_middleware(
 from fastapi.responses import FileResponse
 import os
 
+current_port = 18000
+
 @app.get("/")
 async def serve_frontend():
     html_path = os.path.join(os.path.dirname(__file__), "LLM_Speed_Test_v2_Python_Backend.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return {"message": "Frontend HTML not found"}
+
+@app.get("/api/port")
+async def get_port():
+    """返回当前后端端口号"""
+    return {"port": current_port}
 
 
 class TestConfig(BaseModel):
@@ -537,9 +544,51 @@ async def websocket_test_endpoint(websocket: WebSocket):
         })
 
 
+def find_free_port(preferred_port=18000):
+    """找到一个未占用的端口，优先使用preferred_port"""
+    import socket
+    
+    # 先尝试使用首选端口
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', preferred_port))
+            return preferred_port
+    except OSError:
+        # 端口被占用，选择随机端口
+        pass
+    
+    # 选择随机未占用端口
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
 if __name__ == "__main__":
     import uvicorn
-    print("LLM Speed Test Backend Server")
-    print("WebSocket endpoint: ws://localhost:8000/ws/test")
-    print("Frontend page: http://localhost:8000/")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        port = int(sys.argv[1])
+    else:
+        port = find_free_port()
+    
+    # 设置全局端口变量
+    current_port = port
+    
+    print("LLM Speed Test Backend Server", flush=True)
+    print(f"WebSocket endpoint: ws://localhost:{port}/ws/test", flush=True)
+    print(f"Frontend page: http://localhost:{port}/", flush=True)
+    print(f"PORT={port}", flush=True)
+    
+    # 将端口写入配置文件，供bat脚本读取
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        port_file = os.path.join(script_dir, '.backend_port')
+        with open(port_file, 'w') as f:
+            f.write(str(port))
+    except Exception as e:
+        pass
+    
+    uvicorn.run(app, host="0.0.0.0", port=port)
