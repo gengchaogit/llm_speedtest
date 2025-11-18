@@ -83,6 +83,7 @@ class TestConfig(BaseModel):
     min_length: int
     max_length: int
     step: int
+    test_lengths: list = None  # 可选的测试点列表，如果提供则忽略min/max/step
     output_length: int
     concurrency: int
     timeout: int
@@ -424,16 +425,20 @@ async def websocket_test_endpoint(websocket: WebSocket):
         config = TestConfig(**config_data)
         
         print(f"[Config] 接收配置 - API: {config.api_type}, 模型: {config.model_name}, 并发: {config.concurrency}")
-        print(f"[Config] 提示词长度: {config.min_length}-{config.max_length} (步长{config.step})")
+        
+        # 使用提供的测试点列表，或计算测试点
+        if config.test_lengths:
+            test_lengths = config.test_lengths
+            print(f"[Config] 使用自定义测试点列表: {test_lengths}")
+        else:
+            test_lengths = list(range(config.min_length, config.max_length + 1, config.step))
+            print(f"[Config] 提示词长度: {config.min_length}-{config.max_length} (步长{config.step})")
+            print(f"[TestLengths] 计算的测试点列表: {test_lengths}")
         
         await websocket.send_json({
             "type": "info",
             "message": f"开始测试，并发数: {config.concurrency}"
         })
-        
-        # 计算测试点
-        test_lengths = list(range(config.min_length, config.max_length + 1, config.step))
-        print(f"[TestLengths] 测试点列表: {test_lengths}")
         total_tests = len(test_lengths)
         completed = 0
         

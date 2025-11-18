@@ -1231,7 +1231,7 @@
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
                 labelStep: '步长',
-                labelStepMultiplier: '步长倍数',
+                labelStepMultiplier: '步长倍数 <span style="font-size: 0.85em; color: #666;">(指数级：倍数^n，如2则128→256→512→1024...)</span>',
                 labelOutputLength: '期望输出长度',
                 labelConcurrency: '并发数',
                 labelTimeout: '请求超时 (ms)',
@@ -1438,7 +1438,7 @@
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
                 labelStep: 'Step Size',
-                labelStepMultiplier: 'Step Multiplier',
+                labelStepMultiplier: 'Step Multiplier <span style="font-size: 0.85em; color: #666;">(Exponential: multiplier^n, e.g., 2 gives 128→256→512→1024...)</span>',
                 labelOutputLength: 'Expected Output Length',
                 labelConcurrency: 'Concurrency',
                 labelTimeout: 'Request Timeout (ms)',
@@ -1659,7 +1659,7 @@
             document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
             document.querySelector('label[for="maxLength"]').textContent = t.labelMaxLength;
             document.querySelector('label[for="step"]').textContent = t.labelStep;
-            document.querySelector('label[for="stepMultiplier"]').textContent = t.labelStepMultiplier;
+            document.querySelector('label[for="stepMultiplier"]').innerHTML = t.labelStepMultiplier;
             document.querySelector('label[for="outputLength"]').textContent = t.labelOutputLength;
             document.querySelector('label[for="concurrency"]').textContent = t.labelConcurrency;
             document.querySelector('label[for="timeout"]').textContent = t.labelTimeout;
@@ -1723,8 +1723,8 @@
         // 文本生成长度控制参数 (整数)
         let d_minLength = 512;                                                      // 生成文本的最小长度（例如，token 或字符数）
         let d_maxLength = 8192;                                                     // 生成文本的最大长度（例如，token 或字符数）
-        let d_step = 512;                                                           // 每次提示词长度增加的步长
-        let d_stepMultiplier = 1;                                                   // 步长倍数（所有步长相关参数的系数）
+        let d_step = 128;                                                           // 基础步长
+        let d_stepMultiplier = 1;                                                   // 步长倍数（指数增长：第n次步长 = 基础步长 × 倍数^n）
         let d_outputLength = 128;                                                   // 期望输出的文本长度
         let d_timeout = 30000;                                                      // 请求超时时间 (ms)
         // 文本生成采样参数 (浮点数)
@@ -3005,15 +3005,15 @@ async function processOllamaResponse(response, promptLength) {
 */
 
         // WebSocket-based test functions for Python backend
-        async function testOpenAI(apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
-            return await testWithBackend('openai', apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+        async function testOpenAI(apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+            return await testWithBackend('openai', apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
         }
 
-        async function testOllama(apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
-            return await testWithBackend('ollama', apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+        async function testOllama(apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+            return await testWithBackend('ollama', apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
         }
 
-        async function testWithBackend(apiType, apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+        async function testWithBackend(apiType, apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
             const t = translations[currentLang];
             
             // Connect to Python backend WebSocket
@@ -3036,6 +3036,7 @@ async function processOllamaResponse(response, promptLength) {
                         min_length: minLength,
                         max_length: maxLength,
                         step: step,
+                        test_lengths: testLengths,  // 传递测试点列表
                         output_length: outputLength,
                         concurrency: concurrency,
                         timeout: timeout,
@@ -3601,8 +3602,32 @@ async function processOllamaResponse(response, promptLength) {
             const maxLength = parseInt(document.getElementById('maxLength').value, 10);
             const baseStep = parseInt(document.getElementById('step').value, 10);
             const stepMultiplier = parseInt(document.getElementById('stepMultiplier').value, 10) || 1;
-            const step = baseStep * stepMultiplier;  // 应用步长倍数
-            console.log(`[步长计算] 基础步长: ${baseStep}, 倍数: ${stepMultiplier}, 实际步长: ${step}`);
+            
+            // 计算测试点列表（指数增长）
+            const testLengths = [];
+            let stepIndex = 0;
+            
+            if (stepMultiplier === 1) {
+                // 倍数为1时，使用线性步长
+                let currentLength = minLength;
+                while (currentLength <= maxLength) {
+                    testLengths.push(currentLength);
+                    currentLength += baseStep;
+                }
+            } else {
+                // 倍数>1时，测试点直接按指数序列生成: baseStep * multiplier^n
+                while (true) {
+                    const currentLength = baseStep * Math.pow(stepMultiplier, stepIndex);
+                    if (currentLength > maxLength) break;
+                    if (currentLength >= minLength) {
+                        testLengths.push(currentLength);
+                    }
+                    stepIndex++;
+                }
+            }
+            
+            console.log(`[步长计算] 基础步长: ${baseStep}, 倍数: ${stepMultiplier}, 测试点: ${testLengths.join(', ')}`);
+            
             const outputLength = parseInt(document.getElementById('outputLength').value, 10);
             const concurrency = parseInt(document.getElementById('concurrency').value, 10) || 1;
             const timeout = parseInt(document.getElementById('timeout').value, 10);
@@ -3719,9 +3744,9 @@ async function processOllamaResponse(response, promptLength) {
 
             try {
                 if (currentApiType === 'openai') {
-                    await testOpenAI(apiUrl, currentModelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOpenAI(apiUrl, currentModelName, minLength, maxLength, 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 } else {
-                    await testOllama(apiUrl, currentModelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOllama(apiUrl, currentModelName, minLength, maxLength, 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 }
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
