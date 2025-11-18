@@ -4959,12 +4959,13 @@ async function processOllamaResponse(response, promptLength) {
         };
 
         //
-        async function loadBackendPort() {
-            // 方法1: 从当前页面的location获取端口（如果是从后端served）
+        async function loadBackendConfig() {
+            // 方法1: 从当前页面的location获取主机和端口（如果是从后端served）
             if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-                const currentPort = window.location.port || '80';
-                console.log(`[Init] Backend port from window.location: ${currentPort}`);
-                return currentPort;
+                const host = window.location.hostname;
+                const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+                console.log(`[Init] Backend from window.location: ${host}:${port}`);
+                return { host, port };
             }
             
             // 方法2: 从URL参数获取端口号（bat脚本传递）
@@ -4973,7 +4974,7 @@ async function processOllamaResponse(response, promptLength) {
             
             if (port) {
                 console.log(`[Init] Backend port from URL parameter: ${port}`);
-                return port;
+                return { host: 'localhost', port };
             }
             
             // 方法3: 尝试从后端API获取端口
@@ -4983,22 +4984,22 @@ async function processOllamaResponse(response, promptLength) {
                     const data = await response.json();
                     port = data.port.toString();
                     console.log(`[Init] Backend port from API: ${port}`);
-                    return port;
+                    return { host: 'localhost', port };
                 }
             } catch (e) {
                 console.log('[Init] Failed to fetch port from API:', e);
             }
             
-            // 方法4: 使用默认端口
-            console.log('[Init] Using default port: 18000');
-            return '18000';
+            // 方法4: 使用默认配置
+            console.log('[Init] Using default: localhost:18000');
+            return { host: 'localhost', port: '18000' };
         }
         
         window.onload = async function () {
-            // 加载后端端口
-            const port = await loadBackendPort();
+            // 加载后端配置
+            const { host, port } = await loadBackendConfig();
             const backendUrlInput = document.getElementById('backendUrl');
-            backendUrlInput.value = `ws://localhost:${port}`;
+            backendUrlInput.value = `ws://${host}:${port}`;
             
             setDefaultValues();
             // v1.9: 更新历史记录按钮文本
