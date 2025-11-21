@@ -196,6 +196,10 @@ async def execute_single_request(
     server_prefill_time_ms = None
     server_decode_time_ms = None
     usage_info = None
+
+    # ITL (Inter-Token Latency) tracking
+    token_timestamps = []  # 记录每个token的时间戳
+    last_token_time = None  # 上一个token的时间戳
     
     try:
         print(f"[Request] 发送请求到 {api_url}")
@@ -311,10 +315,28 @@ async def execute_single_request(
                                 content_chunk_count += 1
                             
                             if content_text:
+                                current_token_time = time.perf_counter()
+
                                 if first_token_time is None:
-                                    first_token_time = time.perf_counter()
+                                    first_token_time = current_token_time
                                     print(f"[FirstToken] 接收到首个token，耗时: {(first_token_time - start_time)*1000:.2f}ms")
-                                
+
+                                # 记录token时间戳和ITL
+                                token_timestamps.append({
+                                    "timestamp": current_token_time,
+                                    "time_from_start_ms": (current_token_time - start_time) * 1000,
+                                    "is_reasoning": is_reasoning
+                                })
+
+                                # 计算ITL（如果不是第一个token）
+                                if last_token_time is not None:
+                                    itl = (current_token_time - last_token_time) * 1000  # ms
+                                    token_timestamps[-1]["itl_ms"] = itl
+                                else:
+                                    token_timestamps[-1]["itl_ms"] = None  # 第一个token没有ITL
+
+                                last_token_time = current_token_time
+
                                 if is_reasoning:
                                     reasoning_content += content_text
                                 else:
@@ -379,7 +401,21 @@ async def execute_single_request(
         output_speed = (actual_output_tokens / (output_time_ms / 1000)) if actual_output_tokens > 0 else 0
         
         print(f"[Result] Prefill速度: {prefill_speed:.2f} t/s, Decode速度: {output_speed:.2f} t/s")
-        
+
+        # 计算ITL统计
+        itl_stats = {}
+        if len(token_timestamps) > 1:
+            itl_values = [t["itl_ms"] for t in token_timestamps if t["itl_ms"] is not None]
+            if itl_values:
+                itl_stats = {
+                    "mean": round(sum(itl_values) / len(itl_values), 2),
+                    "min": round(min(itl_values), 2),
+                    "max": round(max(itl_values), 2),
+                    "std": round((sum((x - sum(itl_values)/len(itl_values))**2 for x in itl_values) / len(itl_values))**0.5, 2) if len(itl_values) > 1 else 0,
+                    "count": len(itl_values)
+                }
+                print(f"[ITL] 平均: {itl_stats['mean']}ms, 最小: {itl_stats['min']}ms, 最大: {itl_stats['max']}ms, 标准差: {itl_stats['std']}ms")
+
         return {
             "success": True,
             "prompt_length": prompt_length,
@@ -400,7 +436,10 @@ async def execute_single_request(
             "start_timestamp": start_time,
             "first_token_timestamp": first_token_time,
             "end_timestamp": end_time,
-            "token_source": token_source  # 添加token来源
+            "token_source": token_source,  # 添加token来源
+            # 新增ITL相关数据
+            "token_timestamps": token_timestamps,  # 所有token的时间戳数据
+            "itl_stats": itl_stats  # ITL统计信息
         }
     
     except Exception as e:

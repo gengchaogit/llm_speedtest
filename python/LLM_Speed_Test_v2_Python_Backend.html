@@ -1141,13 +1141,19 @@
             <p class="info">等待开始测试...</p>
         </div>
 
-        <!-- 绘图区域：包含两个 canvas -->
+        <!-- 绘图区域：包含四个 canvas -->
         <div id="chartContainer" style="display: none;">
             <h3>预填充 (Prefill) 吞吐</h3>
             <canvas id="prefillChart"></canvas>
 
             <h3 style="margin-top: 25px;">输出 (Decode) 吞吐</h3>
             <canvas id="outputChart"></canvas>
+
+            <h3 style="margin-top: 25px;">首Token时间 (TTFT)</h3>
+            <canvas id="ttftChart"></canvas>
+
+            <h3 style="margin-top: 25px;">Token间延迟 (ITL) - 平均值与抖动</h3>
+            <canvas id="itlChart"></canvas>
         </div>
 
         <!-- v1.8: 新的对比绘图区域 -->
@@ -1864,8 +1870,12 @@
         const chartContainer = document.getElementById('chartContainer');
         const prefillChartCanvas = document.getElementById('prefillChart');
         const outputChartCanvas = document.getElementById('outputChart');
+        const ttftChartCanvas = document.getElementById('ttftChart');
+        const itlChartCanvas = document.getElementById('itlChart');
         let prefillChartInstance = null;
         let outputChartInstance = null;
+        let ttftChartInstance = null;
+        let itlChartInstance = null;
 
         // 对比图表 (v1.8)
         let comparisonData = [];
@@ -3175,6 +3185,18 @@ async function processOllamaResponse(response, promptLength) {
                     });
                 }
 
+                // 计算TTFT和ITL的聚合统计
+                const avgTtftMs = message.avg_ttft_ms || (details.reduce((sum, r) => sum + (r.ttft_ms || 0), 0) / details.length);
+
+                // 聚合ITL统计（从所有并发请求中取平均）
+                const itlStatsArray = details.filter(r => r.itl_stats && Object.keys(r.itl_stats).length > 0).map(r => r.itl_stats);
+                let avgItlMean = 'N/A';
+                let avgItlStd = 'N/A';
+                if (itlStatsArray.length > 0) {
+                    avgItlMean = (itlStatsArray.reduce((sum, s) => sum + (s.mean || 0), 0) / itlStatsArray.length).toFixed(2);
+                    avgItlStd = (itlStatsArray.reduce((sum, s) => sum + (s.std || 0), 0) / itlStatsArray.length).toFixed(2);
+                }
+
                 // Prepare result entry for detail view
                 const resultEntry = {
                     promptLength: message.prompt_length,
@@ -3195,7 +3217,11 @@ async function processOllamaResponse(response, promptLength) {
                         apiType: currentApiType === 'openai' ? 'OpenAI Compatible' : 'Ollama',
                         model: currentModelName
                     },
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    // 新增ITL和TTFT相关字段
+                    avgTtftMs: avgTtftMs.toFixed ? avgTtftMs.toFixed(2) : avgTtftMs,
+                    avgItlMean: avgItlMean,
+                    avgItlStd: avgItlStd
                 };
 
                 detailButton.onclick = () => showTestDetail(resultEntry);
@@ -3232,7 +3258,10 @@ async function processOllamaResponse(response, promptLength) {
                     outputTimeMs: 'N/A',
                     outputSpeed: 'N/A',
                     status: t.statusFailed,
-                    concurrency: message.concurrency || 1
+                    concurrency: message.concurrency || 1,
+                    avgTtftMs: 'N/A',
+                    avgItlMean: 'N/A',
+                    avgItlStd: 'N/A'
                 });
             }
             
@@ -4201,12 +4230,14 @@ async function processOllamaResponse(response, promptLength) {
         // 原有图表生成
         // ===============================================================================
 
-        // 生成图表 (现在是两张图)
+        // 生成图表 (现在是四张图)
         function generateCharts() {
             if (testResultsData.length === 0) {
                 //
                 if (prefillChartInstance) prefillChartInstance.clear();
                 if (outputChartInstance) outputChartInstance.clear();
+                if (ttftChartInstance) ttftChartInstance.clear();
+                if (itlChartInstance) itlChartInstance.clear();
                 return;
             }
 
@@ -4318,6 +4349,126 @@ async function processOllamaResponse(response, promptLength) {
                                 title: {
                                     display: true,
                                     text: t.chartAxisThroughput
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 图表3: TTFT (Time To First Token)
+            const ttftData = testResultsData.map(d => d.avgTtftMs === 'N/A' ? null : parseFloat(d.avgTtftMs));
+            if (ttftChartInstance) {
+                ttftChartInstance.data.labels = labels;
+                ttftChartInstance.data.datasets[0].data = ttftData;
+                ttftChartInstance.update('none');
+            } else {
+                const ttftCtx = ttftChartCanvas.getContext('2d');
+                ttftChartInstance = new Chart(ttftCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'TTFT (ms)',
+                                data: ttftData,
+                                borderColor: 'rgb(153, 102, 255)',
+                                backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                                tension: 0.1,
+                                fill: true,
+                                spanGaps: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: `首Token时间 (TTFT) - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisPromptLen
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: '时间 (ms)'
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 图表4: ITL (Inter-Token Latency) - 显示平均值和标准差
+            const itlMeanData = testResultsData.map(d => d.avgItlMean === 'N/A' ? null : parseFloat(d.avgItlMean));
+            const itlStdData = testResultsData.map(d => d.avgItlStd === 'N/A' ? null : parseFloat(d.avgItlStd));
+            if (itlChartInstance) {
+                itlChartInstance.data.labels = labels;
+                itlChartInstance.data.datasets[0].data = itlMeanData;
+                itlChartInstance.data.datasets[1].data = itlStdData;
+                itlChartInstance.update('none');
+            } else {
+                const itlCtx = itlChartCanvas.getContext('2d');
+                itlChartInstance = new Chart(itlCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'ITL 平均值 (ms)',
+                                data: itlMeanData,
+                                borderColor: 'rgb(255, 159, 64)',
+                                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            },
+                            {
+                                label: 'ITL 标准差 (ms)',
+                                data: itlStdData,
+                                borderColor: 'rgb(255, 205, 86)',
+                                backgroundColor: 'rgba(255, 205, 86, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false,
+                                borderDash: [5, 5]  // 虚线
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: `Token间延迟 (ITL) - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisPromptLen
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: '延迟 (ms)'
                                 },
                                 beginAtZero: true
                             }
