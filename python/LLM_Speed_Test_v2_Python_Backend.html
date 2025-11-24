@@ -3965,6 +3965,7 @@ async function processOllamaResponse(response, promptLength) {
 
         // v1.8: 监听合并导出按钮
         exportCombinedChartBtn.addEventListener('click', () => {
+            const t = translations[currentLang];  // 获取当前语言的翻译
             const modelName = currentModelName.replace(/[\/\\]/g, '_'); // 清理文件名
             downloadCombinedChart(
                 prefillChartCanvas,
