@@ -1164,6 +1164,18 @@
             <h3 style="margin-top: 25px;">对比 - 输出 (Decode) 吞吐</h3>
             <canvas id="comparisonOutputChart"></canvas>
 
+            <h3 style="margin-top: 25px;">对比 - 首Token时间 (TTFT)</h3>
+            <canvas id="comparisonTtftChart"></canvas>
+
+            <h3 style="margin-top: 25px;">对比 - Token间延迟 (ITL)</h3>
+            <canvas id="comparisonItlChart"></canvas>
+
+            <h3 style="margin-top: 25px;">对比 - Prefill吞吐百分位统计</h3>
+            <canvas id="comparisonPrefillPercentileChart"></canvas>
+
+            <h3 style="margin-top: 25px;">对比 - Decode吞吐百分位统计</h3>
+            <canvas id="comparisonDecodePercentileChart"></canvas>
+
             <!-- v1.8: 对比图表导出按钮 -->
             <button id="exportComparisonChart" style="display: none; background: #8e44ad; margin-top: 15px;">导出一张对比图</button>
         </div>
@@ -1887,6 +1899,10 @@
         let comparisonData = [];
         let comparisonPrefillChartInstance = null;
         let comparisonOutputChartInstance = null;
+        let comparisonTtftChartInstance = null;
+        let comparisonItlChartInstance = null;
+        let comparisonPrefillPercentileChartInstance = null;
+        let comparisonDecodePercentileChartInstance = null;
 
         let testResultsData = [];
         let totalTests = 0;
@@ -3632,8 +3648,16 @@ async function processOllamaResponse(response, promptLength) {
             exportComparisonChartBtn.style.display = 'none'; // v1.8
             if (comparisonPrefillChartInstance) comparisonPrefillChartInstance.destroy();
             if (comparisonOutputChartInstance) comparisonOutputChartInstance.destroy();
+            if (comparisonTtftChartInstance) comparisonTtftChartInstance.destroy();
+            if (comparisonItlChartInstance) comparisonItlChartInstance.destroy();
+            if (comparisonPrefillPercentileChartInstance) comparisonPrefillPercentileChartInstance.destroy();
+            if (comparisonDecodePercentileChartInstance) comparisonDecodePercentileChartInstance.destroy();
             comparisonPrefillChartInstance = null;
             comparisonOutputChartInstance = null;
+            comparisonTtftChartInstance = null;
+            comparisonItlChartInstance = null;
+            comparisonPrefillPercentileChartInstance = null;
+            comparisonDecodePercentileChartInstance = null;
             comparisonData = [];
             importFilesInput.value = ""; // 清空文件选择
 
@@ -4045,7 +4069,7 @@ async function processOllamaResponse(response, promptLength) {
             );
         });
 
-        // v1.8: 监听对比图表导出按钮
+        // v1.8: 监听对比图表导出按钮 - 导出所有6个对比图表
         exportComparisonChartBtn.addEventListener('click', () => {
             if (comparisonData.length === 0) {
                 alert("没有对比数据可导出。");
@@ -4058,11 +4082,20 @@ async function processOllamaResponse(response, promptLength) {
                        .replace(/_+/g, '_') // 移除连续的下划线
             );
             // 限制文件名长度，防止过长
-            const filename = `Comparison_${labels.join('_vs_').slice(0, 100)}.png`;
+            const filename = `Comparison_All_${labels.join('_vs_').slice(0, 100)}.png`;
 
-            downloadCombinedChart(
-                document.getElementById('comparisonPrefillChart'),
-                document.getElementById('comparisonOutputChart'),
+            // 收集所有对比图表
+            const allComparisonCharts = [
+                document.getElementById('comparisonPrefillChart'),     // Prefill吞吐对比
+                document.getElementById('comparisonOutputChart'),      // Decode吞吐对比
+                document.getElementById('comparisonTtftChart'),        // TTFT对比
+                document.getElementById('comparisonItlChart'),         // ITL对比
+                document.getElementById('comparisonPrefillPercentileChart'),  // Prefill百分位对比
+                document.getElementById('comparisonDecodePercentileChart')    // Decode百分位对比
+            ];
+
+            downloadMultipleCharts(
+                allComparisonCharts,
                 filename,
                 "性能对比图表" // 大标题
             );
@@ -4115,32 +4148,97 @@ async function processOllamaResponse(response, promptLength) {
          * 将 testResultsData 格式的数据转换为对比图表所需的对象数组格式
          * @param {Array} resultsArray - 来源数据 (e.g., testResultsData)
          * @param {string} label - 这个数据集的图例标签
-         * @returns {object} - { label, prefillData: [{x, y}], outputData: [{x, y}] }
+         * @returns {object} - 包含所有图表数据的对象
          */
         function formatDataForComparison(resultsArray, label) {
             const data = {
                 label: label,
-                prefillData: [], // {x: promptLength, y: speed}
-                outputData: []   // {x: promptLength, y: speed}
+                prefillData: [],    // {x: promptLength, y: speed}
+                outputData: [],     // {x: promptLength, y: speed}
+                ttftData: [],       // {x: promptLength, y: ttft_ms}
+                itlMeanData: [],    // {x: promptLength, y: itl_mean_ms}
+                itlStdData: [],     // {x: promptLength, y: itl_std_ms}
+                prefillP50Data: [], // {x: promptLength, y: speed}
+                prefillP90Data: [],
+                prefillP95Data: [],
+                decodeP50Data: [],  // {x: promptLength, y: speed}
+                decodeP90Data: [],
+                decodeP95Data: []
             };
 
             for (const res of resultsArray) {
                 const promptLength = parseFloat(res.promptLength);
-                const prefillSpeed = res.prefillSpeed === 'N/A' ? null : parseFloat(res.prefillSpeed);
-                const outputSpeed = res.outputSpeed === 'N/A' ? null : parseFloat(res.outputSpeed);
 
                 if (!isNaN(promptLength)) {
+                    // Prefill/Decode速度
+                    const prefillSpeed = res.prefillSpeed === 'N/A' ? null : parseFloat(res.prefillSpeed);
+                    const outputSpeed = res.outputSpeed === 'N/A' ? null : parseFloat(res.outputSpeed);
+
                     if (prefillSpeed !== null) {
                         data.prefillData.push({ x: promptLength, y: prefillSpeed });
                     }
                     if (outputSpeed !== null) {
                         data.outputData.push({ x: promptLength, y: outputSpeed });
                     }
+
+                    // TTFT
+                    const ttft = res.avgTtftMs === 'N/A' ? null : parseFloat(res.avgTtftMs);
+                    if (ttft !== null) {
+                        data.ttftData.push({ x: promptLength, y: ttft });
+                    }
+
+                    // ITL
+                    const itlMean = res.avgItlMean === 'N/A' ? null : parseFloat(res.avgItlMean);
+                    const itlStd = res.avgItlStd === 'N/A' ? null : parseFloat(res.avgItlStd);
+                    if (itlMean !== null) {
+                        data.itlMeanData.push({ x: promptLength, y: itlMean });
+                    }
+                    if (itlStd !== null) {
+                        data.itlStdData.push({ x: promptLength, y: itlStd });
+                    }
+
+                    // 百分位统计 - 需要从concurrentDetails中提取
+                    if (res.concurrentDetails && res.concurrentDetails.length > 0) {
+                        const prefillSpeeds = res.concurrentDetails
+                            .map(d => d.prefill_speed)
+                            .filter(s => s && s !== 'N/A')
+                            .map(s => parseFloat(s))
+                            .sort((a, b) => a - b);
+
+                        const decodeSpeeds = res.concurrentDetails
+                            .map(d => d.output_speed)
+                            .filter(s => s && s !== 'N/A')
+                            .map(s => parseFloat(s))
+                            .sort((a, b) => a - b);
+
+                        if (prefillSpeeds.length > 0) {
+                            data.prefillP50Data.push({ x: promptLength, y: calculatePercentile(prefillSpeeds, 50) });
+                            data.prefillP90Data.push({ x: promptLength, y: calculatePercentile(prefillSpeeds, 90) });
+                            data.prefillP95Data.push({ x: promptLength, y: calculatePercentile(prefillSpeeds, 95) });
+                        }
+
+                        if (decodeSpeeds.length > 0) {
+                            data.decodeP50Data.push({ x: promptLength, y: calculatePercentile(decodeSpeeds, 50) });
+                            data.decodeP90Data.push({ x: promptLength, y: calculatePercentile(decodeSpeeds, 90) });
+                            data.decodeP95Data.push({ x: promptLength, y: calculatePercentile(decodeSpeeds, 95) });
+                        }
+                    }
                 }
             }
+
             // 按 x (promptLength) 排序以确保线条正确绘制
-            data.prefillData.sort((a, b) => a.x - b.x);
-            data.outputData.sort((a, b) => a.x - b.x);
+            const sortByX = (arr) => arr.sort((a, b) => a.x - b.x);
+            sortByX(data.prefillData);
+            sortByX(data.outputData);
+            sortByX(data.ttftData);
+            sortByX(data.itlMeanData);
+            sortByX(data.itlStdData);
+            sortByX(data.prefillP50Data);
+            sortByX(data.prefillP90Data);
+            sortByX(data.prefillP95Data);
+            sortByX(data.decodeP50Data);
+            sortByX(data.decodeP90Data);
+            sortByX(data.decodeP95Data);
 
             return data;
         }
@@ -4281,6 +4379,229 @@ async function processOllamaResponse(response, promptLength) {
                     plugins: {
                         legend: { position: 'top' },
                         title: { display: true, text: t.chartComparisonDecodeThroughput }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: t.chartAxisPromptLen }
+                        },
+                        y: {
+                            title: { display: true, text: t.chartAxisThroughput },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 3. 创建 TTFT 对比图表
+            const ttftDatasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label,
+                    data: dataset.ttftData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false
+                };
+            });
+
+            const compTtftCanvas = document.getElementById('comparisonTtftChart').getContext('2d');
+            if (comparisonTtftChartInstance) comparisonTtftChartInstance.destroy();
+            comparisonTtftChartInstance = new Chart(compTtftCanvas, {
+                type: 'line',
+                data: { datasets: ttftDatasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - 首Token时间 (TTFT)' }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: t.chartAxisPromptLen }
+                        },
+                        y: {
+                            title: { display: true, text: '时间 (ms)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 4. 创建 ITL 对比图表（平均值和标准差）
+            const itlMeanDatasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label + ' (平均)',
+                    data: dataset.itlMeanData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderWidth: 2
+                };
+            });
+
+            const itlStdDatasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label + ' (标准差)',
+                    data: dataset.itlStdData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderWidth: 1,
+                    borderDash: [5, 5]  // 虚线
+                };
+            });
+
+            const compItlCanvas = document.getElementById('comparisonItlChart').getContext('2d');
+            if (comparisonItlChartInstance) comparisonItlChartInstance.destroy();
+            comparisonItlChartInstance = new Chart(compItlCanvas, {
+                type: 'line',
+                data: { datasets: [...itlMeanDatasets, ...itlStdDatasets] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - Token间延迟 (ITL)' }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: t.chartAxisPromptLen }
+                        },
+                        y: {
+                            title: { display: true, text: '时间 (ms)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 5. 创建 Prefill 百分位对比图表
+            const prefillP50Datasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label + ' (P50)',
+                    data: dataset.prefillP50Data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false
+                };
+            });
+
+            const prefillP90Datasets = comparisonData.map((dataset, index) => {
+                const color = colors[index % colors.length];
+                return {
+                    label: dataset.label + ' (P90)',
+                    data: dataset.prefillP90Data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderDash: [5, 5]
+                };
+            });
+
+            const prefillP95Datasets = comparisonData.map((dataset, index) => {
+                const color = colors[index % colors.length];
+                return {
+                    label: dataset.label + ' (P95)',
+                    data: dataset.prefillP95Data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderDash: [10, 5]
+                };
+            });
+
+            const compPrefillPercentileCanvas = document.getElementById('comparisonPrefillPercentileChart').getContext('2d');
+            if (comparisonPrefillPercentileChartInstance) comparisonPrefillPercentileChartInstance.destroy();
+            comparisonPrefillPercentileChartInstance = new Chart(compPrefillPercentileCanvas, {
+                type: 'line',
+                data: { datasets: [...prefillP50Datasets, ...prefillP90Datasets, ...prefillP95Datasets] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - Prefill吞吐百分位统计' }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: t.chartAxisPromptLen }
+                        },
+                        y: {
+                            title: { display: true, text: t.chartAxisThroughput },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 6. 创建 Decode 百分位对比图表
+            const decodeP50Datasets = comparisonData.map((dataset, index) => {
+                return {
+                    label: dataset.label + ' (P50)',
+                    data: dataset.decodeP50Data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false
+                };
+            });
+
+            const decodeP90Datasets = comparisonData.map((dataset, index) => {
+                const color = colors[index % colors.length];
+                return {
+                    label: dataset.label + ' (P90)',
+                    data: dataset.decodeP90Data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderDash: [5, 5]
+                };
+            });
+
+            const decodeP95Datasets = comparisonData.map((dataset, index) => {
+                const color = colors[index % colors.length];
+                return {
+                    label: dataset.label + ' (P95)',
+                    data: dataset.decodeP95Data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    tension: 0.1,
+                    spanGaps: false,
+                    fill: false,
+                    borderDash: [10, 5]
+                };
+            });
+
+            const compDecodePercentileCanvas = document.getElementById('comparisonDecodePercentileChart').getContext('2d');
+            if (comparisonDecodePercentileChartInstance) comparisonDecodePercentileChartInstance.destroy();
+            comparisonDecodePercentileChartInstance = new Chart(compDecodePercentileCanvas, {
+                type: 'line',
+                data: { datasets: [...decodeP50Datasets, ...decodeP90Datasets, ...decodeP95Datasets] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '对比 - Decode吞吐百分位统计' }
                     },
                     scales: {
                         x: {
