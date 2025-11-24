@@ -254,49 +254,43 @@
         /* 提示词长度 */
         #results th:nth-child(1),
         #results td:nth-child(1) {
-            width: 11%;
+            width: 12%;
         }
 
-        /* 预填充耗时 */
+        /* TTFT */
         #results th:nth-child(2),
         #results td:nth-child(2) {
-            width: 13%;
+            width: 12%;
         }
 
-        /* 预填充速度 */
+        /* ITL平均 */
         #results th:nth-child(3),
         #results td:nth-child(3) {
-            width: 13%;
+            width: 12%;
         }
 
-        /* 输出长度 */
+        /* Prefill速度 */
         #results th:nth-child(4),
         #results td:nth-child(4) {
-            width: 11%;
-        }
-
-        /* 输出耗时 */
-        #results th:nth-child(5),
-        #results td:nth-child(5) {
-            width: 13%;
-        }
-
-        /* 输出速度 */
-        #results th:nth-child(6),
-        #results td:nth-child(6) {
-            width: 13%;
-        }
-
-        /* 状态 */
-        #results th:nth-child(7),
-        #results td:nth-child(7) {
             width: 16%;
         }
 
+        /* Output速度 */
+        #results th:nth-child(5),
+        #results td:nth-child(5) {
+            width: 16%;
+        }
+
+        /* 状态 */
+        #results th:nth-child(6),
+        #results td:nth-child(6) {
+            width: 20%;
+        }
+
         /* 详情按钮 */
-        #results th:nth-child(8),
-        #results td:nth-child(8) {
-            width: 10%;
+        #results th:nth-child(7),
+        #results td:nth-child(7) {
+            width: 12%;
             text-align: center;
             padding: 4px 2px;
         }
@@ -1154,6 +1148,12 @@
 
             <h3 style="margin-top: 25px;">Token间延迟 (ITL) - 平均值与抖动</h3>
             <canvas id="itlChart"></canvas>
+
+            <h3 style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Prefill吞吐</h3>
+            <canvas id="percentilePrefillChart"></canvas>
+
+            <h3 style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Decode吞吐</h3>
+            <canvas id="percentileDecodeChart"></canvas>
         </div>
 
         <!-- v1.8: 新的对比绘图区域 -->
@@ -1263,6 +1263,7 @@
                 // 表格标题
                 tableHeaderPromptLen: '提示词长度<br>(tokens)',
                 tableHeaderTTFT: 'TTFT<br>(ms)',
+                tableHeaderITL: 'ITL平均<br>(ms)',
                 tableHeaderPrefillTime: '预填充耗时<br>(ms)',
                 tableHeaderPrefillSpeed: '预填充速度<br>(tokens/s)',
                 tableHeaderOutputLen: '输出长度<br>(tokens)',
@@ -1472,6 +1473,7 @@
                 // Table headers
                 tableHeaderPromptLen: 'Prompt Length<br>(tokens)',
                 tableHeaderTTFT: 'TTFT<br>(ms)',
+                tableHeaderITL: 'ITL Avg<br>(ms)',
                 tableHeaderPrefillTime: 'Prefill Time<br>(ms)',
                 tableHeaderPrefillSpeed: 'Prefill Speed<br>(tokens/s)',
                 tableHeaderOutputLen: 'Output Length<br>(tokens)',
@@ -1872,10 +1874,14 @@
         const outputChartCanvas = document.getElementById('outputChart');
         const ttftChartCanvas = document.getElementById('ttftChart');
         const itlChartCanvas = document.getElementById('itlChart');
+        const percentilePrefillChartCanvas = document.getElementById('percentilePrefillChart');
+        const percentileDecodeChartCanvas = document.getElementById('percentileDecodeChart');
         let prefillChartInstance = null;
         let outputChartInstance = null;
         let ttftChartInstance = null;
         let itlChartInstance = null;
+        let percentilePrefillChartInstance = null;
+        let percentileDecodeChartInstance = null;
 
         // 对比图表 (v1.8)
         let comparisonData = [];
@@ -3123,11 +3129,11 @@ async function processOllamaResponse(response, promptLength) {
             if (!row) {
                 row = document.createElement('tr');
                 tbody.appendChild(row);
-                for (let i = 0; i < 8; i++) {
+                for (let i = 0; i < 7; i++) {
                     row.appendChild(document.createElement('td'));
                 }
             }
-            
+
             const cells = row.querySelectorAll('td');
 
             if (message.status === '成功' || message.status === 'Success') {
@@ -3154,16 +3160,28 @@ async function processOllamaResponse(response, promptLength) {
                 console.log(`[Throughput] Prefill: ${totalPromptTokens} tokens / ${prefillDurationSec.toFixed(3)}s = ${totalPrefillSpeed.toFixed(2)} t/s`);
                 console.log(`[Throughput] Decode: ${totalOutputTokens} tokens / ${decodeDurationSec.toFixed(3)}s = ${totalOutputSpeed.toFixed(2)} t/s`);
 
+                // 计算TTFT和ITL的聚合统计（提前计算，供表格和详情使用）
+                const avgTtftMs = message.avg_ttft_ms || (details.reduce((sum, r) => sum + (r.ttft_ms || 0), 0) / details.length);
+
+                // 聚合ITL统计（从所有并发请求中取平均）
+                const itlStatsArray = details.filter(r => r.itl_stats && Object.keys(r.itl_stats).length > 0).map(r => r.itl_stats);
+                let avgItlMean = 'N/A';
+                let avgItlStd = 'N/A';
+                if (itlStatsArray.length > 0) {
+                    avgItlMean = (itlStatsArray.reduce((sum, s) => sum + (s.mean || 0), 0) / itlStatsArray.length).toFixed(2);
+                    avgItlStd = (itlStatsArray.reduce((sum, s) => sum + (s.std || 0), 0) / itlStatsArray.length).toFixed(2);
+                }
+
                 cells[0].textContent = message.prompt_length;
                 cells[1].textContent = message.avg_ttft_ms.toFixed(2);
-                cells[2].textContent = totalPrefillSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
-                cells[3].textContent = message.concurrent_details[0]?.output_tokens || 'N/A';
-                cells[4].textContent = message.concurrent_details[0]?.output_time_ms.toFixed(2) || 'N/A';
-                cells[5].textContent = totalOutputSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
-                cells[6].textContent = `${message.successful}/${message.concurrency} ${t.msgConcurrentSuccess}`;
+                cells[2].textContent = avgItlMean;
+
+                cells[3].textContent = totalPrefillSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
+                cells[4].textContent = totalOutputSpeed.toFixed(2);  // 修复：使用基于时间戳的真实总吞吐
+                cells[5].textContent = `${message.successful}/${message.concurrency} ${t.msgConcurrentSuccess}`;
 
                 // Create detail button
-                cells[7].textContent = '';
+                cells[6].textContent = '';
                 const detailButton = document.createElement('button');
                 detailButton.className = 'detail-button';
                 detailButton.textContent = t.detailBtnView;
@@ -3177,24 +3195,12 @@ async function processOllamaResponse(response, promptLength) {
                 const firstPromptSample = message.concurrent_details[0]?.prompt_text || 'a'.repeat(message.prompt_length);
                 const firstOutputSample = message.concurrent_details[0]?.output_content || '';
                 const firstReasoningSample = message.concurrent_details[0]?.reasoning_content || '';
-                
+
                 if (!saveDetailContent) {
                     concurrentDetailsToSave = message.concurrent_details.map(detail => {
                         const { prompt_text, output_content, reasoning_content, ...rest } = detail;
                         return rest;
                     });
-                }
-
-                // 计算TTFT和ITL的聚合统计
-                const avgTtftMs = message.avg_ttft_ms || (details.reduce((sum, r) => sum + (r.ttft_ms || 0), 0) / details.length);
-
-                // 聚合ITL统计（从所有并发请求中取平均）
-                const itlStatsArray = details.filter(r => r.itl_stats && Object.keys(r.itl_stats).length > 0).map(r => r.itl_stats);
-                let avgItlMean = 'N/A';
-                let avgItlStd = 'N/A';
-                if (itlStatsArray.length > 0) {
-                    avgItlMean = (itlStatsArray.reduce((sum, s) => sum + (s.mean || 0), 0) / itlStatsArray.length).toFixed(2);
-                    avgItlStd = (itlStatsArray.reduce((sum, s) => sum + (s.std || 0), 0) / itlStatsArray.length).toFixed(2);
                 }
 
                 // Prepare result entry for detail view
@@ -3225,7 +3231,7 @@ async function processOllamaResponse(response, promptLength) {
                 };
 
                 detailButton.onclick = () => showTestDetail(resultEntry);
-                cells[7].appendChild(detailButton);
+                cells[6].appendChild(detailButton);
 
                 row.classList.remove('info', 'error');
                 row.classList.add('success');
@@ -3236,16 +3242,15 @@ async function processOllamaResponse(response, promptLength) {
                 // Update charts and stats
                 updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
                 generateCharts();
-                
+
             } else {
                 cells[0].textContent = message.prompt_length;
                 cells[1].textContent = 'N/A';
                 cells[2].textContent = 'N/A';
                 cells[3].textContent = 'N/A';
                 cells[4].textContent = 'N/A';
-                cells[5].textContent = 'N/A';
-                cells[6].textContent = message.error || t.statusFailed;
-                cells[7].textContent = '-';
+                cells[5].textContent = message.error || t.statusFailed;
+                cells[6].textContent = '-';
                 
                 row.classList.remove('info', 'success');
                 row.classList.add('error');
@@ -3756,10 +3761,9 @@ async function processOllamaResponse(response, promptLength) {
             const headerRow = document.createElement('tr');
             [
                 t.tableHeaderPromptLen,
-                t.tableHeaderPrefillTime,
+                t.tableHeaderTTFT,
+                t.tableHeaderITL,
                 t.tableHeaderPrefillSpeed,
-                t.tableHeaderOutputLen,
-                t.tableHeaderOutputTime,
                 t.tableHeaderOutputSpeed,
                 t.tableHeaderStatus,
                 t.tableHeaderDetail
@@ -3848,12 +3852,12 @@ async function processOllamaResponse(response, promptLength) {
             const apiTypeText = currentApiType === 'openai' ? t.apiOpenAI : t.apiOllama;
             let markdownTable = `## ${t.mdTestResults} (${apiTypeText} - ${currentModelName})\n\n`;
             markdownTable += `${t.mdNotes}${notes} | ${t.mdConcurrency} ${concurrency}\n\n`;
-            markdownTable += `| ${t.tableHeaderPromptLen.replace('<br>', ' ')} | ${t.tableHeaderPrefillTime.replace('<br>', ' ')} | ${t.tableHeaderPrefillSpeed.replace('<br>', ' ')} | ${t.tableHeaderOutputLen.replace('<br>', ' ')} | ${t.tableHeaderOutputTime.replace('<br>', ' ')} | ${t.tableHeaderOutputSpeed.replace('<br>', ' ')} |\n`;
-            markdownTable += `|---------------------|-------------------|-------------------------|-------------------|---------------|---------------------|\n`;
+            markdownTable += `| ${t.tableHeaderPromptLen.replace('<br>', ' ')} | ${t.tableHeaderTTFT.replace('<br>', ' ')} | ${t.tableHeaderITL.replace('<br>', ' ')} | ${t.tableHeaderPrefillSpeed.replace('<br>', ' ')} | ${t.tableHeaderOutputSpeed.replace('<br>', ' ')} | ${t.tableHeaderStatus.replace('<br>', ' ')} |\n`;
+            markdownTable += `|---------------------|-------------------|-------------------|-------------------------|---------------------|---------------------|\n`;
 
             testResultsData.forEach(res => {
                 // Markdown 中也显示 N/A
-                markdownTable += `| ${res.promptLength} | ${res.prefillTimeMs} | ${res.prefillSpeed} | ${res.outputTokens} | ${res.outputTimeMs} | ${res.outputSpeed} |\n`;
+                markdownTable += `| ${res.promptLength} | ${res.avgTtftMs || 'N/A'} | ${res.avgItlMean || 'N/A'} | ${res.prefillSpeed} | ${res.outputSpeed} | ${res.status} |\n`;
             });
             markdownOutputHidden.value = markdownTable;
 
@@ -4227,10 +4231,34 @@ async function processOllamaResponse(response, promptLength) {
 
 
         // ===============================================================================
+        // 百分位计算函数
+        // ===============================================================================
+
+        // 计算百分位数
+        function calculatePercentile(arr, percentile) {
+            if (arr.length === 0) return null;
+            const sorted = [...arr].sort((a, b) => a - b);
+            const index = (percentile / 100) * (sorted.length - 1);
+            const lower = Math.floor(index);
+            const upper = Math.ceil(index);
+            const weight = index - lower;
+            return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+        }
+
+        // 计算多个百分位统计
+        function calculatePercentiles(arr) {
+            return {
+                p50: calculatePercentile(arr, 50),
+                p90: calculatePercentile(arr, 90),
+                p95: calculatePercentile(arr, 95)
+            };
+        }
+
+        // ===============================================================================
         // 原有图表生成
         // ===============================================================================
 
-        // 生成图表 (现在是四张图)
+        // 生成图表 (现在是六张图)
         function generateCharts() {
             if (testResultsData.length === 0) {
                 //
@@ -4238,6 +4266,8 @@ async function processOllamaResponse(response, promptLength) {
                 if (outputChartInstance) outputChartInstance.clear();
                 if (ttftChartInstance) ttftChartInstance.clear();
                 if (itlChartInstance) itlChartInstance.clear();
+                if (percentilePrefillChartInstance) percentilePrefillChartInstance.clear();
+                if (percentileDecodeChartInstance) percentileDecodeChartInstance.clear();
                 return;
             }
 
@@ -4469,6 +4499,209 @@ async function processOllamaResponse(response, promptLength) {
                                 title: {
                                     display: true,
                                     text: '延迟 (ms)'
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 图表5: Prefill吞吐百分位统计 (P50/P90/P95)
+            // 为每个提示词长度计算百分位
+            const prefillP50Data = [];
+            const prefillP90Data = [];
+            const prefillP95Data = [];
+
+            labels.forEach((label, index) => {
+                const dataPoint = testResultsData[index];
+                if (dataPoint.concurrentDetails && Array.isArray(dataPoint.concurrentDetails)) {
+                    const prefillSpeeds = dataPoint.concurrentDetails
+                        .map(d => d.prefill_speed)
+                        .filter(v => v && v !== 'N/A' && !isNaN(v));
+
+                    if (prefillSpeeds.length > 0) {
+                        const percentiles = calculatePercentiles(prefillSpeeds);
+                        prefillP50Data.push(percentiles.p50);
+                        prefillP90Data.push(percentiles.p90);
+                        prefillP95Data.push(percentiles.p95);
+                    } else {
+                        prefillP50Data.push(null);
+                        prefillP90Data.push(null);
+                        prefillP95Data.push(null);
+                    }
+                } else {
+                    prefillP50Data.push(null);
+                    prefillP90Data.push(null);
+                    prefillP95Data.push(null);
+                }
+            });
+
+            if (percentilePrefillChartInstance) {
+                percentilePrefillChartInstance.data.labels = labels;
+                percentilePrefillChartInstance.data.datasets[0].data = prefillP50Data;
+                percentilePrefillChartInstance.data.datasets[1].data = prefillP90Data;
+                percentilePrefillChartInstance.data.datasets[2].data = prefillP95Data;
+                percentilePrefillChartInstance.update('none');
+            } else {
+                const percentilePrefillCtx = percentilePrefillChartCanvas.getContext('2d');
+                percentilePrefillChartInstance = new Chart(percentilePrefillCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'P50 (中位数)',
+                                data: prefillP50Data,
+                                borderColor: 'rgb(54, 162, 235)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            },
+                            {
+                                label: 'P90',
+                                data: prefillP90Data,
+                                borderColor: 'rgb(255, 206, 86)',
+                                backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            },
+                            {
+                                label: 'P95',
+                                data: prefillP95Data,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: `📊 Prefill吞吐百分位统计 - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisPromptLen
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisThroughput
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 图表6: Decode吞吐百分位统计 (P50/P90/P95)
+            const decodeP50Data = [];
+            const decodeP90Data = [];
+            const decodeP95Data = [];
+
+            labels.forEach((label, index) => {
+                const dataPoint = testResultsData[index];
+                if (dataPoint.concurrentDetails && Array.isArray(dataPoint.concurrentDetails)) {
+                    const decodeSpeeds = dataPoint.concurrentDetails
+                        .map(d => d.output_speed)
+                        .filter(v => v && v !== 'N/A' && !isNaN(v));
+
+                    if (decodeSpeeds.length > 0) {
+                        const percentiles = calculatePercentiles(decodeSpeeds);
+                        decodeP50Data.push(percentiles.p50);
+                        decodeP90Data.push(percentiles.p90);
+                        decodeP95Data.push(percentiles.p95);
+                    } else {
+                        decodeP50Data.push(null);
+                        decodeP90Data.push(null);
+                        decodeP95Data.push(null);
+                    }
+                } else {
+                    decodeP50Data.push(null);
+                    decodeP90Data.push(null);
+                    decodeP95Data.push(null);
+                }
+            });
+
+            if (percentileDecodeChartInstance) {
+                percentileDecodeChartInstance.data.labels = labels;
+                percentileDecodeChartInstance.data.datasets[0].data = decodeP50Data;
+                percentileDecodeChartInstance.data.datasets[1].data = decodeP90Data;
+                percentileDecodeChartInstance.data.datasets[2].data = decodeP95Data;
+                percentileDecodeChartInstance.update('none');
+            } else {
+                const percentileDecodeCtx = percentileDecodeChartCanvas.getContext('2d');
+                percentileDecodeChartInstance = new Chart(percentileDecodeCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'P50 (中位数)',
+                                data: decodeP50Data,
+                                borderColor: 'rgb(54, 162, 235)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            },
+                            {
+                                label: 'P90',
+                                data: decodeP90Data,
+                                borderColor: 'rgb(255, 206, 86)',
+                                backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            },
+                            {
+                                label: 'P95',
+                                data: decodeP95Data,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.1,
+                                fill: false,
+                                spanGaps: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: `📊 Decode吞吐百分位统计 - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}`
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisPromptLen
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: t.chartAxisThroughput
                                 },
                                 beginAtZero: true
                             }
@@ -4816,10 +5049,9 @@ async function processOllamaResponse(response, promptLength) {
             const headerRow = document.createElement('tr');
             [
                 t.tableHeaderPromptLen,
-                t.tableHeaderPrefillTime,
+                t.tableHeaderTTFT,
+                t.tableHeaderITL,
                 t.tableHeaderPrefillSpeed,
-                t.tableHeaderOutputLen,
-                t.tableHeaderOutputTime,
                 t.tableHeaderOutputSpeed,
                 t.tableHeaderStatus,
                 t.tableHeaderDetail
@@ -4834,19 +5066,18 @@ async function processOllamaResponse(response, promptLength) {
             testResultsData.forEach(resultEntry => {
                 const row = document.createElement('tr');
                 const cells = [];
-                for (let i = 0; i < 8; i++) {
+                for (let i = 0; i < 7; i++) {
                     const cell = document.createElement('td');
                     cells.push(cell);
                     row.appendChild(cell);
                 }
 
                 cells[0].textContent = resultEntry.promptLength;
-                cells[1].textContent = resultEntry.prefillTimeMs;
-                cells[2].textContent = resultEntry.prefillSpeed;
-                cells[3].textContent = resultEntry.outputTokens;
-                cells[4].textContent = resultEntry.outputTimeMs;
-                cells[5].textContent = resultEntry.outputSpeed;
-                cells[6].textContent = resultEntry.status;
+                cells[1].textContent = resultEntry.avgTtftMs || 'N/A';
+                cells[2].textContent = resultEntry.avgItlMean || 'N/A';
+                cells[3].textContent = resultEntry.prefillSpeed;
+                cells[4].textContent = resultEntry.outputSpeed;
+                cells[5].textContent = resultEntry.status;
 
                 // 添加详情按钮（如果有详情数据）
                 if (resultEntry.promptText || resultEntry.outputText) {
@@ -4854,9 +5085,9 @@ async function processOllamaResponse(response, promptLength) {
                     detailButton.className = 'detail-button';
                     detailButton.textContent = t.detailBtnView;
                     detailButton.onclick = () => showTestDetail(resultEntry);
-                    cells[7].appendChild(detailButton);
+                    cells[6].appendChild(detailButton);
                 } else {
-                    cells[7].textContent = '-';
+                    cells[6].textContent = '-';
                 }
 
                 // 根据状态设置行样式
