@@ -1366,7 +1366,7 @@
                 mdNotes: '备注：',
                 mdConcurrency: '并发数:',
                 csvConcurrency: '并发数：',
-                csvHeaders: '提示词长度(tokens),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态',
+                csvHeaders: '提示词长度(tokens),TTFT(ms),ITL平均(ms),ITL标准差(ms),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态',
                 // 错误消息和提示
                 errMissingColumns: 'CSV文件缺少必要的列 (提示词长度, 预填充速度, 输出速度)',
                 errHttpError: 'HTTP错误! 状态:',
@@ -1576,7 +1576,7 @@
                 mdNotes: 'Notes:',
                 mdConcurrency: 'Concurrency:',
                 csvConcurrency: 'Concurrency:',
-                csvHeaders: 'Prompt Length(tokens),Prefill Time(ms),Prefill Speed(tokens/s),Output Length(tokens),Output Time(ms),Output Speed(tokens/s),Status',
+                csvHeaders: 'Prompt Length(tokens),TTFT(ms),ITL Mean(ms),ITL Std(ms),Prefill Time(ms),Prefill Speed(tokens/s),Output Length(tokens),Output Time(ms),Output Speed(tokens/s),Status',
                 // Error messages and alerts
                 errMissingColumns: 'CSV file missing required columns (Prompt Length, Prefill Speed, Output Speed)',
                 errHttpError: 'HTTP Error! Status:',
@@ -3903,33 +3903,40 @@ async function processOllamaResponse(response, promptLength) {
         exportCSVBtn.addEventListener('click', () => {
             const t = translations[currentLang];
             const apiTypeText = currentApiType === 'openai' ? t.apiOpenAI : t.apiOllama;
-            let csvContent = "data:text/csv;charset=utf-8,";
+            // 添加UTF-8 BOM解决Excel乱码问题
+            let csvContent = "\uFEFF";
             csvContent += `${apiTypeText}, ${currentModelName}\n`;
             csvContent += `${t.mdNotes}, "${notes.replace(/"/g, '""')}"\n`; // 处理备注中的引号
             const concurrencyValue = document.getElementById('concurrency').value; // 获取并发数
             csvContent += `${t.csvConcurrency}, ${concurrencyValue}\n`;
             csvContent += t.csvHeaders + "\n";
             testResultsData.forEach(res => {
-                csvContent += `${res.promptLength},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
+                // 添加TTFT和ITL数据
+                const ttft = res.avgTtftMs || 'N/A';
+                const itlMean = res.avgItlMean || 'N/A';
+                const itlStd = res.avgItlStd || 'N/A';
+                csvContent += `${res.promptLength},${ttft},${itlMean},${itlStd},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
             });
-            const encodedUri = encodeURI(csvContent);
+            // 使用Blob创建下载，确保BOM生效
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
+            link.setAttribute("href", url);
 
             // 获取备注（可能需要对特殊字符进行处理，确保文件名兼容性）
             const cleanNotes = notes // 假设notes是包含备注的变量
                 .replace(/[\s\t\n\r]+/g, '_') // 将空格和换行符替换为下划线
-                .replace(/[^a-zA-Z0-9_\-\.]/g, '') // 移除其他非字母数字下划线连接符点号的字符
+                .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5\-\.]/g, '') // 保留中文字符
                 .substring(0, 30); // 限制文件名中的备注长度，防止过长
 
             // 构建新的文件名
             const filename = `${currentModelName}_${cleanNotes}_concurrency_${concurrencyValue}.csv`;
-            // --- 重点修改部分结束 ---
 
             link.setAttribute("download", filename);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url); // 释放URL对象
         });
 
 
@@ -4250,7 +4257,9 @@ async function processOllamaResponse(response, promptLength) {
          */
         function parseImportedCSV(csvContent) {
             // v1.8 bug fix: 同时处理 \n 和 \r\n 换行
-            const lines = csvContent.trim().split(/\r?\n/);
+            // 移除UTF-8 BOM（如果存在）
+            const cleanContent = csvContent.replace(/^\uFEFF/, '');
+            const lines = cleanContent.trim().split(/\r?\n/);
             if (lines.length < 5) throw new Error("CSV文件格式不正确，行数不足。");
 
             // 移除\r (再次确保)
@@ -4273,6 +4282,13 @@ async function processOllamaResponse(response, promptLength) {
             let outputSpdIdx = headers.indexOf("输出速度(tokens/s)");
             if (outputSpdIdx === -1) outputSpdIdx = headers.indexOf("Output Speed(tokens/s)");
 
+            // 新增：查找TTFT和ITL列索引
+            let ttftIdx = headers.indexOf("TTFT(ms)");
+            let itlMeanIdx = headers.indexOf("ITL平均(ms)");
+            if (itlMeanIdx === -1) itlMeanIdx = headers.indexOf("ITL Mean(ms)");
+            let itlStdIdx = headers.indexOf("ITL标准差(ms)");
+            if (itlStdIdx === -1) itlStdIdx = headers.indexOf("ITL Std(ms)");
+
             if (lenIdx === -1 || prefillSpdIdx === -1 || outputSpdIdx === -1) {
                 throw new Error(translations[currentLang].errMissingColumns);
             }
@@ -4287,6 +4303,10 @@ async function processOllamaResponse(response, promptLength) {
                         promptLength: values[lenIdx],
                         prefillSpeed: values[prefillSpdIdx],
                         outputSpeed: values[outputSpdIdx],
+                        // 新增TTFT和ITL字段
+                        avgTtftMs: ttftIdx !== -1 ? values[ttftIdx] : 'N/A',
+                        avgItlMean: itlMeanIdx !== -1 ? values[itlMeanIdx] : 'N/A',
+                        avgItlStd: itlStdIdx !== -1 ? values[itlStdIdx] : 'N/A',
                         prefillTimeMs: 'N/A',
                         outputTokens: 'N/A',
                         outputTimeMs: 'N/A',
@@ -5516,23 +5536,30 @@ async function processOllamaResponse(response, promptLength) {
             }
 
             const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
-            let csvContent = "data:text/csv;charset=utf-8,";
+            // 添加UTF-8 BOM解决Excel乱码问题
+            let csvContent = "\uFEFF";
             csvContent += `${apiTypeText}, ${record.config.modelName}\n`;
             csvContent += `${t.mdNotes}, "${record.notes.replace(/"/g, '""')}"\n`;
             csvContent += `${t.csvConcurrency}, ${record.config.concurrency}\n`;
             csvContent += t.csvHeaders + "\n";
 
             record.results.forEach(res => {
-                csvContent += `${res.promptLength},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
+                // 添加TTFT和ITL数据
+                const ttft = res.avgTtftMs || 'N/A';
+                const itlMean = res.avgItlMean || 'N/A';
+                const itlStd = res.avgItlStd || 'N/A';
+                csvContent += `${res.promptLength},${ttft},${itlMean},${itlStd},${res.prefillTimeMs},${res.prefillSpeed},${res.outputTokens},${res.outputTimeMs},${res.outputSpeed},"${res.status.replace(/"/g, '""')}"\n`;
             });
 
-            const encodedUri = encodeURI(csvContent);
+            // 使用Blob创建下载，确保BOM生效
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
+            link.setAttribute("href", url);
 
             const cleanNotes = record.notes
                 .replace(/[\s\t\n\r]+/g, '_')
-                .replace(/[^a-zA-Z0-9_\-\.]/g, '')
+                .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5\-\.]/g, '') // 保留中文字符
                 .substring(0, 30);
 
             const filename = `history_${record.config.modelName}_${cleanNotes}_${record.id}.csv`;
@@ -5540,6 +5567,7 @@ async function processOllamaResponse(response, promptLength) {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url); // 释放URL对象
         }
 
         /**
