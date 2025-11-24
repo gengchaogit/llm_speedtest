@@ -18,6 +18,37 @@ This project is a powerful local large language model (LLM) inference performanc
 
 This tool is a modified version based on the original work by "Zhiyuan Suifeng" (Bilibili/DeepSeek-R1-0528), adding practical features and optimizations including retry mechanism, automatic chart display, Prefill/Decode speed separation, concurrency fixes, request timeout control, auto-save configuration, concurrent throughput fixes, and token source tracking.
 
+---
+
+## 🔥 Important Notice
+
+> ### Recommended: Python Backend Version 🐍
+>
+> **Python backend version has more features and is actively maintained!**
+>
+> #### ✅ Python Backend Advantages (v2.2 Latest)
+> - **🚀 True High Concurrency**: Break through browser's 6-connection limit, support 50+ concurrent requests
+> - **📊 Complete 6-Chart System**: Prefill/Decode throughput + TTFT/ITL latency + Percentile statistics
+> - **🔍 TTFT & ITL Measurement**: Time To First Token + Inter-Token Latency (mean + std/jitter)
+> - **📈 Full-Dimensional Comparison**: History comparison supports all 6 charts for comprehensive analysis
+> - **💾 Enhanced Export**: CSV includes all data, Excel-friendly (no encoding issues), export all charts in one click
+> - **🎯 More Accurate Throughput**: Wall-clock time based concurrent throughput calculation
+> - **⚡ Actively Maintained**: New features implemented in Python version first
+>
+> #### ⚠️ Browser Version Limitations
+> - Concurrency Limit: Maximum 6 concurrent (browser restriction)
+> - Feature Updates: Slower maintenance, new features delayed
+> - Test Accuracy: More affected by browser environment
+>
+> **📖 Quick Start:** [Python Backend Complete Documentation](python/README_Backend.md)
+>
+> **💡 Recommended Workflow:**
+> 1. Double-click `python/Start_LLM_Speed_Test.bat` (Windows) for one-click launch
+> 2. Auto-install dependencies, start backend, open test page
+> 3. Enjoy full features and accurate testing!
+
+---
+
 ## Changelog
 
 <!-- Please note, the following changelog starts from v1.7. -->
