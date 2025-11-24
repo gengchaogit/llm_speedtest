@@ -3963,14 +3963,84 @@ async function processOllamaResponse(response, promptLength) {
             document.body.removeChild(link);
         }
 
-        // v1.8: 监听合并导出按钮
+        /**
+         * 将多个 canvas 纵向合并并下载为一张图片
+         * @param {Array<HTMLCanvasElement>} canvases - 图表数组
+         * @param {string} filename - 下载的文件名
+         * @param {string} title - (可选) 在图表顶部添加的大标题
+         */
+        function downloadMultipleCharts(canvases, filename, title = null) {
+            // 过滤掉不存在的canvas
+            const validCanvases = canvases.filter(c => c);
+
+            if (validCanvases.length === 0) {
+                alert("图表尚未生成！");
+                return;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const padding = 20; // 图表间的间距
+            const titleHeight = title ? 60 : 0; // 为顶部大标题留出空间
+
+            // 计算总尺寸
+            const maxWidth = Math.max(...validCanvases.map(c => c.width));
+            const totalHeight = validCanvases.reduce((sum, c) => sum + c.height, 0)
+                              + padding * (validCanvases.length - 1)
+                              + titleHeight;
+
+            // 设置画布尺寸
+            tempCanvas.width = maxWidth;
+            tempCanvas.height = totalHeight;
+
+            // 1. 填充白色背景
+            tempCtx.fillStyle = '#FFFFFF';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 2. (可选) 绘制大标题
+            if (title) {
+                tempCtx.fillStyle = '#333333';
+                tempCtx.font = 'bold 24px sans-serif';
+                tempCtx.textAlign = 'center';
+                tempCtx.fillText(title, tempCanvas.width / 2, 40);
+            }
+
+            // 3. 依次绘制所有图表
+            let currentY = titleHeight;
+            for (let i = 0; i < validCanvases.length; i++) {
+                const canvas = validCanvases[i];
+                tempCtx.drawImage(canvas, 0, currentY);
+                currentY += canvas.height + padding;
+            }
+
+            // 4. 触发下载
+            const link = document.createElement('a');
+            link.href = tempCanvas.toDataURL('image/png');
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // v1.8: 监听合并导出按钮 - 导出所有6个图表
         exportCombinedChartBtn.addEventListener('click', () => {
             const t = translations[currentLang];  // 获取当前语言的翻译
             const modelName = currentModelName.replace(/[\/\\]/g, '_'); // 清理文件名
-            downloadCombinedChart(
-                prefillChartCanvas,
-                outputChartCanvas,
-                `Perf_Chart_${modelName}.png`,
+
+            // 按顺序收集所有图表的canvas
+            const allCharts = [
+                prefillChartCanvas,      // Prefill吞吐
+                outputChartCanvas,       // Decode吞吐
+                ttftChartCanvas,         // TTFT
+                itlChartCanvas,          // ITL
+                percentilePrefillChartCanvas,  // Prefill百分位
+                percentileDecodeChartCanvas    // Decode百分位
+            ];
+
+            downloadMultipleCharts(
+                allCharts,
+                `Perf_Chart_All_${modelName}.png`,
                 `${t.chartExportTitle} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}` // 大标题
             );
         });
