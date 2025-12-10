@@ -3159,17 +3159,18 @@ async function processOllamaResponse(response, promptLength) {
                 // 调试：查看第一个请求的时间戳字段
                 console.log('[Debug] First detail item:', JSON.stringify(details[0], null, 2));
 
-                // Prefill: 从最早开始到最晚的first_token
+                // Prefill: 从最早开始到最晚的first_chunk（prefill完成时间）
                 const minStartTime = Math.min(...details.map(r => r.start_timestamp));
-                const maxFirstTokenTime = Math.max(...details.map(r => r.first_token_timestamp));
-                const prefillDurationSec = maxFirstTokenTime - minStartTime;
+                // 使用first_chunk_timestamp（第一个chunk到达）而不是first_token_timestamp（第一个内容token）
+                const maxFirstChunkTime = Math.max(...details.map(r => r.first_chunk_timestamp || r.first_token_timestamp || r.end_timestamp));
+                const prefillDurationSec = maxFirstChunkTime - minStartTime;
                 const totalPromptTokens = details.reduce((sum, r) => sum + r.prompt_tokens, 0);
                 const totalPrefillSpeed = prefillDurationSec > 0 ? totalPromptTokens / prefillDurationSec : 0;
 
-                // Decode: 从最早的first_token到最晚的end
-                const minFirstTokenTime = Math.min(...details.map(r => r.first_token_timestamp));
+                // Decode: 从最早的first_chunk到最晚的end
+                const minFirstChunkTime = Math.min(...details.map(r => r.first_chunk_timestamp || r.first_token_timestamp || r.start_timestamp));
                 const maxEndTime = Math.max(...details.map(r => r.end_timestamp));
-                const decodeDurationSec = maxEndTime - minFirstTokenTime;
+                const decodeDurationSec = maxEndTime - minFirstChunkTime;
                 const totalOutputTokens = details.reduce((sum, r) => sum + r.output_tokens, 0);
                 const totalOutputSpeed = decodeDurationSec > 0 ? totalOutputTokens / decodeDurationSec : 0;
 

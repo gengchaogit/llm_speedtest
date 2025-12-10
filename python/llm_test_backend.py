@@ -231,7 +231,8 @@ async def execute_single_request(
         }
     
     start_time = time.perf_counter()
-    first_token_time = None
+    first_chunk_time = None  # 第一个chunk到达时间（prefill结束）
+    first_token_time = None  # 第一个有内容token的时间（用于ITL）
     output_content = ""
     reasoning_content = ""
     actual_output_tokens = None
@@ -291,7 +292,13 @@ async def execute_single_request(
                         json_line = line.replace("data: ", "")
                         data = json.loads(json_line)
                         chunk_count += 1
-                        
+
+                        # 记录第一个chunk到达时间（prefill结束时间）
+                        if first_chunk_time is None:
+                            first_chunk_time = time.perf_counter()
+                            ttft_ms = (first_chunk_time - start_time) * 1000
+                            print(f"[FirstChunk] 接收到首个chunk（prefill完成），耗时: {ttft_ms:.2f}ms")
+
                         # 提取usage信息
                         if data.get("usage"):
                             usage = data["usage"]
@@ -378,7 +385,8 @@ async def execute_single_request(
 
                                 if first_token_time is None:
                                     first_token_time = current_token_time
-                                    print(f"[FirstToken] 接收到首个token，耗时: {(first_token_time - start_time)*1000:.2f}ms")
+                                    token_latency_ms = (first_token_time - start_time) * 1000
+                                    print(f"[FirstToken] 接收到首个内容token，耗时: {token_latency_ms:.2f}ms")
 
                                 # 记录token时间戳和ITL
                                 token_timestamps.append({
@@ -405,17 +413,39 @@ async def execute_single_request(
                         continue
         
         end_time = time.perf_counter()
-        
+
         print(f"[Response] 接收完成 - 内容长度: {len(output_content)}, Reasoning: {len(reasoning_content)}")
-        
-        # 计算指标
-        if first_token_time is None:
-            first_token_time = end_time
-        
-        ttft_ms = (first_token_time - start_time) * 1000
+
+        # 计算指标 - 使用第一个chunk时间作为prefill结束标志
         total_time_ms = (end_time - start_time) * 1000
-        
-        print(f"[Timing] TTFT: {ttft_ms:.2f}ms, Total: {total_time_ms:.2f}ms")
+
+        if first_chunk_time is not None:
+            # 有chunk数据 - 可以计算准确的prefill和decode时间
+            ttft_ms = (first_chunk_time - start_time) * 1000
+            decode_time_ms = total_time_ms - ttft_ms  # decode时间 = 总时间 - prefill时间
+
+            # 确保decode时间至少为1ms（避免除零），但保留真实时间用于显示
+            real_decode_time_ms = decode_time_ms
+            decode_time_ms = max(decode_time_ms, 1)
+
+            if first_token_time is not None:
+                # 有实际内容token
+                token_first_ms = (first_token_time - start_time) * 1000
+                print(f"[Timing] TTFT(首个chunk): {ttft_ms:.2f}ms, 首个内容token: {token_first_ms:.2f}ms, Total: {total_time_ms:.2f}ms")
+            else:
+                # 没有内容token，但有chunk（服务器完成了处理）
+                print(f"[Timing] TTFT(首个chunk): {ttft_ms:.2f}ms, Total: {total_time_ms:.2f}ms, Decode: {real_decode_time_ms:.2f}ms")
+                if chunk_count > 0 and actual_output_tokens and actual_output_tokens > 0:
+                    if real_decode_time_ms < 10:
+                        print(f"[Warning] 收到 {chunk_count} 个chunk，usage显示 {actual_output_tokens} tokens，但decode时间极短 (可能非流式)")
+                    else:
+                        print(f"[Warning] 收到 {chunk_count} 个chunk，usage显示 {actual_output_tokens} tokens，但无流式内容")
+        else:
+            # 完全没有收到chunk - 异常情况
+            ttft_ms = total_time_ms  # fallback
+            decode_time_ms = 1
+            print(f"[Timing] 异常：未收到任何chunk, Total: {total_time_ms:.2f}ms")
+
         print(f"[Timing] Server Prefill: {server_prefill_time_ms}ms, Server Decode: {server_decode_time_ms}ms")
         
         # Token统计
@@ -440,26 +470,39 @@ async def execute_single_request(
 
         if not token_source:
             token_source = 'Unknown'
-        
-        # 计算时间：完全使用端到端测量
-        # vLLM的timing字段（prompt_ms/predicted_ms）不可靠，与实际差异很大
-        # 原版HTML也是这样处理的：优先服务器timing，但vLLM一般会fallback到端到端
-        
-        prefill_time_ms = ttft_ms  # TTFT = prefill时间
-        output_time_ms = max(total_time_ms - ttft_ms, 1)  # 总时间 - TTFT = decode时间
-        
-        time_source = '端到端测量'
+
+        # 计算时间和速度：基于chunk时序和usage数据
+        # 即使没有收到实际内容，也使用usage的token数量和chunk时间来计算速度
+
+        prefill_time_ms = ttft_ms
+        output_time_ms = decode_time_ms
+
+        time_source = '端到端测量（基于chunk时序）'
         print(f"[TimeSource] 使用端到端测量 - Prefill(TTFT): {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms")
-        
+
         # 如果有服务器timing，也打印出来作为参考（但不使用）
         if server_prefill_time_ms and server_decode_time_ms:
             print(f"[TimeSource] 服务器timing（仅参考）- Prefill: {server_prefill_time_ms:.2f}ms, Decode: {server_decode_time_ms:.2f}ms")
-        
+
         # 计算速度 (tokens/second)
-        prefill_speed = (actual_prompt_tokens / (prefill_time_ms / 1000))
-        output_speed = (actual_output_tokens / (output_time_ms / 1000)) if actual_output_tokens > 0 else 0
-        
+        # 使用usage中的token数量，即使没有收到实际内容也计算
+        if prefill_time_ms > 0:
+            prefill_speed = (actual_prompt_tokens / (prefill_time_ms / 1000))
+        else:
+            prefill_speed = 0
+
+        if output_time_ms > 0 and actual_output_tokens > 0:
+            output_speed = (actual_output_tokens / (output_time_ms / 1000))
+        else:
+            output_speed = 0
+
         print(f"[Result] Prefill速度: {prefill_speed:.2f} t/s, Decode速度: {output_speed:.2f} t/s")
+
+        # 添加数据质量警告
+        if actual_output_tokens > 0 and len(output_content) == 0 and len(reasoning_content) == 0:
+            print(f"[Warning] 速度基于usage ({actual_output_tokens} tokens)和timing计算，但未收到实际流式内容")
+            if output_speed > 10000:  # 超过10000 t/s通常不合理
+                print(f"[Warning] Decode速度异常高 ({output_speed:.2f} t/s)，可能表示服务器非真正流式生成")
 
         # 计算ITL统计
         itl_stats = {}
@@ -491,9 +534,12 @@ async def execute_single_request(
             "reasoning_content": reasoning_content,
             "usage_info": usage_info,
             "server_timing_used": server_prefill_time_ms is not None,
+            "has_streaming_content": first_token_time is not None,  # 是否有实际内容token
+            "chunk_count": chunk_count,  # chunk数量
             # 添加绝对时间戳用于并发总吞吐计算
             "start_timestamp": start_time,
-            "first_token_timestamp": first_token_time,
+            "first_chunk_timestamp": first_chunk_time,  # chunk到达时间
+            "first_token_timestamp": first_token_time,  # 内容token时间
             "end_timestamp": end_time,
             "token_source": token_source,  # 添加token来源
             # 新增ITL相关数据
