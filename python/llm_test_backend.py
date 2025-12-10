@@ -97,16 +97,61 @@ def estimate_token_count(text: str) -> int:
     """估算文本的token数量（当API不返回usage时使用）"""
     if not text or len(text) == 0:
         return 0
-    
+
     # 统计中文字符
     chinese_chars = len([c for c in text if '\u4e00' <= c <= '\u9fa5'])
     # 其他字符
     other_chars = len(text) - chinese_chars
-    
+
     # 粗略估算：中文约1.5字符=1token，英文约4字符=1token
     estimated_tokens = round(chinese_chars / 1.5 + other_chars / 4)
-    
+
     return max(1, estimated_tokens)
+
+
+def calculate_dynamic_timeout(prompt_length: int, base_timeout: int) -> int:
+    """
+    根据prompt长度动态计算超时时间
+
+    规则（以65K tokens = 30分钟为基准）：
+    - 1K tokens: ~27.7秒
+    - 2K tokens: ~55.4秒
+    - 4K tokens: ~1.85分钟
+    - 8K tokens: ~3.69分钟
+    - 16K tokens: ~7.38分钟
+    - 32K tokens: ~14.77分钟
+    - 65K tokens: 30分钟
+    - 128K (65K*2): 60分钟
+    - 256K (65K*4): 120分钟
+
+    对于 >= 1K tokens: 按比例动态计算
+    对于 < 1K tokens: 使用配置的base_timeout
+    """
+    import math
+
+    # 基准点：65K tokens = 30分钟
+    REFERENCE_TOKENS = 65536
+    REFERENCE_TIME_MS = 30 * 60 * 1000  # 1800000 ms
+
+    if prompt_length >= 1024:  # >= 1K tokens
+        if prompt_length <= REFERENCE_TOKENS:
+            # 1K - 65K: 线性计算
+            # timeout = (prompt_length / 65536) * 30分钟
+            calculated_timeout = int((prompt_length / REFERENCE_TOKENS) * REFERENCE_TIME_MS)
+            print(f"[Timeout] Prompt长度 {prompt_length} -> 动态超时: {calculated_timeout}ms ({calculated_timeout/1000:.1f}秒 / {calculated_timeout/60000:.2f}分钟)", flush=True)
+            return calculated_timeout
+        else:
+            # > 65K: 按2的幂次翻倍
+            ratio = prompt_length / REFERENCE_TOKENS
+            power = math.ceil(math.log2(ratio))
+            timeout_multiplier = 2 ** power
+            calculated_timeout = int(REFERENCE_TIME_MS * timeout_multiplier)
+            print(f"[Timeout] Prompt长度 {prompt_length} -> 动态超时: {calculated_timeout}ms ({calculated_timeout/60000:.1f}分钟)", flush=True)
+            return calculated_timeout
+    else:
+        # < 1K tokens: 使用配置的超时
+        print(f"[Timeout] Prompt长度 {prompt_length} -> 使用配置超时: {base_timeout}ms", flush=True)
+        return base_timeout
 
 
 def generate_prompt(length: int, seed: int = 0) -> str:
@@ -202,9 +247,23 @@ async def execute_single_request(
     last_token_time = None  # 上一个token的时间戳
     
     try:
-        print(f"[Request] 发送请求到 {api_url}")
-        async with httpx.AsyncClient(timeout=timeout/1000.0, verify=False) as client:
+        print(f"[Request] 发送请求到 {api_url}", flush=True)
+        print(f"[Request] Payload大小预估: {len(json.dumps(payload))} 字节", flush=True)
+        print(f"[Request] Headers: {headers}", flush=True)
+
+        # 配置httpx以支持大payload和长时间请求
+        # httpx 0.13.x 使用不同的Timeout API
+        # 使用简单的超时值，httpx会自动应用到各个阶段
+        timeout_seconds = timeout / 1000.0  # 转换为秒
+
+        print(f"[Request] 创建httpx客户端 (超时: {timeout_seconds}秒)...", flush=True)
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            verify=False
+        ) as client:
+            print(f"[Request] 开始发送POST请求...", flush=True)
             async with client.stream("POST", api_url, headers=headers, json=payload) as response:
+                print(f"[Response] 收到响应，状态码: {response.status_code}", flush=True)
                 if response.status_code != 200:
                     error_text = await response.aread()
                     error_msg = f"HTTP {response.status_code}: {error_text.decode()}"
@@ -442,9 +501,31 @@ async def execute_single_request(
             "itl_stats": itl_stats  # ITL统计信息
         }
     
+    except (httpx.ReadTimeout, httpx.WriteTimeout, httpx.ConnectTimeout, httpx.PoolTimeout) as e:
+        error_msg = f"请求超时: {type(e).__name__}: {str(e)} (提示词长度: {prompt_length}, 超时设置: {timeout}ms)"
+        print(f"[Error] {error_msg}", flush=True)
+        import traceback
+        print(f"[Error] 详细堆栈:\n{traceback.format_exc()}", flush=True)
+        return {
+            "success": False,
+            "error": error_msg,
+            "prompt_length": prompt_length
+        }
+    except httpx.HTTPError as e:
+        error_msg = f"HTTP错误: {type(e).__name__}: {str(e)}"
+        print(f"[Error] {error_msg}", flush=True)
+        import traceback
+        print(f"[Error] 详细堆栈:\n{traceback.format_exc()}", flush=True)
+        return {
+            "success": False,
+            "error": error_msg,
+            "prompt_length": prompt_length
+        }
     except Exception as e:
-        error_msg = f"请求异常: {str(e)}"
-        print(f"[Error] {error_msg}")
+        error_msg = f"请求异常: {type(e).__name__}: {str(e)}"
+        print(f"[Error] {error_msg}", flush=True)
+        import traceback
+        print(f"[Error] 详细堆栈:\n{traceback.format_exc()}", flush=True)
         return {
             "success": False,
             "error": error_msg,
@@ -494,6 +575,9 @@ async def websocket_test_endpoint(websocket: WebSocket):
             })
             
             # 创建并发任务（每个任务使用不同的seed避免cache）
+            # 根据prompt长度动态计算超时时间
+            dynamic_timeout = calculate_dynamic_timeout(length, config.timeout)
+
             tasks = []
             for i in range(config.concurrency):
                 task = execute_single_request(
@@ -503,7 +587,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     model_name=config.model_name,
                     prompt_length=length,
                     output_length=config.output_length,
-                    timeout=config.timeout,
+                    timeout=dynamic_timeout,  # 使用动态计算的超时
                     temperature=config.temperature,
                     top_p=config.top_p,
                     presence_penalty=config.presence_penalty,
@@ -520,14 +604,19 @@ async def websocket_test_endpoint(websocket: WebSocket):
             # 处理结果
             successful_results = []
             failed_count = 0
-            
-            for result in results:
+
+            for idx, result in enumerate(results):
                 if isinstance(result, Exception):
                     failed_count += 1
+                    print(f"[Error] 请求 #{idx+1} 抛出异常: {type(result).__name__}: {str(result)}", flush=True)
+                    import traceback
+                    print(f"[Error] 异常堆栈:\n{''.join(traceback.format_exception(type(result), result, result.__traceback__))}", flush=True)
                 elif result.get("success"):
                     successful_results.append(result)
                 else:
                     failed_count += 1
+                    error_msg = result.get("error", "未知错误")
+                    print(f"[Error] 请求 #{idx+1} 失败: {error_msg}", flush=True)
             
             if successful_results:
                 # 计算聚合统计
