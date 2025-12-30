@@ -1,9 +1,23 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-<!-- v2.1 Python后端版 (chao魔改版):
+<!-- v2.2 Python后端版 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
+    1. (v2.2) 【图表标题国际化】修复所有图表标题的翻译问题，支持中英文动态切换
+       - 非对比模式：6个图表标题（Prefill/Decode/TTFT/ITL/百分位）
+       - 对比模式：6个对比图表标题
+       - Y轴标签：吞吐/时间单位的翻译
+    2. (v2.2) 【文件名优化】全面优化导出文件名生成逻辑
+       - 兼容Windows/Linux/macOS文件名限制（禁止字符、长度限制）
+       - 移除所有特殊字符（+、括号、冒号等）
+       - 防止中文字符截断问题
+       - 添加时间戳避免文件覆盖
+       - 优化文件名长度（<200字符）
+       - 影响范围：CSV导出、历史记录CSV、图表导出、对比图表导出
+-->
+
+<!-- v2.1 Python后端版 (chao魔改版):
     1. (v2.1) 【Python后端】通过Python后端发起请求，突破浏览器6并发限制，支持真正的高并发测试
     2. (v2.1) 【Token来源追踪】测试详情显示token统计来源（API/本地估算），并对本地估算值加⚠标记
     3. (v2.1) 【并发吞吐修复】修复并发测试吞吐量计算错误：使用真实墙上时间（总tokens/总耗时）而非错误的单请求吞吐求和
@@ -63,7 +77,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v2.1 Python后端版</title>
+    <title>本地大模型推理速度测试工具 v2.2 Python后端版</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1221,7 +1235,7 @@
         // ===============================================================================
         const translations = {
             'zh': {
-                pageTitle: '大模型 Prefill & Decode 性能测试工具 v2.0 (chao魔改版)',
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v2.2 (chao魔改版)',
                 langToggle: 'English',
                 apiOpenAI: 'OpenAI兼容接口',
                 apiOllama: 'Ollama接口',
@@ -1443,7 +1457,7 @@
                 historyRecordNotFound: '历史记录未找到'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.0 (chao mod)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.2 (chao mod)',
                 langToggle: '中文',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',

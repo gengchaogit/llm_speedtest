@@ -1,4 +1,4 @@
-# 🐍 LLM速度测试工具 - Python后端版 v2.1
+# 🐍 LLM速度测试工具 - Python后端版 v2.2
 
 ## 简介
 
@@ -270,6 +270,20 @@ pip install -i https://pypi.mirrors.ustc.edu.cn/simple fastapi uvicorn httpx
 
 ### v2.2 (当前版本)
 
+#### Bug修复
+- ✅ **图表标题国际化修复**：修复所有图表标题的翻译问题，支持中英文动态切换
+  - 非对比模式：6个图表标题（Prefill/Decode/TTFT/ITL/百分位）完整翻译
+  - 对比模式：6个对比图表标题完整翻译
+  - Y轴标签：吞吐/时间单位的翻译
+  - 解决英文模式下仍显示中文标题的问题
+- ✅ **文件名优化**：全面优化导出文件名生成逻辑
+  - 兼容Windows/Linux/macOS文件名限制（正确处理禁止字符`< > : " / \ | ? *`）
+  - 移除所有特殊字符（+、括号、冒号等）
+  - 防止中文字符截断问题（使用`substring`而非`slice`）
+  - 添加时间戳避免文件覆盖（格式：2025-12-30_14_30_45）
+  - 优化文件名长度（限制在200字符以内，确保跨平台兼容）
+  - 影响范围：CSV导出、历史记录CSV导出、图表导出、对比图表导出
+
 #### 新增功能
 - ✅ **TTFT测量**：新增首Token时间(Time To First Token)测量，独立图表展示
 - ✅ **ITL测量**：新增Token间延迟(Inter-Token Latency)测量
@@ -291,7 +305,7 @@ pip install -i https://pypi.mirrors.ustc.edu.cn/simple fastapi uvicorn httpx
 - ✅ **手动端口指定**：支持通过命令行参数手动指定端口
 - ✅ **历史记录保持**：使用固定默认端口，确保localStorage历史记录不丢失
 
-#### Bug修复
+#### v2.1版本的关键修复
 - ✅ **修复并发吞吐量计算**（关键修复）：
   - 使用基于真实时间戳的墙上时间计算总吞吐量
   - 正确处理并发请求的时间重叠
@@ -323,4 +337,4 @@ pip install -i https://pypi.mirrors.ustc.edu.cn/simple fastapi uvicorn httpx
 
 **开发者**: chao (魔改版维护者)
 **版本**: v2.2
-**最后更新**: 2025-11-24
+**最后更新**: 2025-12-30
