@@ -1,6 +1,6 @@
-# 🚀 Local LLM Inference Speed Test Tool v2.1 (Chao Modded Version)
+# 🚀 Local LLM Inference Speed Test Tool v2.2 (Chao Modded Version)
 
-![Version](https://img.shields.io/badge/version-2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2-blue.svg)
 
 ---
 
@@ -13,8 +13,8 @@
 This project is a powerful local large language model (LLM) inference performance testing tool designed to help users quickly and conveniently test the Prefill (prompt processing) and Decode (token generation/output) performance of various locally deployed LLM inference services.
 
 **Two versions available:**
-- **Browser Version**: Runs offline directly in browser with no server deployment needed, ensuring data privacy and testing convenience
-- **Python Backend Version** (New in v2.1): Uses Python backend to send requests, breaking through browser's 6-connection limit, supporting true high concurrency testing (50+ concurrent)
+- **Browser Version** (v2.2): Runs offline directly in browser with no server deployment needed, ensuring data privacy and testing convenience
+- **Python Backend Version** (v2.2): Uses Python backend to send requests, breaking through browser's 6-connection limit, supporting true high concurrency testing (50+ concurrent)
 
 This tool is a modified version based on the original work by "Zhiyuan Suifeng" (Bilibili/DeepSeek-R1-0528), adding practical features and optimizations including retry mechanism, automatic chart display, Prefill/Decode speed separation, concurrency fixes, request timeout control, auto-save configuration, concurrent throughput fixes, and token source tracking.
 
@@ -52,6 +52,20 @@ This tool is a modified version based on the original work by "Zhiyuan Suifeng" 
 ## Changelog
 
 <!-- Please note, the following changelog starts from v1.7. -->
+
+### v2.2 (Chao Enhanced Modded Version - Browser Version Feature Sync)
+*   **🌐 Chart Title Internationalization**: Fixed all chart title translation issues, supports dynamic Chinese/English switching, Y-axis labels fully translated
+*   **📁 Filename Optimization**: Comprehensive optimization of export filename generation logic
+    *   Compatible with Windows/Linux/macOS filename restrictions, remove special characters
+    *   Add timestamp to avoid file overwrite (format: YYYY-MM-DD_HH_MM_SS)
+    *   Prevent Chinese character truncation issues, filename length < 200 characters
+    *   Scope: CSV export, history CSV, chart export, comparison chart export
+*   **📊 Step Multiplier**: Added step multiplier input field, supports exponential step growth (multiplier^n, e.g., 2 gives 128→256→512→1024...)
+*   **📸 Screenshot Feature**: Added screenshot comparison result button
+    *   One-click capture of table + Prefill + Decode charts
+    *   Direct copy to clipboard for easy sharing
+    *   Implemented with html2canvas library for high-quality screenshots
+*   **📚 Button Optimization**: History button text changed to "View/Compare History", emphasizing comparison feature
 
 ### v2.1 (Chao Enhanced Modded Version - Python Backend & Concurrent Throughput Fix)
 *   **🐍 Python Backend Version**: New Python backend version breaks through browser 6-connection limit, supports true high concurrency testing (50+ concurrent)

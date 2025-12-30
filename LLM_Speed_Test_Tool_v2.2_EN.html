@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
+    <!-- v2.2 (chao魔改版):
+    可以在下面的github地址获取最新版的更新
+    https://github.com/gengchaogit/llm_speedtest
+    1. (v2.2) 【图表标题国际化】修复所有图表标题的翻译问题，支持中英文动态切换
+    2. (v2.2) 【文件名优化】全面优化导出文件名生成逻辑，兼容Windows/Linux/macOS文件名限制
+    3. (v2.2) 【步长倍数】新增步长倍数输入框，支持指数级步长增长（倍数^n）
+    4. (v2.2) 【截图功能】新增截图对比结果按钮，一键截取表格+Prefill+Decode图表并复制到剪贴板
+    5. (v2.2) 【按钮优化】历史记录按钮文本改为“查看/对比历史记录”，强调对比功能
+-->
+
 <!-- v2.1 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
@@ -61,7 +71,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v2.1</title>
+    <title>本地大模型推理速度测试工具 v2.2</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1110,8 +1120,6 @@
             <button id="exportCSV" style="display: none; background: #4eb8a6;">导出 CSV 数据</button>
             <!-- v1.8: 合并图表导出 -->
             <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
-            <!-- 截图功能 -->
-            <button id="screenshotComparison" style="display: none; background: #8e44ad;">📸 截图对比结果</button>
             <!-- v1.9: 历史记录 -->
             <button id="viewHistory" style="background: #9b59b6;">📚 查看/对比历史记录</button>
             <!-- v1.9.1: 重置参数 -->
@@ -1128,7 +1136,11 @@
                 <label for="importFiles">导入CSV结果文件 (可多选)</label>
                 <input type="file" id="importFiles" multiple accept=".csv" style="padding: 5px;">
             </div>
-            <button id="startComparison" style="background: #27ae60;">生成对比图表</button>
+            <div class="action-buttons" style="margin-top: 15px;">
+                <button id="startComparison" style="background: #27ae60; width: 160px; flex: none;">生成对比图表</button>
+                <!-- 截图功能 -->
+                <button id="screenshotComparison" style="display: none; background: #8e44ad; width: 160px; flex: none;">📸 截图对比结果</button>
+            </div>
             <p class="notes" style="margin-top: 10px;">说明：先“开始测试”运行一次，然后再导入其他CSV文件，点击“生成对比图表”</p>
         </div>
 
@@ -1196,7 +1208,7 @@
         // ===============================================================================
         const translations = {
             'zh': {
-                pageTitle: '大模型 Prefill & Decode 性能测试工具 v2.0 (chao魔改版)',
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v2.2 (chao魔改版)',
                 langToggle: 'English',
                 apiOpenAI: 'OpenAI兼容接口',
                 apiOllama: 'Ollama接口',
@@ -1406,7 +1418,7 @@
                 historyRecordNotFound: '历史记录未找到'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.0 (chao mod)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.2 (chao mod)',
                 langToggle: '中文',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',
@@ -1618,7 +1630,7 @@
         };
 
         // 当前语言
-        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        let currentLang = localStorage.getItem('llmPerfTestLang') || 'en';
 
         // 切换语言函数
         function switchLanguage(lang) {
@@ -1725,6 +1737,7 @@
         let d_minLength = 512;                                                      // 生成文本的最小长度（例如，token 或字符数）
         let d_maxLength = 8192;                                                     // 生成文本的最大长度（例如，token 或字符数）
         let d_step = 512;                                                           // 每次提示词长度增加的步长
+        let d_stepMultiplier = 1;                                                   // 步长倍数（指数增长：第n次步长 = 基础步长 × 倍数^n）
         let d_outputLength = 128;                                                   // 期望输出的文本长度
         let d_timeout = 30000;                                                      // 请求超时时间 (ms)
         // 文本生成采样参数 (浮点数)
@@ -3404,6 +3417,7 @@
             const minLength = parseInt(document.getElementById('minLength').value, 10);
             const maxLength = parseInt(document.getElementById('maxLength').value, 10);
             const step = parseInt(document.getElementById('step').value, 10);
+            const stepMultiplier = parseInt(document.getElementById('stepMultiplier').value, 10) || 1;
             const outputLength = parseInt(document.getElementById('outputLength').value, 10);
             const concurrency = parseInt(document.getElementById('concurrency').value, 10) || 1;
             const timeout = parseInt(document.getElementById('timeout').value, 10);
@@ -3422,6 +3436,7 @@
                 localStorage.setItem('llmPerfTestMinLength', minLength);
                 localStorage.setItem('llmPerfTestMaxLength', maxLength);
                 localStorage.setItem('llmPerfTestStep', step);
+                localStorage.setItem('llmPerfTestStepMultiplier', stepMultiplier);
                 localStorage.setItem('llmPerfTestOutputLength', outputLength);
                 localStorage.setItem('llmPerfTestConcurrency', concurrency);
                 localStorage.setItem('llmPerfTestTimeout', timeout);
@@ -3634,12 +3649,12 @@
                 .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
                 .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
                 .substring(0, 80);                // 限制模型名长度
-            
+
             const cleanNotes = notes
                 .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
                 .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
                 .substring(0, 60);                // 限制备注长度
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `${cleanModelName}_${cleanNotes}_c${concurrencyValue}_${timestamp}.csv`
                 .substring(0, 200);  // 确保总长度<200字符
@@ -3708,11 +3723,12 @@
         // v1.8: 监听合并导出按钮
         exportCombinedChartBtn.addEventListener('click', () => {
             const t = translations[currentLang];  // 获取当前语言的翻译
+            const currentConcurrency = document.getElementById('concurrency').value;
             const cleanModelName = currentModelName
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 80);
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
 
             downloadCombinedChart(
@@ -3727,20 +3743,20 @@
         // 截图功能：截取表格+Prefill+Decode图表并复制到剪贴板
         screenshotComparisonBtn.addEventListener('click', async () => {
             const t = translations[currentLang];
-            
+
             try {
                 // 1. 获取图表容器的实际显示宽度（不含padding）
                 const chartContainer = document.getElementById('chartContainer');
                 const containerStyle = window.getComputedStyle(chartContainer);
-                const containerWidth = chartContainer.clientWidth - 
-                    parseFloat(containerStyle.paddingLeft) - 
+                const containerWidth = chartContainer.clientWidth -
+                    parseFloat(containerStyle.paddingLeft) -
                     parseFloat(containerStyle.paddingRight);
-                
+
                 // 2. 创建一个临时容器，宽度与图表显示区域一致
                 const tempContainer = document.createElement('div');
                 tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: white; padding: 20px; width: ${containerWidth + 40}px;`;
                 document.body.appendChild(tempContainer);
-                
+
                 // 3. 克隆表格，让其自适应容器宽度
                 const resultsClone = resultsDiv.cloneNode(true);
                 resultsClone.style.width = '100%';
@@ -3750,7 +3766,7 @@
                     tableInClone.style.width = '100%';
                 }
                 tempContainer.appendChild(resultsClone);
-                
+
                 // 4. 添加Prefill图表标题和canvas
                 const prefillTitle = document.createElement('h3');
                 prefillTitle.textContent = t.chartPrefillTitle;
@@ -3758,7 +3774,7 @@
                 tempContainer.appendChild(prefillTitle);
                 const prefillClone = prefillChartCanvas.cloneNode(true);
                 tempContainer.appendChild(prefillClone);
-                
+
                 // 5. 添加Decode图表标题和canvas
                 const decodeTitle = document.createElement('h3');
                 decodeTitle.textContent = t.chartDecodeTitle;
@@ -3766,13 +3782,13 @@
                 tempContainer.appendChild(decodeTitle);
                 const decodeClone = outputChartCanvas.cloneNode(true);
                 tempContainer.appendChild(decodeClone);
-                
+
                 // 6. 将canvas内容绘制到克隆的canvas上
                 const prefillCloneCtx = prefillClone.getContext('2d');
                 prefillCloneCtx.drawImage(prefillChartCanvas, 0, 0);
                 const decodeCloneCtx = decodeClone.getContext('2d');
                 decodeCloneCtx.drawImage(outputChartCanvas, 0, 0);
-                
+
                 // 7. 使用html2canvas截图（降低scale提高速度）
                 const canvas = await html2canvas(tempContainer, {
                     backgroundColor: '#ffffff',
@@ -3780,10 +3796,10 @@
                     logging: false,
                     useCORS: true
                 });
-                
+
                 // 8. 清理临时容器
                 document.body.removeChild(tempContainer);
-                
+
                 // 9. 将canvas转换为blob并复制到剪贴板
                 canvas.toBlob(async (blob) => {
                     try {
@@ -3814,7 +3830,7 @@
                        .replace(/[\s\t\n\r\(\),]/g, '_') // 替换空白字符和括号
                        .replace(/_+/g, '_') // 移除连续的下划线
             );
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `Comparison_${labels.join('_vs_')}_${timestamp}.png`.substring(0, 200);
 
@@ -4200,6 +4216,7 @@
             const savedMinLength = localStorage.getItem('llmPerfTestMinLength');
             const savedMaxLength = localStorage.getItem('llmPerfTestMaxLength');
             const savedStep = localStorage.getItem('llmPerfTestStep');
+            const savedStepMultiplier = localStorage.getItem('llmPerfTestStepMultiplier');
             const savedOutputLength = localStorage.getItem('llmPerfTestOutputLength');
             const savedConcurrency = localStorage.getItem('llmPerfTestConcurrency');
             const savedTimeout = localStorage.getItem('llmPerfTestTimeout');
@@ -4224,6 +4241,7 @@
             document.getElementById('minLength').value = savedMinLength || d_minLength;
             document.getElementById('maxLength').value = savedMaxLength || d_maxLength;
             document.getElementById('step').value = savedStep || d_step;
+            document.getElementById('stepMultiplier').value = savedStepMultiplier || d_stepMultiplier;
             document.getElementById('outputLength').value = savedOutputLength || d_outputLength;
             document.getElementById('concurrency').value = savedConcurrency || 1;
             document.getElementById('timeout').value = savedTimeout || d_timeout;
@@ -4620,12 +4638,12 @@
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 80);
-            
+
             const cleanNotes = record.notes
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 60);
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `history_${cleanModelName}_${cleanNotes}_${timestamp}.csv`
                 .substring(0, 200);
@@ -4810,6 +4828,7 @@
             document.getElementById('minLength').value = d_minLength;
             document.getElementById('maxLength').value = d_maxLength;
             document.getElementById('step').value = d_step;
+            document.getElementById('stepMultiplier').value = d_stepMultiplier;
             document.getElementById('outputLength').value = d_outputLength;
             document.getElementById('concurrency').value = 1;
             document.getElementById('timeout').value = d_timeout;
