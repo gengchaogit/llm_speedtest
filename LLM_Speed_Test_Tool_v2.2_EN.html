@@ -2093,8 +2093,8 @@
         }
 
         // 【修复】测试OpenAI兼容接口
-        async function testOpenAI(apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
-            for (let length = minLength; length <= maxLength; length += step) {
+        async function testOpenAI(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+            for (let length of testLengths) {
                 if (!isTestingRunning) break;
 
                 // F12控制台日志
@@ -2726,8 +2726,8 @@
         }
 
         // 【修复】测试Ollama接口
-        async function testOllama(apiUrl, modelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
-             for (let length = minLength; length <= maxLength; length += step) {
+        async function testOllama(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+             for (let length of testLengths) {
                 if (!isTestingRunning) break;
 
                 // F12控制台日志
@@ -3455,7 +3455,32 @@
                 return;
             }
 
-            totalTests = Math.floor((maxLength - minLength) / step) + 1;
+            // 计算测试点列表（指数增长）
+            const testLengths = [];
+            let stepIndex = 0;
+
+            if (stepMultiplier === 1) {
+                // 倍数为1时，使用线性步长
+                let currentLength = minLength;
+                while (currentLength <= maxLength) {
+                    testLengths.push(currentLength);
+                    currentLength += step;
+                }
+            } else {
+                // 倍数>1时，测试点直接按指数序列生成: baseStep * multiplier^n
+                while (true) {
+                    const currentLength = step * Math.pow(stepMultiplier, stepIndex);
+                    if (currentLength > maxLength) break;
+                    if (currentLength >= minLength) {
+                        testLengths.push(currentLength);
+                    }
+                    stepIndex++;
+                }
+            }
+
+            console.log(`[步长计算] 基础步长: ${step}, 倍数: ${stepMultiplier}, 测试点: ${testLengths.join(', ')}`);
+
+            totalTests = testLengths.length;
             if (totalTests <= 0) {
                 alert("最大长度必须大于最小长度，步长必须为正数。");
                 return;
@@ -3540,9 +3565,9 @@
 
             try {
                 if (currentApiType === 'openai') {
-                    await testOpenAI(apiUrl, currentModelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOpenAI(apiUrl, currentModelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 } else {
-                    await testOllama(apiUrl, currentModelName, minLength, maxLength, step, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOllama(apiUrl, currentModelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 }
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
