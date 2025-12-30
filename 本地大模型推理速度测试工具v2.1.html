@@ -64,6 +64,7 @@
     <title>本地大模型推理速度测试工具 v2.1</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         :root {
             --primary-color: #1a73e8;
@@ -1063,6 +1064,10 @@
                     <input type="number" id="step" value="" step="128">
                 </div>
                 <div class="form-group">
+                    <label for="stepMultiplier">步长倍数</label>
+                    <input type="number" id="stepMultiplier" value="" min="1" step="1">
+                </div>
+                <div class="form-group">
                     <label for="outputLength">期望输出长度</label>
                     <input type="number" id="outputLength" value="" min="1">
                 </div>
@@ -1105,8 +1110,10 @@
             <button id="exportCSV" style="display: none; background: #4eb8a6;">导出 CSV 数据</button>
             <!-- v1.8: 合并图表导出 -->
             <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
+            <!-- 截图功能 -->
+            <button id="screenshotComparison" style="display: none; background: #8e44ad;">📸 截图对比结果</button>
             <!-- v1.9: 历史记录 -->
-            <button id="viewHistory" style="background: #9b59b6;">📚 查看历史记录</button>
+            <button id="viewHistory" style="background: #9b59b6;">📚 查看/对比历史记录</button>
             <!-- v1.9.1: 重置参数 -->
             <button id="resetParams" style="background: #e67e22;">🔄 重置参数</button>
         </div>
@@ -1218,6 +1225,7 @@
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
                 labelStep: '步长',
+                labelStepMultiplier: '步长倍数 <span style="font-size: 0.85em; color: #666;">(指数级：倍数^n，如2则128→256→512→1024...)</span>',
                 labelOutputLength: '期望输出长度',
                 labelConcurrency: '并发数',
                 labelTimeout: '请求超时 (ms)',
@@ -1227,6 +1235,7 @@
                 btnCopyMarkdown: '复制 Markdown 表格',
                 btnExportCSV: '导出 CSV 数据',
                 btnExportCombinedChart: '导出一张图表',
+                btnScreenshotComparison: '截图Prefill&Decode结果',
                 btnResetParams: '🔄 重置参数',
                 sectionComparison: '多结果对比',
                 labelImportFiles: '导入CSV结果文件 (可多选)',
@@ -1324,6 +1333,7 @@
                 chartTitleDecodeThroughput: '总输出 (Decode) 吞吐',
                 chartAxisPromptLen: '提示词长度 (tokens)',
                 chartAxisThroughput: '吞吐 (tokens/s)',
+                chartAxisTime: '时间 (ms)',
                 chartComparisonPrefillThroughput: '对比 - 总预填充 (Prefill) 吞吐',
                 chartComparisonDecodeThroughput: '对比 - 总输出 (Decode) 吞吐',
                 // Markdown / CSV
@@ -1336,6 +1346,8 @@
                 errMissingColumns: 'CSV文件缺少必要的列 (提示词长度, 预填充速度, 输出速度)',
                 errHttpError: 'HTTP错误! 状态:',
                 alertMarkdownCopied: 'Markdown表格已复制到剪贴板！',
+                alertScreenshotSuccess: '✓ 截图已复制到剪贴板！',
+                alertScreenshotFailed: '✗ 截图失败，请重试！',
                 alertNoTestResults: '请先至少运行一次"开始测试"，以便将当前结果包含在对比中。',
                 btnTextStart: '开始测试',
                 btnTextStop: '停止',
@@ -1360,7 +1372,7 @@
                 labelTimeoutPrefix: '超时:',
                 // v1.9: 历史记录功能
                 historyTitle: '📚 历史记录',
-                historyBtn: '查看历史记录',
+                historyBtn: '查看/对比历史记录',
                 historyModalTitle: '测试历史记录',
                 historyEmpty: '暂无历史记录',
                 historyRecordTime: '测试时间:',
@@ -1423,6 +1435,7 @@
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
                 labelStep: 'Step Size',
+                labelStepMultiplier: 'Step Multiplier <span style="font-size: 0.85em; color: #666;">(Exponential: multiplier^n, e.g., 2 gives 128→256→512→1024...)</span>',
                 labelOutputLength: 'Expected Output Length',
                 labelConcurrency: 'Concurrency',
                 labelTimeout: 'Request Timeout (ms)',
@@ -1432,6 +1445,7 @@
                 btnCopyMarkdown: 'Copy Markdown Table',
                 btnExportCSV: 'Export CSV Data',
                 btnExportCombinedChart: 'Export Combined Chart',
+                btnScreenshotComparison: 'Screenshot Prefill&Decode',
                 btnResetParams: '🔄 Reset Parameters',
                 sectionComparison: 'Multi-Result Comparison',
                 labelImportFiles: 'Import CSV result files (multiple selection)',
@@ -1529,6 +1543,7 @@
                 chartTitleDecodeThroughput: 'Total Decode Throughput',
                 chartAxisPromptLen: 'Prompt Length (tokens)',
                 chartAxisThroughput: 'Throughput (tokens/s)',
+                chartAxisTime: 'Time (ms)',
                 chartComparisonPrefillThroughput: 'Comparison - Total Prefill Throughput',
                 chartComparisonDecodeThroughput: 'Comparison - Total Decode Throughput',
                 // Markdown / CSV
@@ -1541,6 +1556,8 @@
                 errMissingColumns: 'CSV file missing required columns (Prompt Length, Prefill Speed, Output Speed)',
                 errHttpError: 'HTTP Error! Status:',
                 alertMarkdownCopied: 'Markdown table copied to clipboard!',
+                alertScreenshotSuccess: '✓ Screenshot copied to clipboard!',
+                alertScreenshotFailed: '✗ Screenshot failed, please try again!',
                 alertNoTestResults: 'Please run "Start Test" at least once to include current results in comparison.',
                 btnTextStart: 'Start Test',
                 btnTextStop: 'Stop',
@@ -1565,7 +1582,7 @@
                 labelTimeoutPrefix: 'Timeout:',
                 // v1.9: History feature
                 historyTitle: '📚 History',
-                historyBtn: 'View History',
+                historyBtn: 'View/Compare History',
                 historyModalTitle: 'Test History',
                 historyEmpty: 'No history records',
                 historyRecordTime: 'Time:',
@@ -1642,6 +1659,7 @@
             document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
             document.querySelector('label[for="maxLength"]').textContent = t.labelMaxLength;
             document.querySelector('label[for="step"]').textContent = t.labelStep;
+            document.querySelector('label[for="stepMultiplier"]').innerHTML = t.labelStepMultiplier;
             document.querySelector('label[for="outputLength"]').textContent = t.labelOutputLength;
             document.querySelector('label[for="concurrency"]').textContent = t.labelConcurrency;
             document.querySelector('label[for="timeout"]').textContent = t.labelTimeout;
@@ -1653,6 +1671,7 @@
             document.getElementById('copyMarkdown').textContent = t.btnCopyMarkdown;
             document.getElementById('exportCSV').textContent = t.btnExportCSV;
             document.getElementById('exportCombinedChart').textContent = t.btnExportCombinedChart;
+            document.getElementById('screenshotComparison').textContent = t.btnScreenshotComparison;
             document.getElementById('resetParams').textContent = t.btnResetParams;
             document.getElementById('startComparison').textContent = t.btnStartComparison;
             document.getElementById('exportComparisonChart').textContent = t.btnExportComparisonChart;
@@ -1829,6 +1848,7 @@
         const copyMarkdownBtn = document.getElementById('copyMarkdown');
         const exportCSVBtn = document.getElementById('exportCSV');
         const exportCombinedChartBtn = document.getElementById('exportCombinedChart'); // v1.8
+        const screenshotComparisonBtn = document.getElementById('screenshotComparison'); // 截图按钮
         const startComparisonBtn = document.getElementById('startComparison'); // v1.8
         const importFilesInput = document.getElementById('importFiles'); // v1.8
         const exportComparisonChartBtn = document.getElementById('exportComparisonChart'); // v1.8
@@ -3441,6 +3461,7 @@
             copyMarkdownBtn.style.display = 'none';
             exportCSVBtn.style.display = 'none';
             exportCombinedChartBtn.style.display = 'none'; // v1.8
+            screenshotComparisonBtn.style.display = 'none'; // 截图按钮
             // chartContainer.style.display = 'none';
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
@@ -3581,6 +3602,7 @@
             copyMarkdownBtn.style.display = 'block';
             exportCSVBtn.style.display = 'block';
             exportCombinedChartBtn.style.display = 'block'; // v1.8
+            screenshotComparisonBtn.style.display = 'block'; // 截图按钮
             stopTestBtn.style.display = 'none';
         });
 
@@ -3607,15 +3629,20 @@
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
 
-            // 获取备注（可能需要对特殊字符进行处理，确保文件名兼容性）
-            const cleanNotes = notes // 假设notes是包含备注的变量
-                .replace(/[\s\t\n\r]+/g, '_') // 将空格和换行符替换为下划线
-                .replace(/[^a-zA-Z0-9_\-\.]/g, '') // 移除其他非字母数字下划线连接符点号的字符
-                .substring(0, 30); // 限制文件名中的备注长度，防止过长
-
-            // 构建新的文件名
-            const filename = `${currentModelName}_${cleanNotes}_concurrency_${concurrencyValue}.csv`;
-            // --- 重点修改部分结束 ---
+            // 生成安全的文件名（兼容Windows/Linux/macOS，总长度<200字符）
+            const cleanModelName = currentModelName
+                .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
+                .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
+                .substring(0, 80);                // 限制模型名长度
+            
+            const cleanNotes = notes
+                .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
+                .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
+                .substring(0, 60);                // 限制备注长度
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+            const filename = `${cleanModelName}_${cleanNotes}_c${concurrencyValue}_${timestamp}.csv`
+                .substring(0, 200);  // 确保总长度<200字符
 
             link.setAttribute("download", filename);
             document.body.appendChild(link);
@@ -3680,29 +3707,116 @@
 
         // v1.8: 监听合并导出按钮
         exportCombinedChartBtn.addEventListener('click', () => {
-            const modelName = currentModelName.replace(/[\/\\]/g, '_'); // 清理文件名
+            const t = translations[currentLang];  // 获取当前语言的翻译
+            const cleanModelName = currentModelName
+                .replace(/[<>:"\/\\|?*]/g, '_')
+                .replace(/[\s\t\n\r]+/g, '_')
+                .substring(0, 80);
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+
             downloadCombinedChart(
                 prefillChartCanvas,
                 outputChartCanvas,
-                `Perf_Chart_${modelName}.png`,
-                `性能测试图表 - ${currentModelName} - ${notes}` // 大标题
+                `Perf_${cleanModelName}_c${currentConcurrency}_${timestamp}.png`.substring(0, 200),
+                `${t.chartExportTitle} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}` // 大标题
             );
         });
 
         // v1.8: 监听对比图表导出按钮
+        // 截图功能：截取表格+Prefill+Decode图表并复制到剪贴板
+        screenshotComparisonBtn.addEventListener('click', async () => {
+            const t = translations[currentLang];
+            
+            try {
+                // 1. 获取图表容器的实际显示宽度（不含padding）
+                const chartContainer = document.getElementById('chartContainer');
+                const containerStyle = window.getComputedStyle(chartContainer);
+                const containerWidth = chartContainer.clientWidth - 
+                    parseFloat(containerStyle.paddingLeft) - 
+                    parseFloat(containerStyle.paddingRight);
+                
+                // 2. 创建一个临时容器，宽度与图表显示区域一致
+                const tempContainer = document.createElement('div');
+                tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: white; padding: 20px; width: ${containerWidth + 40}px;`;
+                document.body.appendChild(tempContainer);
+                
+                // 3. 克隆表格，让其自适应容器宽度
+                const resultsClone = resultsDiv.cloneNode(true);
+                resultsClone.style.width = '100%';
+                resultsClone.style.maxWidth = '100%';
+                const tableInClone = resultsClone.querySelector('table');
+                if (tableInClone) {
+                    tableInClone.style.width = '100%';
+                }
+                tempContainer.appendChild(resultsClone);
+                
+                // 4. 添加Prefill图表标题和canvas
+                const prefillTitle = document.createElement('h3');
+                prefillTitle.textContent = t.chartPrefillTitle;
+                prefillTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px;';
+                tempContainer.appendChild(prefillTitle);
+                const prefillClone = prefillChartCanvas.cloneNode(true);
+                tempContainer.appendChild(prefillClone);
+                
+                // 5. 添加Decode图表标题和canvas
+                const decodeTitle = document.createElement('h3');
+                decodeTitle.textContent = t.chartDecodeTitle;
+                decodeTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px;';
+                tempContainer.appendChild(decodeTitle);
+                const decodeClone = outputChartCanvas.cloneNode(true);
+                tempContainer.appendChild(decodeClone);
+                
+                // 6. 将canvas内容绘制到克隆的canvas上
+                const prefillCloneCtx = prefillClone.getContext('2d');
+                prefillCloneCtx.drawImage(prefillChartCanvas, 0, 0);
+                const decodeCloneCtx = decodeClone.getContext('2d');
+                decodeCloneCtx.drawImage(outputChartCanvas, 0, 0);
+                
+                // 7. 使用html2canvas截图（降低scale提高速度）
+                const canvas = await html2canvas(tempContainer, {
+                    backgroundColor: '#ffffff',
+                    scale: 1.5,
+                    logging: false,
+                    useCORS: true
+                });
+                
+                // 8. 清理临时容器
+                document.body.removeChild(tempContainer);
+                
+                // 9. 将canvas转换为blob并复制到剪贴板
+                canvas.toBlob(async (blob) => {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                        ]);
+                        alert(t.alertScreenshotSuccess || '截图已复制到剪贴板！');
+                    } catch (clipboardError) {
+                        console.error('复制到剪贴板失败:', clipboardError);
+                        alert(t.alertScreenshotFailed || '截图失败，请重试！');
+                    }
+                }, 'image/png', 0.95);
+            } catch (error) {
+                console.error('截图失败:', error);
+                alert(t.alertScreenshotFailed || '截图失败，请重试！');
+            }
+        });
+
         exportComparisonChartBtn.addEventListener('click', () => {
             if (comparisonData.length === 0) {
                 alert("没有对比数据可导出。");
                 return;
             }
-            // v1.8: 从 comparisonData 动态生成文件名
+            // v1.8: 从 comparisonData 动态生成文件名（优化文件名安全性）
             const labels = comparisonData.map(d =>
                 d.label.replace(/【.*?】/g, '') // 移除【导入】
-                       .replace(/[\s\(\),]/g, '_') // 替换非法字符
+                       .replace(/[<>:"\/\\|?*]/g, '_') // 替换Windows禁止字符
+                       .replace(/[\s\t\n\r\(\),]/g, '_') // 替换空白字符和括号
                        .replace(/_+/g, '_') // 移除连续的下划线
             );
-            // 限制文件名长度，防止过长
-            const filename = `Comparison_${labels.join('_vs_').slice(0, 100)}.png`;
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+            const filename = `Comparison_${labels.join('_vs_')}_${timestamp}.png`.substring(0, 200);
 
             downloadCombinedChart(
                 document.getElementById('comparisonPrefillChart'),
@@ -4501,12 +4615,21 @@
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
 
-            const cleanNotes = record.notes
+            // 生成安全的文件名（兼容Windows/Linux/macOS）
+            const cleanModelName = record.config.modelName
+                .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
-                .replace(/[^a-zA-Z0-9_\-\.]/g, '')
-                .substring(0, 30);
+                .substring(0, 80);
+            
+            const cleanNotes = record.notes
+                .replace(/[<>:"\/\\|?*]/g, '_')
+                .replace(/[\s\t\n\r]+/g, '_')
+                .substring(0, 60);
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+            const filename = `history_${cleanModelName}_${cleanNotes}_${timestamp}.csv`
+                .substring(0, 200);
 
-            const filename = `history_${record.config.modelName}_${cleanNotes}_${record.id}.csv`;
             link.setAttribute("download", filename);
             document.body.appendChild(link);
             link.click();
