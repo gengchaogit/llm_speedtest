@@ -1139,43 +1139,43 @@
 
         <!-- 绘图区域：包含四个 canvas -->
         <div id="chartContainer" style="display: none;">
-            <h3>预填充 (Prefill) 吞吐</h3>
+            <h3 id="chartPrefillTitle">预填充 (Prefill) 吞吐</h3>
             <canvas id="prefillChart"></canvas>
 
-            <h3 style="margin-top: 25px;">输出 (Decode) 吞吐</h3>
+            <h3 id="chartDecodeTitle" style="margin-top: 25px;">输出 (Decode) 吞吐</h3>
             <canvas id="outputChart"></canvas>
 
-            <h3 style="margin-top: 25px;">首Token时间 (TTFT)</h3>
+            <h3 id="chartTtftTitle" style="margin-top: 25px;">首Token时间 (TTFT)</h3>
             <canvas id="ttftChart"></canvas>
 
-            <h3 style="margin-top: 25px;">Token间延迟 (ITL) - 平均值与抖动</h3>
+            <h3 id="chartItlTitle" style="margin-top: 25px;">Token间延迟 (ITL) - 平均值与抖动</h3>
             <canvas id="itlChart"></canvas>
 
-            <h3 style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Prefill吞吐</h3>
+            <h3 id="chartPrefillPercentileTitle" style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Prefill吞吐</h3>
             <canvas id="percentilePrefillChart"></canvas>
 
-            <h3 style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Decode吞吐</h3>
+            <h3 id="chartDecodePercentileTitle" style="margin-top: 25px;">📊 百分位统计 (P50/P90/P95) - Decode吞吐</h3>
             <canvas id="percentileDecodeChart"></canvas>
         </div>
 
         <!-- v1.8: 新的对比绘图区域 -->
         <div id="comparisonChartContainer" style="display: none; margin-top: 30px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-            <h3>对比 - 预填充 (Prefill) 吞吐</h3>
+            <h3 id="comparisonPrefillTitle">对比 - 预填充 (Prefill) 吞吐</h3>
             <canvas id="comparisonPrefillChart"></canvas>
 
-            <h3 style="margin-top: 25px;">对比 - 输出 (Decode) 吞吐</h3>
+            <h3 id="comparisonDecodeTitle" style="margin-top: 25px;">对比 - 输出 (Decode) 吞吐</h3>
             <canvas id="comparisonOutputChart"></canvas>
 
-            <h3 style="margin-top: 25px;">对比 - 首Token时间 (TTFT)</h3>
+            <h3 id="comparisonTtftTitle" style="margin-top: 25px;">对比 - 首Token时间 (TTFT)</h3>
             <canvas id="comparisonTtftChart"></canvas>
 
-            <h3 style="margin-top: 25px;">对比 - Token间延迟 (ITL)</h3>
+            <h3 id="comparisonItlTitle" style="margin-top: 25px;">对比 - Token间延迟 (ITL)</h3>
             <canvas id="comparisonItlChart"></canvas>
 
-            <h3 style="margin-top: 25px;">对比 - Prefill吞吐百分位统计</h3>
+            <h3 id="comparisonPrefillPercentileTitle" style="margin-top: 25px;">对比 - Prefill吞吐百分位统计</h3>
             <canvas id="comparisonPrefillPercentileChart"></canvas>
 
-            <h3 style="margin-top: 25px;">对比 - Decode吞吐百分位统计</h3>
+            <h3 id="comparisonDecodePercentileTitle" style="margin-top: 25px;">对比 - Decode吞吐百分位统计</h3>
             <canvas id="comparisonDecodePercentileChart"></canvas>
 
             <!-- v1.8: 对比图表导出按钮 -->
@@ -1269,8 +1269,17 @@
                 msgWaiting: '等待开始测试...',
                 chartPrefillTitle: '预填充 (Prefill) 吞吐',
                 chartDecodeTitle: '输出 (Decode) 吞吐',
+                chartTtftTitle: '首Token时间 (TTFT)',
+                chartItlTitle: 'Token间延迟 (ITL) - 平均值与抖动',
+                chartPrefillPercentileTitle: '📊 百分位统计 (P50/P90/P95) - Prefill吞吐',
+                chartDecodePercentileTitle: '📊 百分位统计 (P50/P90/P95) - Decode吞吐',
                 chartComparisonPrefillTitle: '对比 - 预填充 (Prefill) 吞吐',
                 chartComparisonDecodeTitle: '对比 - 输出 (Decode) 吞吐',
+                chartComparisonTtftTitle: '对比 - 首Token时间 (TTFT)',
+                chartComparisonItlTitle: '对比 - Token间延迟 (ITL)',
+                chartComparisonPrefillPercentileTitle: '对比 - Prefill吞吐百分位统计',
+                chartComparisonDecodePercentileTitle: '对比 - Decode吞吐百分位统计',
+                chartAxisTime: '时间 (ms)',
                 btnExportComparisonChart: '导出一张对比图',
                 btnScreenshotComparison: '截图Prefill&Decode结果',
                 concurrentStatsTitle: '总吞吐量性能统计',
@@ -1482,8 +1491,17 @@
                 msgWaiting: 'Waiting to start test...',
                 chartPrefillTitle: 'Prefill Throughput',
                 chartDecodeTitle: 'Decode Throughput',
+                chartTtftTitle: 'Time to First Token (TTFT)',
+                chartItlTitle: 'Inter-Token Latency (ITL) - Mean & Jitter',
+                chartPrefillPercentileTitle: '📊 Percentile Stats (P50/P90/P95) - Prefill Throughput',
+                chartDecodePercentileTitle: '📊 Percentile Stats (P50/P90/P95) - Decode Throughput',
                 chartComparisonPrefillTitle: 'Comparison - Prefill Throughput',
                 chartComparisonDecodeTitle: 'Comparison - Decode Throughput',
+                chartComparisonTtftTitle: 'Comparison - TTFT (Time to First Token)',
+                chartComparisonItlTitle: 'Comparison - ITL (Inter-Token Latency)',
+                chartComparisonPrefillPercentileTitle: 'Comparison - Prefill Throughput Percentiles',
+                chartComparisonDecodePercentileTitle: 'Comparison - Decode Throughput Percentiles',
+                chartAxisTime: 'Time (ms)',
                 btnExportComparisonChart: 'Export Comparison Chart',
                 btnScreenshotComparison: 'Screenshot Prefill&Decode',
                 concurrentStatsTitle: 'Total Throughput Performance Statistics',
@@ -1712,17 +1730,20 @@
             document.querySelector('.config-section p.notes').textContent = t.comparisonNote;
 
             // 更新图表标题
-            const chartTitles = document.querySelectorAll('#chartContainer h3');
-            if (chartTitles.length >= 2) {
-                chartTitles[0].textContent = t.chartPrefillTitle;
-                chartTitles[1].textContent = t.chartDecodeTitle;
-            }
+            document.getElementById('chartPrefillTitle').textContent = t.chartPrefillTitle;
+            document.getElementById('chartDecodeTitle').textContent = t.chartDecodeTitle;
+            document.getElementById('chartTtftTitle').textContent = t.chartTtftTitle;
+            document.getElementById('chartItlTitle').textContent = t.chartItlTitle;
+            document.getElementById('chartPrefillPercentileTitle').textContent = t.chartPrefillPercentileTitle;
+            document.getElementById('chartDecodePercentileTitle').textContent = t.chartDecodePercentileTitle;
 
-            const comparisonTitles = document.querySelectorAll('#comparisonChartContainer h3');
-            if (comparisonTitles.length >= 2) {
-                comparisonTitles[0].textContent = t.chartComparisonPrefillTitle;
-                comparisonTitles[1].textContent = t.chartComparisonDecodeTitle;
-            }
+            // 更新对比图表标题
+            document.getElementById('comparisonPrefillTitle').textContent = t.chartComparisonPrefillTitle;
+            document.getElementById('comparisonDecodeTitle').textContent = t.chartComparisonDecodeTitle;
+            document.getElementById('comparisonTtftTitle').textContent = t.chartComparisonTtftTitle;
+            document.getElementById('comparisonItlTitle').textContent = t.chartComparisonItlTitle;
+            document.getElementById('comparisonPrefillPercentileTitle').textContent = t.chartComparisonPrefillPercentileTitle;
+            document.getElementById('comparisonDecodePercentileTitle').textContent = t.chartComparisonDecodePercentileTitle;
 
             // 如果结果区域是等待状态，更新文本
             const resultsDiv = document.getElementById('results');
@@ -4535,7 +4556,7 @@ async function processOllamaResponse(response, promptLength) {
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - 首Token时间 (TTFT)' }
+                        title: { display: true, text: t.chartComparisonTtftTitle }
                     },
                     scales: {
                         x: {
@@ -4544,7 +4565,7 @@ async function processOllamaResponse(response, promptLength) {
                             title: { display: true, text: t.chartAxisPromptLen }
                         },
                         y: {
-                            title: { display: true, text: '时间 (ms)' },
+                            title: { display: true, text: t.chartAxisTime },
                             beginAtZero: true
                         }
                     }
@@ -4588,7 +4609,7 @@ async function processOllamaResponse(response, promptLength) {
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - Token间延迟 (ITL)' }
+                        title: { display: true, text: t.chartComparisonItlTitle }
                     },
                     scales: {
                         x: {
@@ -4597,7 +4618,7 @@ async function processOllamaResponse(response, promptLength) {
                             title: { display: true, text: t.chartAxisPromptLen }
                         },
                         y: {
-                            title: { display: true, text: '时间 (ms)' },
+                            title: { display: true, text: t.chartAxisTime },
                             beginAtZero: true
                         }
                     }
@@ -4654,7 +4675,7 @@ async function processOllamaResponse(response, promptLength) {
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - Prefill吞吐百分位统计' }
+                        title: { display: true, text: t.chartComparisonPrefillPercentileTitle }
                     },
                     scales: {
                         x: {
@@ -4720,7 +4741,7 @@ async function processOllamaResponse(response, promptLength) {
                     responsive: true,
                     plugins: {
                         legend: { position: 'top' },
-                        title: { display: true, text: '对比 - Decode吞吐百分位统计' }
+                        title: { display: true, text: t.chartComparisonDecodePercentileTitle }
                     },
                     scales: {
                         x: {
@@ -4943,7 +4964,7 @@ async function processOllamaResponse(response, promptLength) {
                             y: {
                                 title: {
                                     display: true,
-                                    text: '时间 (ms)'
+                                    text: t.chartAxisTime
                                 },
                                 beginAtZero: true
                             }
