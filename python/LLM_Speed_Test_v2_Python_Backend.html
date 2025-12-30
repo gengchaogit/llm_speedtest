@@ -3965,14 +3965,20 @@ async function processOllamaResponse(response, promptLength) {
             const link = document.createElement("a");
             link.setAttribute("href", url);
 
-            // 获取备注（可能需要对特殊字符进行处理，确保文件名兼容性）
-            const cleanNotes = notes // 假设notes是包含备注的变量
-                .replace(/[\s\t\n\r]+/g, '_') // 将空格和换行符替换为下划线
-                .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5\-\.]/g, '') // 保留中文字符
-                .substring(0, 30); // 限制文件名中的备注长度，防止过长
-
-            // 构建新的文件名
-            const filename = `${currentModelName}_${cleanNotes}_concurrency_${concurrencyValue}.csv`;
+            // 生成安全的文件名（兼容Windows/Linux/macOS，总长度<200字符）
+            const cleanModelName = currentModelName
+                .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
+                .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
+                .substring(0, 80);                // 限制模型名长度
+            
+            const cleanNotes = notes
+                .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
+                .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
+                .substring(0, 60);                // 限制备注长度
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+            const filename = `${cleanModelName}_${cleanNotes}_c${concurrencyValue}_${timestamp}.csv`
+                .substring(0, 200);  // 确保总长度<200字符
 
             link.setAttribute("download", filename);
             document.body.appendChild(link);
@@ -4099,7 +4105,12 @@ async function processOllamaResponse(response, promptLength) {
         // v1.8: 监听合并导出按钮 - 导出所有6个图表
         exportCombinedChartBtn.addEventListener('click', () => {
             const t = translations[currentLang];  // 获取当前语言的翻译
-            const modelName = currentModelName.replace(/[\/\\]/g, '_'); // 清理文件名
+            const cleanModelName = currentModelName
+                .replace(/[<>:"\/\\|?*]/g, '_')
+                .replace(/[\s\t\n\r]+/g, '_')
+                .substring(0, 80);
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
 
             // 按顺序收集所有图表的canvas
             const allCharts = [
@@ -4113,7 +4124,7 @@ async function processOllamaResponse(response, promptLength) {
 
             downloadMultipleCharts(
                 allCharts,
-                `Perf_Chart_All_${modelName}.png`,
+                `Perf_${cleanModelName}_c${currentConcurrency}_${timestamp}.png`.substring(0, 200),
                 `${t.chartExportTitle} - ${currentModelName} - ${t.chartConcurrency}${currentConcurrency} - ${notes}` // 大标题
             );
         });
@@ -4127,11 +4138,14 @@ async function processOllamaResponse(response, promptLength) {
             // v1.8: 从 comparisonData 动态生成文件名
             const labels = comparisonData.map(d =>
                 d.label.replace(/【.*?】/g, '') // 移除【导入】
-                       .replace(/[\s\(\),]/g, '_') // 替换非法字符
+                       .replace(/[<>:"\/\\|?*]/g, '_') // 替换Windows禁止字符
+                       .replace(/[\s\t\n\r\(\),]/g, '_') // 替换空白字符和括号
                        .replace(/_+/g, '_') // 移除连续的下划线
+                       .substring(0, 40) // 每个标签最多40字符
             );
-            // 限制文件名长度，防止过长
-            const filename = `Comparison_All_${labels.join('_vs_').slice(0, 100)}.png`;
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
+            // 安全拼接文件名，确保总长度<200
+            const filename = `Comparison_${labels.join('_vs_')}_${timestamp}.png`.substring(0, 200);
 
             // 收集所有对比图表
             const allComparisonCharts = [
@@ -5686,12 +5700,18 @@ async function processOllamaResponse(response, promptLength) {
             const link = document.createElement("a");
             link.setAttribute("href", url);
 
-            const cleanNotes = record.notes
+            const cleanModelName = record.config.modelName
+                .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
-                .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5\-\.]/g, '') // 保留中文字符
-                .substring(0, 30);
+                .substring(0, 80);
+            
+            const cleanNotes = record.notes
+                .replace(/[<>:"\/\\|?*]/g, '_')
+                .replace(/[\s\t\n\r]+/g, '_')
+                .substring(0, 60);
 
-            const filename = `history_${record.config.modelName}_${cleanNotes}_${record.id}.csv`;
+            const filename = `history_${cleanModelName}_${cleanNotes}_${record.id}.csv`
+                .substring(0, 200);
             link.setAttribute("download", filename);
             document.body.appendChild(link);
             link.click();
