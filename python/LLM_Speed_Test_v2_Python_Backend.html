@@ -1272,7 +1272,7 @@
                 chartComparisonPrefillTitle: '对比 - 预填充 (Prefill) 吞吐',
                 chartComparisonDecodeTitle: '对比 - 输出 (Decode) 吞吐',
                 btnExportComparisonChart: '导出一张对比图',
-                btnScreenshotComparison: '📸 截图结果',
+                btnScreenshotComparison: '截图Prefill&Decode结果',
                 concurrentStatsTitle: '总吞吐量性能统计',
                 concurrentLabel: '并发',
                 // 表格标题
@@ -1485,7 +1485,7 @@
                 chartComparisonPrefillTitle: 'Comparison - Prefill Throughput',
                 chartComparisonDecodeTitle: 'Comparison - Decode Throughput',
                 btnExportComparisonChart: 'Export Comparison Chart',
-                btnScreenshotComparison: '📸 Screenshot',
+                btnScreenshotComparison: 'Screenshot Prefill&Decode',
                 concurrentStatsTitle: 'Total Throughput Performance Statistics',
                 concurrentLabel: 'Concurrent',
                 // Table headers
@@ -3772,11 +3772,19 @@ async function processOllamaResponse(response, promptLength) {
             resultsDiv.innerHTML = "";
             testResultsData = [];
 
-            // 销毁旧图表
+            // 销毁旧图表（所有6个图表）
             if (prefillChartInstance) prefillChartInstance.destroy();
             if (outputChartInstance) outputChartInstance.destroy();
+            if (ttftChartInstance) ttftChartInstance.destroy();
+            if (itlChartInstance) itlChartInstance.destroy();
+            if (percentilePrefillChartInstance) percentilePrefillChartInstance.destroy();
+            if (percentileDecodeChartInstance) percentileDecodeChartInstance.destroy();
             prefillChartInstance = null;
             outputChartInstance = null;
+            ttftChartInstance = null;
+            itlChartInstance = null;
+            percentilePrefillChartInstance = null;
+            percentileDecodeChartInstance = null;
 
             const t = translations[currentLang];
 
@@ -5526,6 +5534,11 @@ async function processOllamaResponse(response, promptLength) {
             }
             // 填充备注字段
             document.getElementById('notes').value = record.notes || '';
+
+            // 更新全局变量（用于图表标题）
+            currentModelName = record.config.modelName || '/model';
+            currentConcurrency = record.config.concurrency || 1;
+            notes = record.notes || '';
 
             // 加载历史记录的结果数据
             testResultsData = [...record.results];
