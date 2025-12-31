@@ -280,18 +280,28 @@ async def execute_single_request(
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue
-                    
-                    if not line.startswith("data: "):
-                        continue
-                    
-                    if "[DONE]" in line:
-                        print(f"[Stream] 收到 [DONE]，共处理 {chunk_count} 个chunk")
-                        break
-                    
-                    try:
+
+                    # Log raw streamed line for debugging
+                    # print(f"[RawLine] {line.strip()}")
+
+                    # 处理OpenAI SSE格式
+                    if line.startswith("data: "):
+                        if "[DONE]" in line:
+                            print(f"[Stream] 收到 [DONE]，共处理 {chunk_count} 个chunk")
+                            break
                         json_line = line.replace("data: ", "")
+                    else:
+                        # Ollama直接返回JSON，不需要处理SSE格式
+                        json_line = line.strip()
+
+                    try:
                         data = json.loads(json_line)
                         chunk_count += 1
+
+                        # 检查ollama的done字段
+                        if data.get("done") is True:
+                            print(f"[Stream] Ollama返回done=true，共处理 {chunk_count} 个chunk")
+                            # 继续处理这个chunk（包含最终的timing信息），不要break
 
                         # 记录第一个chunk到达时间（prefill结束时间）
                         if first_chunk_time is None:
@@ -299,20 +309,20 @@ async def execute_single_request(
                             ttft_ms = (first_chunk_time - start_time) * 1000
                             print(f"[FirstChunk] 接收到首个chunk（prefill完成），耗时: {ttft_ms:.2f}ms")
 
-                        # 提取usage信息
+                        # 提取usage信息（OpenAI格式）
                         if data.get("usage"):
                             usage = data["usage"]
                             completion = usage.get("completion_tokens", 0)
                             reasoning = usage.get("reasoning_tokens", 0)
                             prompt = usage.get("prompt_tokens", 0)
-                            
+
                             print(f"[Usage] 找到usage字段！prompt_tokens: {prompt}, completion_tokens: {completion}, reasoning_tokens: {reasoning}")
                             print(f"[Debug] 完整usage字段: {json.dumps(usage, indent=2)}")
-                            
+
                             actual_output_tokens = completion + reasoning
                             actual_prompt_tokens = prompt
                             usage_info = usage.copy()
-                            
+
                             # 提取服务器timing (多种可能的字段名)
                             # llama.cpp/Ollama格式：纳秒
                             if usage.get("prompt_eval_duration"):
@@ -324,7 +334,7 @@ async def execute_single_request(
                             elif usage.get("prompt_time"):
                                 server_prefill_time_ms = usage["prompt_time"] * 1000  # 秒转毫秒
                                 print(f"[Usage] 找到 prompt_time: {server_prefill_time_ms:.2f}ms")
-                            
+
                             if usage.get("eval_duration"):
                                 server_decode_time_ms = usage["eval_duration"] / 1_000_000
                                 print(f"[Usage] 找到 eval_duration: {server_decode_time_ms:.2f}ms")
@@ -334,10 +344,46 @@ async def execute_single_request(
                             elif usage.get("completion_time"):
                                 server_decode_time_ms = usage["completion_time"] * 1000  # 秒转毫秒
                                 print(f"[Usage] 找到 completion_time: {server_decode_time_ms:.2f}ms")
-                            
+
                             if data.get("timings"):
                                 usage_info["timings"] = data["timings"]
                                 print(f"[Debug] 完整timings字段: {json.dumps(data['timings'], indent=2)}")
+
+                        # 提取usage信息（Ollama格式 - 直接在顶层）
+                        if data.get("prompt_eval_count") is not None:
+                            prompt = data.get("prompt_eval_count", 0)
+                            completion = data.get("eval_count", 0)
+
+                            print(f"[Usage-Ollama] 找到ollama格式！prompt_eval_count: {prompt}, eval_count: {completion}")
+
+                            actual_output_tokens = completion
+                            actual_prompt_tokens = prompt
+
+                            # 构造usage_info
+                            usage_info = {
+                                "prompt_tokens": prompt,
+                                "completion_tokens": completion,
+                                "total_tokens": prompt + completion
+                            }
+
+                            # 提取ollama的timing信息（纳秒）
+                            if data.get("prompt_eval_duration"):
+                                server_prefill_time_ms = data["prompt_eval_duration"] / 1_000_000
+                                print(f"[Usage-Ollama] 找到 prompt_eval_duration: {server_prefill_time_ms:.2f}ms")
+                                usage_info["prompt_eval_duration_ns"] = data["prompt_eval_duration"]
+
+                            if data.get("eval_duration"):
+                                server_decode_time_ms = data["eval_duration"] / 1_000_000
+                                print(f"[Usage-Ollama] 找到 eval_duration: {server_decode_time_ms:.2f}ms")
+                                usage_info["eval_duration_ns"] = data["eval_duration"]
+
+                            if data.get("total_duration"):
+                                usage_info["total_duration_ns"] = data["total_duration"]
+                                print(f"[Usage-Ollama] total_duration: {data['total_duration'] / 1_000_000:.2f}ms")
+
+                            if data.get("load_duration"):
+                                usage_info["load_duration_ns"] = data["load_duration"]
+                                print(f"[Usage-Ollama] load_duration: {data['load_duration'] / 1_000_000:.2f}ms")
                         
                         # 提取timings（顶层，某些API实现可能放在这里）
                         if data.get("timings") and not (server_prefill_time_ms and server_decode_time_ms):
@@ -361,10 +407,15 @@ async def execute_single_request(
                                     print(f"[Timings] 找到 predicted_ms: {server_decode_time_ms:.2f}ms")
                         
                         # 提取内容
+                        content_text = None
+                        is_reasoning = False
+                        # Handle Ollama streaming response field
+                        if data.get("response") is not None:
+                            content_text = data["response"]
+                            content_chunk_count += 1
+                        
                         if data.get("choices") and len(data["choices"]) > 0:
                             choice = data["choices"][0]
-                            content_text = None
-                            is_reasoning = False
                             
                             if choice.get("delta", {}).get("reasoning_content"):
                                 content_text = choice["delta"]["reasoning_content"]
@@ -379,8 +430,17 @@ async def execute_single_request(
                             elif choice.get("text"):
                                 content_text = choice["text"]
                                 content_chunk_count += 1
-                            
-                            if content_text:
+                        elif data.get("message"):
+                            message = data["message"]
+                            if message.get("thinking"):
+                                content_text = message["thinking"]
+                                is_reasoning = True
+                                reasoning_chunk_count += 1
+                            elif message.get("content"):
+                                content_text = message["content"]
+                                content_chunk_count += 1
+                        
+                        if content_text:
                                 current_token_time = time.perf_counter()
 
                                 if first_token_time is None:
@@ -408,7 +468,12 @@ async def execute_single_request(
                                     reasoning_content += content_text
                                 else:
                                     output_content += content_text
-                    
+
+                        # 如果ollama标记done=true，处理完这个chunk后退出
+                        if data.get("done") is True:
+                            print(f"[Stream] Ollama done=true，退出循环")
+                            break
+
                     except json.JSONDecodeError:
                         continue
         
@@ -471,18 +536,23 @@ async def execute_single_request(
         if not token_source:
             token_source = 'Unknown'
 
-        # 计算时间和速度：基于chunk时序和usage数据
-        # 即使没有收到实际内容，也使用usage的token数量和chunk时间来计算速度
+        # 计算时间和速度：优先使用服务器返回的timing，否则使用客户端测量
 
-        prefill_time_ms = ttft_ms
-        output_time_ms = decode_time_ms
-
-        time_source = '端到端测量（基于chunk时序）'
-        print(f"[TimeSource] 使用端到端测量 - Prefill(TTFT): {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms")
-
-        # 如果有服务器timing，也打印出来作为参考（但不使用）
-        if server_prefill_time_ms and server_decode_time_ms:
-            print(f"[TimeSource] 服务器timing（仅参考）- Prefill: {server_prefill_time_ms:.2f}ms, Decode: {server_decode_time_ms:.2f}ms")
+        # 优先使用服务器返回的timing
+        if server_prefill_time_ms is not None and server_decode_time_ms is not None:
+            prefill_time_ms = server_prefill_time_ms
+            output_time_ms = server_decode_time_ms
+            time_source = '服务器timing'
+            print(f"[TimeSource] 使用服务器timing - Prefill: {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms")
+            print(f"[TimeSource] 客户端测量（参考）- Prefill(TTFT): {ttft_ms:.2f}ms, Decode: {decode_time_ms:.2f}ms")
+        else:
+            # 回退到客户端测量的时间
+            prefill_time_ms = ttft_ms
+            output_time_ms = decode_time_ms
+            time_source = '端到端测量（基于chunk时序）'
+            print(f"[TimeSource] 使用端到端测量 - Prefill(TTFT): {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms")
+            if server_prefill_time_ms or server_decode_time_ms:
+                print(f"[TimeSource] 部分服务器timing可用 - Prefill: {server_prefill_time_ms}ms, Decode: {server_decode_time_ms}ms")
 
         # 计算速度 (tokens/second)
         # 使用usage中的token数量，即使没有收到实际内容也计算
