@@ -2218,6 +2218,11 @@
                         }
                     }
 
+                    //  检查是否有成功的请求
+                    if (concurrencyResults.length === 0) {
+                        throw new Error(`所有 ${concurrency} 个并发请求都失败了`);
+                    }
+
                     //
                     const avgPrefillTimeMs = concurrencyResults.reduce((sum, res) => sum + res.prefillTimeMs, 0) / concurrencyResults.length;
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
@@ -2243,8 +2248,17 @@
                     const totalOutputTokens = concurrencyResults.reduce((sum, r) => sum + r.outputTokens, 0);
                     const totalOutputSpeed = decodeDurationMs > 0 ? (totalOutputTokens / (decodeDurationMs / 1000)) : 0;
 
+                    console.log(`[时间戳调试] minStartTime: ${minStartTime.toFixed(2)}, maxFirstTokenTime: ${maxFirstTokenTime.toFixed(2)}, minFirstTokenTime: ${minFirstTokenTime.toFixed(2)}, maxEndTime: ${maxEndTime.toFixed(2)}`);
                     console.log(`[并发总吞吐] Prefill: ${totalPromptTokens} tokens / ${prefillDurationMs.toFixed(2)}ms = ${totalPrefillSpeed.toFixed(2)} t/s`);
                     console.log(`[并发总吞吐] Decode: ${totalOutputTokens} tokens / ${decodeDurationMs.toFixed(2)}ms = ${totalOutputSpeed.toFixed(2)} t/s`);
+
+                    //  检查速度是否异常
+                    if (totalPrefillSpeed === 0 || !isFinite(totalPrefillSpeed)) {
+                        console.warn(`⚠️ Prefill速度异常: ${totalPrefillSpeed}, prefillDurationMs: ${prefillDurationMs}, totalPromptTokens: ${totalPromptTokens}`);
+                    }
+                    if (totalOutputSpeed === 0 || !isFinite(totalOutputSpeed)) {
+                        console.warn(`⚠️ Decode速度异常: ${totalOutputSpeed}, decodeDurationMs: ${decodeDurationMs}, totalOutputTokens: ${totalOutputTokens}`);
+                    }
 
                     // 仅在成功时更新统计
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
@@ -2377,10 +2391,28 @@
                 const lines = chunk.split('\n').filter(line => line.trim() !== '');
 
                 for (const line of lines) {
-                    if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-                        const jsonLine = line.replace('data: ', '');
+                    // 处理OpenAI SSE格式和Ollama JSON格式
+                    let jsonLine;
+                    if (line.startsWith('data: ')) {
+                        if (line.includes('[DONE]')) {
+                            console.log('[Stream] 收到 [DONE]');
+                            break;
+                        }
+                        jsonLine = line.replace('data: ', '');
+                    } else {
+                        // Ollama直接返回JSON，不需要处理SSE格式
+                        jsonLine = line.trim();
+                    }
+
+                    if (jsonLine) {
                         try {
                             const data = JSON.parse(jsonLine);
+
+                            // 检查ollama的done字段
+                            if (data.done === true) {
+                                console.log('[Stream] Ollama返回done=true');
+                                // 继续处理这个chunk（包含最终的timing信息）
+                            }
 
                             //  解析usage字段（流式响应的最后一个chunk会包含）
                             if (data.usage) {
@@ -2449,6 +2481,47 @@
                                 }
                             }
 
+                            //  提取usage信息（Ollama格式 - 直接在顶层）
+                            if (data.prompt_eval_count !== undefined) {
+                                const prompt = data.prompt_eval_count || 0;
+                                const completion = data.eval_count || 0;
+
+                                console.log(`[Usage-Ollama] 找到ollama格式！prompt_eval_count: ${prompt}, eval_count: ${completion}`);
+
+                                actualOutputTokensFromUsage = completion;
+                                actualPromptTokensFromUsage = prompt;
+
+                                // 构造usage_info
+                                usageInfo = {
+                                    prompt_tokens: prompt,
+                                    completion_tokens: completion,
+                                    total_tokens: prompt + completion
+                                };
+
+                                // 提取ollama的timing信息（纳秒）
+                                if (data.prompt_eval_duration) {
+                                    serverPrefillTimeMs = data.prompt_eval_duration / 1_000_000;
+                                    console.log(`[Usage-Ollama] 找到 prompt_eval_duration: ${serverPrefillTimeMs.toFixed(2)}ms`);
+                                    usageInfo.prompt_eval_duration_ns = data.prompt_eval_duration;
+                                }
+
+                                if (data.eval_duration) {
+                                    serverDecodeTimeMs = data.eval_duration / 1_000_000;
+                                    console.log(`[Usage-Ollama] 找到 eval_duration: ${serverDecodeTimeMs.toFixed(2)}ms`);
+                                    usageInfo.eval_duration_ns = data.eval_duration;
+                                }
+
+                                if (data.total_duration) {
+                                    usageInfo.total_duration_ns = data.total_duration;
+                                    console.log(`[Usage-Ollama] total_duration: ${(data.total_duration / 1_000_000).toFixed(2)}ms`);
+                                }
+
+                                if (data.load_duration) {
+                                    usageInfo.load_duration_ns = data.load_duration;
+                                    console.log(`[Usage-Ollama] load_duration: ${(data.load_duration / 1_000_000).toFixed(2)}ms`);
+                                }
+                            }
+
                             //  通用fallback：打印完整的data结构（仅在最后一个chunk，且是首次打印）
                             if (data.usage && !window._debugDataPrinted) {
                                 console.log('[调试] 收到usage字段:', JSON.stringify(data.usage, null, 2));
@@ -2464,6 +2537,12 @@
                             // 检查多种可能的content位置
                             let contentText = null;
                             let isReasoningToken = false;
+
+                            // Ollama streaming response field
+                            if (data.response !== undefined) {
+                                contentText = data.response;
+                                contentChunkCount++;
+                            }
 
                             if (data.choices && data.choices[0]) {
                                 const choice = data.choices[0];
@@ -2490,6 +2569,17 @@
                                     contentChunkCount++;
                                 }
                             }
+                            // Ollama的message.thinking/content
+                            else if (data.message) {
+                                if (data.message.thinking) {
+                                    contentText = data.message.thinking;
+                                    isReasoningToken = true;
+                                    reasoningChunkCount++;
+                                } else if (data.message.content) {
+                                    contentText = data.message.content;
+                                    contentChunkCount++;
+                                }
+                            }
 
                             if (contentText) {
                                 if (isReasoningToken) {
@@ -2503,6 +2593,13 @@
                                     const tokenType = isReasoningToken ? 'reasoning' : 'content';
                                     console.log(`[TTFT] 首token到达（${tokenType}），内容: "${contentText.substring(0, 20)}..."`);
                                 }
+                            }
+
+                            // 如果ollama标记done=true，处理完这个chunk后退出
+                            if (data.done === true) {
+                                console.log('[Stream] Ollama done=true，退出循环');
+                                reading = false;
+                                break;
                             }
                         } catch (e) {
                             console.error('解析错误:', e, jsonLine);
@@ -2726,7 +2823,7 @@
         }
 
         // 【修复】测试Ollama接口
-        async function testOllama(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
+        async function testOllama(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout, maxLength) {
              for (let length of testLengths) {
                 if (!isTestingRunning) break;
 
@@ -2810,10 +2907,10 @@
                             { "role": "user", "content": prompt }
                         ],
                         "options": {
-                            "num_predict": outputLength,
-                            "num_ctx": maxLength, // Ollama 通常用 num_ctx 限制上下文
-                            "temperature": temperature,
-                            "top_p": top_p,
+                            "num_predict": parseInt(outputLength, 10),
+                            "num_ctx": parseInt(maxLength, 10), // Ollama 通常用 num_ctx 限制上下文
+                            "temperature": parseFloat(temperature),
+                            "top_p": parseFloat(top_p),
                             "repeat_penalty": 1.1 // 合并 presence 和 frequency (Ollama 不区分)
                         },
                         "stream": false
@@ -2876,21 +2973,26 @@
                         return sum + tokens;
                     }, 0) / concurrencyResults.length;
 
-                    // 计算真实的总吞吐（基于时间戳）
-                    const minStartTime = Math.min(...concurrencyResults.map(r => r.startTimestamp));
-                    const maxFirstTokenTime = Math.max(...concurrencyResults.map(r => r.firstTokenTimestamp));
-                    const prefillDurationMs = maxFirstTokenTime - minStartTime;
+                    // ✨ Ollama 特殊处理：使用服务器返回的真实处理时间
+                    // 对于并发请求，总吞吐 = 所有token数 / 最长的处理时间（因为请求是并发的）
+                    const maxPrefillDurationMs = Math.max(...concurrencyResults.map(r => r.serverPrefillDurationMs || r.prefillTimeMs));
+                    const maxOutputDurationMs = Math.max(...concurrencyResults.map(r => r.serverOutputDurationMs || r.outputTimeMs));
                     const totalPromptTokens = concurrencyResults.reduce((sum, r) => sum + r.actualPromptTokens, 0);
-                    const totalPrefillSpeed = prefillDurationMs > 0 ? (totalPromptTokens / (prefillDurationMs / 1000)) : 0;
-
-                    const minFirstTokenTime = Math.min(...concurrencyResults.map(r => r.firstTokenTimestamp));
-                    const maxEndTime = Math.max(...concurrencyResults.map(r => r.endTimestamp));
-                    const decodeDurationMs = maxEndTime - minFirstTokenTime;
                     const totalOutputTokens = concurrencyResults.reduce((sum, r) => sum + r.outputTokens, 0);
-                    const totalOutputSpeed = decodeDurationMs > 0 ? (totalOutputTokens / (decodeDurationMs / 1000)) : 0;
+                    const totalPrefillSpeed = maxPrefillDurationMs > 0 ? (totalPromptTokens / (maxPrefillDurationMs / 1000)) : 0;
+                    const totalOutputSpeed = maxOutputDurationMs > 0 ? (totalOutputTokens / (maxOutputDurationMs / 1000)) : 0;
 
-                    console.log(`[Ollama 并发总吞吐] Prefill: ${totalPromptTokens} tokens / ${prefillDurationMs.toFixed(2)}ms = ${totalPrefillSpeed.toFixed(2)} t/s`);
-                    console.log(`[Ollama 并发总吞吐] Decode: ${totalOutputTokens} tokens / ${decodeDurationMs.toFixed(2)}ms = ${totalOutputSpeed.toFixed(2)} t/s`);
+                    console.log(`[Ollama 并发总吞吐] Prefill: ${totalPromptTokens} tokens / ${maxPrefillDurationMs.toFixed(2)}ms = ${totalPrefillSpeed.toFixed(2)} t/s`);
+                    console.log(`[Ollama 并发总吞吐] Decode: ${totalOutputTokens} tokens / ${maxOutputDurationMs.toFixed(2)}ms = ${totalOutputSpeed.toFixed(2)} t/s`);
+                    console.log(`[Ollama] 并发数: ${concurrencyResults.length}, 使用服务器端真实处理时间`);
+
+                    //  检查速度是否异常
+                    if (totalPrefillSpeed === 0 || !isFinite(totalPrefillSpeed)) {
+                        console.warn(`⚠️ [Ollama] Prefill速度异常: ${totalPrefillSpeed}, maxPrefillDurationMs: ${maxPrefillDurationMs}, totalPromptTokens: ${totalPromptTokens}`);
+                    }
+                    if (totalOutputSpeed === 0 || !isFinite(totalOutputSpeed)) {
+                        console.warn(`⚠️ [Ollama] Decode速度异常: ${totalOutputSpeed}, maxOutputDurationMs: ${maxOutputDurationMs}, totalOutputTokens: ${totalOutputTokens}`);
+                    }
 
                     updateConcurrencyStats(totalPrefillSpeed, totalOutputSpeed);
 
@@ -3041,7 +3143,10 @@
                 reasoningContent: '',  // Ollama目前不单独区分思考内容
                 completionContent: outputText,  // 答案内容
                 usageInfo: usageInfo,  // API返回的完整usage信息
-                tokenSource: 'API'  // Ollama总是返回准确的token统计
+                tokenSource: 'API',  // Ollama总是返回准确的token统计
+                // 添加虚拟时间戳（Ollama不是流式，但需要兼容并发吞吐计算）
+                serverPrefillDurationMs: prefillDurationMs,  // 服务器返回的真实prefill时间
+                serverOutputDurationMs: outputDurationMs     // 服务器返回的真实output时间
             };
         }
 
@@ -3567,7 +3672,7 @@
                 if (currentApiType === 'openai') {
                     await testOpenAI(apiUrl, currentModelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 } else {
-                    await testOllama(apiUrl, currentModelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOllama(apiUrl, currentModelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout, maxLength);
                 }
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
