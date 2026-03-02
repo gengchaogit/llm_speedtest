@@ -1530,8 +1530,14 @@
                 cloudNotesPlaceholder: '如版本、特殊配置等',
                 cloudUploadBtn: '📤 上传分享',
                 cloudUploading: '上传中...',
-                cloudUploadNote: '上传后数据公开可见，不可删除'
-
+                cloudUploadNote: '上传后数据公开可见，不可删除',
+                // v3 新增翻译
+                batchUploadLimit: '一次只能上传 1 个 CSV 文件。',
+                batchUploadNoData: '未解析到任何有效的测试数据记录。',
+                batchUploadDailyLimit: '已达到每天最多上传 100 次的限制，批量上传终止。',
+                batchUploadResult: '⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}',
+                batchUploadSuccess: '✅ 批量上传成功！共上传 {count} 个测试记录。',
+                batchUploadUnknownModel: '未知历史模型'
             },
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.2 (chao mod)',
@@ -1800,8 +1806,14 @@
                 cloudNotesPlaceholder: 'Version, special config...',
                 cloudUploadBtn: '📤 Upload',
                 cloudUploading: 'Uploading...',
-                cloudUploadNote: 'Data is public once uploaded and cannot be deleted'
-
+                cloudUploadNote: 'Data is public once uploaded and cannot be deleted',
+                // v3 translations
+                batchUploadLimit: 'You can only upload 1 CSV file at a time.',
+                batchUploadNoData: 'No valid test records found in the file.',
+                batchUploadDailyLimit: 'Daily limit of 100 uploads reached. Batch upload stopped.',
+                batchUploadResult: '⚠️ Upload finished. Success: {success}, Fail: {fail}.<br>Last Error: {error}',
+                batchUploadSuccess: '✅ Batch upload successful! Total {count} records uploaded.',
+                batchUploadUnknownModel: 'Unknown Historical Model'
             }
         };
 
@@ -6845,7 +6857,7 @@ async function processOllamaResponse(response, promptLength) {
                     if (resp.ok) {
                         successCount++;
                     } else if (resp.status === 429) {
-                        alert('已达到每天最多上传 100 次的限制，批量上传终止。');
+                        alert(t.batchUploadDailyLimit);
                         failCount += (pendingBatchPayloads.length - i);
                         break;
                     } else {
@@ -6855,20 +6867,20 @@ async function processOllamaResponse(response, promptLength) {
                 } catch (e) {
                     failCount++;
                     lastError = e.message;
-                    console.error("批量上传出错:", e);
+                    console.error("Batch upload error:", e);
                 }
             }
 
             uploadBtn.disabled = false;
-            uploadBtn.textContent = '📤 上传分享';
+            uploadBtn.textContent = t.cloudUploadBtn;
 
             msgDiv.style.display = 'block';
             if (failCount === 0) {
                 msgDiv.style.cssText = 'display:block; background:#0d2b1e; color:#98c379; padding:10px; border-radius:6px; font-size:13px;';
-                msgDiv.innerHTML = `✅ 批量上传成功！共上传 ${successCount} 个测试记录。`;
+                msgDiv.innerHTML = t.batchUploadSuccess.replace('{count}', successCount);
             } else {
                 msgDiv.style.cssText = 'display:block; background:#3a1515; color:#e06c75; padding:10px; border-radius:6px; font-size:13px;';
-                msgDiv.innerHTML = `⚠️ 上传结束。成功: ${successCount}，失败: ${failCount}。<br>最后错误: ${lastError}`;
+                msgDiv.innerHTML = t.batchUploadResult.replace('{success}', successCount).replace('{fail}', failCount).replace('{error}', lastError);
             }
 
             pendingBatchPayloads = []; // clear
@@ -6876,10 +6888,11 @@ async function processOllamaResponse(response, promptLength) {
 
         // ---- 上传历史 CSV ----
         async function handleBatchCsvUpload(event) {
+            const t = translations[currentLang];
             const files = event.target.files;
             if (!files || files.length === 0) return;
             if (files.length > 1) {
-                alert('一次只能上传 1 个 CSV 文件。');
+                alert(t.batchUploadLimit);
                 event.target.value = '';
                 return;
             }
@@ -6902,7 +6915,7 @@ async function processOllamaResponse(response, promptLength) {
 
                     // 解析前缀信息
                     const modelLine = lines[0].split(',');
-                    const modelName = (modelLine[1] || '').trim() || '未知历史模型';
+                    const modelName = (modelLine[1] || '').trim() || t.batchUploadUnknownModel;
 
                     const notesLine = lines[1].split(',');
                     let notesStr = (notesLine.slice(1).join(',') || '').trim();
@@ -7004,7 +7017,7 @@ async function processOllamaResponse(response, promptLength) {
             event.target.value = ''; // 清空选择
 
             if (pendingBatchPayloads.length === 0) {
-                alert('未解析到任何有效的测试数据记录。');
+                alert(t.batchUploadNoData);
             } else {
                 openShareModal(true); // Is batch
             }
