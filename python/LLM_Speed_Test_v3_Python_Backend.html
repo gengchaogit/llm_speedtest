@@ -1820,6 +1820,9 @@
         // 当前语言 (默认中文)
         let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
 
+        // 辅助函数
+        function _e(id) { return document.getElementById(id); }
+
         // 切换语言函数
         function switchLanguage(lang) {
             currentLang = lang;
@@ -1910,7 +1913,6 @@
             }
 
             // 云端分享 UI 语言更新
-            const _e = id => document.getElementById(id);
             if (_e('cloudUserCodeLabel')) _e('cloudUserCodeLabel').textContent = t.cloudUserCode + '：';
             if (_e('cloudUsernameLabel2')) _e('cloudUsernameLabel2').textContent = t.cloudUsername + '：';
             if (_e('cloudNoUsernameText')) _e('cloudNoUsernameText').textContent = t.cloudNoUsername;
@@ -6821,6 +6823,7 @@ async function processOllamaResponse(response, promptLength) {
         }
 
         async function doBatchUploadExtracted(hw, fw, qt, nickname, generalNotes, modelName) {
+            const t = translations[currentLang];
             const userCode = getOrCreateUserCode();
             const msgDiv = document.getElementById('shareResultMsg');
             const uploadBtn = document.getElementById('doUploadBtn');
