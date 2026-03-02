@@ -2547,9 +2547,15 @@
                             if (data.choices && data.choices[0]) {
                                 const choice = data.choices[0];
 
-                                //  思考模型格式：delta.reasoning_content（思考过程）
+                                // 思考模型格式：delta.reasoning_content（思考过程）
                                 if (choice.delta && choice.delta.reasoning_content) {
                                     contentText = choice.delta.reasoning_content;
+                                    isReasoningToken = true;
+                                    reasoningChunkCount++;
+                                }
+                                // 思考模型格式：delta.reasoning（思考过程）
+                                else if (choice.delta && choice.delta.reasoning) {
+                                    contentText = choice.delta.reasoning;
                                     isReasoningToken = true;
                                     reasoningChunkCount++;
                                 }

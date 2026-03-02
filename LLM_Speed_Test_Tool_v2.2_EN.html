@@ -2547,9 +2547,15 @@
                             if (data.choices && data.choices[0]) {
                                 const choice = data.choices[0];
 
-                                //  Reasoning model format: delta.reasoning_content
+                                // Reasoning model format: delta.reasoning_content
                                 if (choice.delta && choice.delta.reasoning_content) {
                                     contentText = choice.delta.reasoning_content;
+                                    isReasoningToken = true;
+                                    reasoningChunkCount++;
+                                }
+                                // Reasoning model format: delta.reasoning（思考过程）
+                                else if (choice.delta && choice.delta.reasoning) {
+                                    contentText = choice.delta.reasoning;
                                     isReasoningToken = true;
                                     reasoningChunkCount++;
                                 }
