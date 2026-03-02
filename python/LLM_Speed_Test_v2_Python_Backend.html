@@ -6174,13 +6174,13 @@ async function processOllamaResponse(response, promptLength) {
     box-shadow: 0 2px 16px rgba(0,0,0,0.5); min-width: 200px;">
         <!-- 昵称行（有昵称时显示） -->
         <div id="nicknameRow" style="display:none; margin-bottom:5px;">
-            <span style="color:#888; font-size:11px;">用户名：</span>
+            <span id="cloudUsernameLabel2" style="color:#888; font-size:11px;">用户名：</span>
             <strong id="nicknameDisplay" style="color:#e5c07b; font-size:13px;"></strong>
         </div>
         <!-- 无昵称时显示提示 -->
         <div id="setNicknameHint" style="display:none; margin-bottom:5px;">
-            <span style="color:#888; font-size:11px;">未设置用户名</span>
-            <button onclick="openNicknameModal()" style="
+            <span id="cloudNoUsernameText" style="color:#888; font-size:11px;">未设置用户名</span>
+            <button id="cloudSetUsernameBtn" onclick="openNicknameModal()" style="
             margin-left:6px; background:#2c4a35; border:1px solid #3a6b47; color:#98c379;
             padding:1px 7px; border-radius:4px; cursor:pointer; font-size:11px;">
                 设置
@@ -6188,7 +6188,7 @@ async function processOllamaResponse(response, promptLength) {
         </div>
         <!-- 识别码行 -->
         <div>
-            <span style="color:#888;">识别码：</span>
+            <span id="cloudUserCodeLabel" style="color:#888;">识别码：</span>
             <strong id="userCodeDisplay" style="color:#61afef; font-family:monospace; letter-spacing:2px;"></strong>
             <button onclick="copyUserCode()" title="复制识别码" style="
             margin-left:6px; background:none; border:none; color:#61afef;
