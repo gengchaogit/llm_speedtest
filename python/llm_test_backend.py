@@ -78,6 +78,7 @@ app.add_middleware(
 
 from fastapi.responses import FileResponse
 import os
+from datetime import datetime
 
 current_port = 18000
 
@@ -87,6 +88,13 @@ async def serve_frontend():
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return {"message": "Frontend HTML not found"}
+
+@app.get("/LLM_Speed_Test_v2_Leaderboard.html")
+async def serve_leaderboard():
+    html_path = os.path.join(os.path.dirname(__file__), "LLM_Speed_Test_v2_Leaderboard.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return {"message": "Leaderboard HTML not found"}
 
 @app.get("/api/port")
 async def get_port():
@@ -217,6 +225,19 @@ async def upload_result(request: Request, payload: UploadPayload):
         for r in payload.results
     ]
 
+    # v3: 速率限制升级，每天每 user_code/ip 100次
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).isoformat() + "Z"
+    ip_hash_val = _get_ip_hash(request)
+    
+    count_query = f"{SUPABASE_TABLE}?select=id&user_code=eq.{payload.user_code}&created_at=gte.{today_start}"
+    count_resp = await _supabase_request("GET", count_query, extra_headers={"Prefer": "count=exact"})
+    if count_resp.status_code == 200 or count_resp.status_code == 206:
+        content_range = count_resp.headers.get("Content-Range", "")
+        if content_range and "/" in content_range:
+            count_str = content_range.split("/")[1]
+            if count_str.isdigit() and int(count_str) >= 100:
+                raise HTTPException(status_code=429, detail="超出每日上传限制 (100次/天)")
+
     record = {
         "user_code": payload.user_code,
         "nickname": payload.nickname,
@@ -229,7 +250,7 @@ async def upload_result(request: Request, payload: UploadPayload):
         "avg_prefill_speed": payload.avg_prefill_speed,
         "avg_decode_speed": payload.avg_decode_speed,
         "results_json": results_json,
-        "ip_hash": _get_ip_hash(request),
+        "ip_hash": ip_hash_val,
         "status": "public",
     }
 
@@ -253,11 +274,17 @@ async def upload_result(request: Request, payload: UploadPayload):
 async def get_results(
     user_code: Optional[str] = None,
     model_name: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
     limit: int = 50
 ):
     """查询排行榜数据"""
     limit = min(limit, 200)
-    params = f"status=eq.public&order=avg_decode_speed.desc&limit={limit}"
+    
+    # 允许按时间和速度排序
+    order_col = "created_at" if sort_by == "created_at" else "avg_decode_speed"
+    
+    params = f"status=eq.public&order={order_col}.desc&limit={limit}"
+    
     if user_code:
         uc = user_code.strip().upper()
         params += f"&user_code=eq.{uc}"

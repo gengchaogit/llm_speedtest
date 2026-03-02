@@ -1145,6 +1145,13 @@
             <button id="resetParams" style="background: #e67e22;">🔄 重置参数</button>
             <!-- 云端分享 -->
             <button id="shareResults" style="display: none; background: #16a085;">☁️ 分享结果</button>
+            <!-- v3: Leaderboard & Batch CSV Upload -->
+            <button id="btnLeaderboard" style="background: #f1c40f; color: #333; font-weight: bold;"
+                onclick="window.open('LLM_Speed_Test_v2_Leaderboard.html', '_blank')">🏆 查看排行榜</button>
+            <button id="btnBatchUpload" style="background: #2980b9;"
+                onclick="document.getElementById('batchCsvInput').click()">📂 批量上传历史 CSV</button>
+            <input type="file" id="batchCsvInput" accept=".csv" multiple style="display:none"
+                onchange="handleBatchCsvUpload(event)">
         </div>
         <div class="progress-container">
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
@@ -1477,6 +1484,8 @@
                 historyConfirmDeleteSelected: '确定要删除选中的 {count} 条历史记录吗？',
                 historyDeletedSuccess: '已成功删除 {count} 条历史记录',
                 historyRecordNotFound: '历史记录未找到',
+                btnLeaderboard: '🏆 查看排行榜',
+                btnBatchUpload: '📂 上传历史 CSV',
                 // 云端分享
                 cloudUserCode: '识别码',
                 cloudUsername: '用户名',
@@ -1745,6 +1754,8 @@
                 historyConfirmDeleteSelected: 'Are you sure you want to delete {count} selected record(s)?',
                 historyDeletedSuccess: 'Successfully deleted {count} record(s)',
                 historyRecordNotFound: 'History record not found',
+                btnLeaderboard: '🏆 View Leaderboard',
+                btnBatchUpload: '📂 Batch Upload CSVs',
                 // Cloud Share
                 cloudUserCode: 'User Code',
                 cloudUsername: 'Username',
@@ -1844,12 +1855,16 @@
             document.querySelector('label[for="importFiles"]').textContent = t.labelImportFiles;
 
             // 更新按钮
-            document.getElementById('startTest').textContent = t.btnStartTest;
-            document.getElementById('stopTest').textContent = t.btnStopTest;
-            document.getElementById('copyMarkdown').textContent = t.btnCopyMarkdown;
-            document.getElementById('exportCSV').textContent = t.btnExportCSV;
-            document.getElementById('exportCombinedChart').textContent = t.btnExportCombinedChart;
-            document.getElementById('resetParams').textContent = t.btnResetParams;
+            if (_e('notes')) _e('notes').placeholder = t.placeholderNotes;
+            if (_e('startTest')) _e('startTest').textContent = isTestingRunning ? t.msgTesting : t.btnTextStart;
+            if (_e('stopTest')) _e('stopTest').textContent = t.btnTextStop;
+            if (_e('copyMarkdown')) _e('copyMarkdown').textContent = t.btnCopyMarkdown;
+            if (_e('exportCSV')) _e('exportCSV').textContent = t.btnExportCSV;
+            if (_e('exportCombinedChart')) _e('exportCombinedChart').textContent = t.btnExportCombinedChart;
+            if (_e('screenshotComparison')) _e('screenshotComparison').textContent = t.btnScreenshotComparison;
+            if (_e('resetParams')) _e('resetParams').textContent = t.btnResetParams;
+            if (_e('btnLeaderboard')) _e('btnLeaderboard').textContent = t.btnLeaderboard;
+            if (_e('btnBatchUpload')) _e('btnBatchUpload').textContent = t.btnBatchUpload;
             document.getElementById('startComparison').textContent = t.btnStartComparison;
             document.getElementById('exportComparisonChart').textContent = t.btnExportComparisonChart;
             document.getElementById('screenshotComparison').textContent = t.btnScreenshotComparison;
@@ -6633,12 +6648,16 @@ async function processOllamaResponse(response, promptLength) {
 
         // ---- 上传弹窗 ----
 
+        let isBatchUploadMode = false;
+        let pendingBatchPayloads = [];
+
         function showShareButton() {
             const btn = document.getElementById('shareResults');
             if (btn) btn.style.display = '';
         }
 
-        function openShareModal() {
+        function openShareModal(isBatch = false) {
+            isBatchUploadMode = isBatch;
             document.getElementById('shareResultMsg').style.display = 'none';
 
             // Auto-fill and persistence logic for Share Modal
@@ -6657,14 +6676,23 @@ async function processOllamaResponse(response, promptLength) {
 
             // Auto-fill notes from the main test page
             const shareNotesInput = document.getElementById('shareNotes');
-            const mainNotes = document.getElementById('notes')?.value?.trim();
-            shareNotesInput.value = mainNotes || '';
+
+            if (isBatchUploadMode && pendingBatchPayloads.length > 0) {
+                // If batch mode, the model name might be extracted from the first CSV
+                modelInput.value = pendingBatchPayloads[0].temp_model_name || '';
+                shareNotesInput.value = pendingBatchPayloads[0].temp_notes || '';
+            } else {
+                const mainNotes = document.getElementById('notes')?.value?.trim();
+                shareNotesInput.value = mainNotes || '';
+            }
 
             document.getElementById('shareModal').style.display = 'flex';
         }
 
         function closeShareModal() {
             document.getElementById('shareModal').style.display = 'none';
+            isBatchUploadMode = false;
+            pendingBatchPayloads = [];
         }
 
         function buildUploadPayload(hardware, framework, quantization, nickname, notes) {
@@ -6674,8 +6702,8 @@ async function processOllamaResponse(response, promptLength) {
             );
             if (validPoints.length === 0) return null;
 
-            const avgPrefill = validPoints.reduce((s, r) => s + parseFloat(r.prefillSpeed), 0) / validPoints.length;
-            const avgDecode = validPoints.reduce((s, r) => s + parseFloat(r.outputSpeed), 0) / validPoints.length;
+            const maxPrefill = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.prefillSpeed)), 0);
+            const maxDecode = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.outputSpeed)), 0);
             const modelName = document.getElementById('shareModelName')?.value?.trim() || '未知模型';
             const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
 
@@ -6688,8 +6716,8 @@ async function processOllamaResponse(response, promptLength) {
                 quantization: quantization || null,
                 notes: notes || null,
                 concurrency: concurrency,
-                avg_prefill_speed: parseFloat(avgPrefill.toFixed(2)),
-                avg_decode_speed: parseFloat(avgDecode.toFixed(2)),
+                avg_prefill_speed: parseFloat(maxPrefill.toFixed(2)),
+                avg_decode_speed: parseFloat(maxDecode.toFixed(2)),
                 results: validPoints.map(r => ({
                     prompt_length: parseFloat(r.promptLength),
                     prefill_speed: parseFloat(r.prefillSpeed),
@@ -6732,16 +6760,23 @@ async function processOllamaResponse(response, promptLength) {
             const modelName = document.getElementById('shareModelName')?.value?.trim();
             if (modelName) localStorage.setItem('llm_speedtest_share_model', modelName);
 
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            msgDiv.style.display = 'none';
+
+            if (isBatchUploadMode) {
+                await doBatchUploadExtracted(hardware, framework, quantization, nickname, notes, modelName);
+                return;
+            }
+
             const payload = buildUploadPayload(hardware, framework, quantization, nickname, notes);
             if (!payload) {
                 msgDiv.style.cssText = 'display:block; background:#3a1515; color:#e06c75; padding:10px; border-radius:6px; font-size:13px;';
                 msgDiv.textContent = '❌ 没有可上传的测试数据，请先完成测试';
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '📤 上传分享';
                 return;
             }
-
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = '上传中...';
-            msgDiv.style.display = 'none';
 
             try {
                 const resp = await fetch(`${BACKEND_BASE}/api/upload`, {
@@ -6768,6 +6803,208 @@ async function processOllamaResponse(response, promptLength) {
             } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '📤 上传分享';
+            }
+        }
+
+        async function doBatchUploadExtracted(hw, fw, qt, nickname, generalNotes, modelName) {
+            const userCode = getOrCreateUserCode();
+            const msgDiv = document.getElementById('shareResultMsg');
+            const uploadBtn = document.getElementById('doUploadBtn');
+            const totalFiles = pendingBatchPayloads.length;
+
+            let successCount = 0;
+            let failCount = 0;
+            let lastError = '';
+
+            for (let i = 0; i < pendingBatchPayloads.length; i++) {
+                const batchData = pendingBatchPayloads[i];
+
+                const payload = {
+                    user_code: userCode,
+                    nickname: nickname || null,
+                    model_name: modelName || batchData.temp_model_name || '未知模型',
+                    hardware: hw,
+                    framework: fw || null,
+                    quantization: qt || null,
+                    notes: generalNotes || batchData.temp_notes || null,
+                    concurrency: batchData.concurrency,
+                    avg_prefill_speed: batchData.avg_prefill_speed,
+                    avg_decode_speed: batchData.avg_decode_speed,
+                    results: batchData.results
+                };
+
+                try {
+                    const resp = await fetch(`${BACKEND_BASE}/api/upload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (resp.ok) {
+                        successCount++;
+                    } else if (resp.status === 429) {
+                        alert('已达到每天最多上传 100 次的限制，批量上传终止。');
+                        failCount += (pendingBatchPayloads.length - i);
+                        break;
+                    } else {
+                        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                        throw new Error(err.detail || `HTTP ${resp.status}`);
+                    }
+                } catch (e) {
+                    failCount++;
+                    lastError = e.message;
+                    console.error("批量上传出错:", e);
+                }
+            }
+
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '📤 上传分享';
+
+            msgDiv.style.display = 'block';
+            if (failCount === 0) {
+                msgDiv.style.cssText = 'display:block; background:#0d2b1e; color:#98c379; padding:10px; border-radius:6px; font-size:13px;';
+                msgDiv.innerHTML = `✅ 批量上传成功！共上传 ${successCount} 个测试记录。`;
+            } else {
+                msgDiv.style.cssText = 'display:block; background:#3a1515; color:#e06c75; padding:10px; border-radius:6px; font-size:13px;';
+                msgDiv.innerHTML = `⚠️ 上传结束。成功: ${successCount}，失败: ${failCount}。<br>最后错误: ${lastError}`;
+            }
+
+            pendingBatchPayloads = []; // clear
+        }
+
+        // ---- 批量上传历史 CSV ----
+        async function handleBatchCsvUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            if (files.length > 10) {
+                alert('为了防止滥用，一次最多只能批量上传 10 个 CSV 文件。');
+                event.target.value = '';
+                return;
+            }
+
+            pendingBatchPayloads = []; // clear any old runs
+
+            const nickname = document.getElementById('shareNickname')?.value?.trim() || '';
+            const userCode = getOrCreateUserCode();
+
+            let successCount = 0;
+            let failCount = 0;
+            let lastError = '';
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                try {
+                    const text = await file.text();
+                    const lines = text.trim().split('\n');
+                    if (lines.length < 5) continue; // 小于5行肯定没有数据
+
+                    // 解析前缀信息
+                    const modelLine = lines[0].split(',');
+                    const modelName = (modelLine[1] || '').trim() || '未知历史模型';
+
+                    const notesLine = lines[1].split(',');
+                    let notesStr = (notesLine.slice(1).join(',') || '').trim();
+                    if (notesStr.startsWith('"') && notesStr.endsWith('"')) {
+                        notesStr = notesStr.substring(1, notesStr.length - 1).replace(/""/g, '"');
+                    }
+
+                    const connLine = lines[2].split(',');
+                    const concurrencyStr = (connLine[1] || '1').trim();
+                    const concurrencyNum = parseInt(concurrencyStr) || 1;
+
+                    // 解析数据头其实在 lines[3]，数据从 lines[4] 开始
+                    let dataStartIndex = 4;
+                    // 兼容旧版，检查表头位置
+                    for (let j = 0; j < 5; j++) {
+                        if (lines[j] && (lines[j].includes('预填充速度') || lines[j].includes('Prefill Speed'))) {
+                            dataStartIndex = j + 1;
+                            break;
+                        }
+                    }
+
+                    const validPoints = [];
+                    for (let r = dataStartIndex; r < lines.length; r++) {
+                        if (!lines[r].trim()) continue;
+                        // CSV 解析
+                        let rowStr = lines[r];
+                        let cols = [];
+                        let inQuotes = false;
+                        let curCol = '';
+                        for (let c = 0; c < rowStr.length; c++) {
+                            const char = rowStr[c];
+                            if (char === '"' && rowStr[c + 1] === '"') {
+                                curCol += '"';
+                                c++;
+                            } else if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                cols.push(curCol);
+                                curCol = '';
+                            } else {
+                                curCol += char;
+                            }
+                        }
+                        cols.push(curCol);
+
+                        if (cols.length < 9) continue; // 列不够
+
+                        // 结构: 提示词长度(tokens),TTFT(ms),ITL平均(ms),ITL标准差(ms),预填充耗时(ms),预填充速度(tokens/s),输出长度(tokens),输出耗时(ms),输出速度(tokens/s),状态
+                        const promptLen = parseFloat(cols[0]);
+                        const ttft = parseFloat(cols[1]); // 可能为 NaN (N/A)
+                        const itlMean = parseFloat(cols[2]); // 可能为 NaN
+                        const itlStd = parseFloat(cols[3]); // 可能为 NaN
+                        const prefillTime = parseFloat(cols[4]);
+                        const prefillSpeed = parseFloat(cols[5]);
+                        const outputLen = parseFloat(cols[6]);
+                        const outputTime = parseFloat(cols[7]);
+                        const outputSpeed = parseFloat(cols[8]);
+                        const status = cols[9] || '';
+
+                        // 只需要成功的，或者至少有速度的
+                        if (isNaN(prefillSpeed) || isNaN(outputSpeed)) continue;
+
+                        validPoints.push({
+                            prompt_length: promptLen,
+                            prefill_speed: prefillSpeed,
+                            output_speed: outputSpeed,
+                            prefill_time_ms: prefillTime || 0,
+                            output_time_ms: outputTime || 0,
+                            avg_ttft_ms: isNaN(ttft) ? null : ttft,
+                            avg_itl_mean: isNaN(itlMean) ? null : itlMean,
+                            avg_itl_std: isNaN(itlStd) ? null : itlStd,
+                            concurrency: concurrencyNum,
+                            successful: status.includes('成功') || status.includes('Success') ? 1 : 1, // 老数据如果存进来了认为都算成功，除非没速度
+                            concurrent_details: [] // 历史CSV没有存并发详情，留空
+                        });
+                    }
+
+                    if (validPoints.length === 0) {
+                        failCount++;
+                        continue;
+                    }
+
+                    const maxPrefill = validPoints.reduce((max, r) => Math.max(max, r.prefill_speed), 0);
+                    const maxDecode = validPoints.reduce((max, r) => Math.max(max, r.output_speed), 0);
+
+                    pendingBatchPayloads.push({
+                        temp_model_name: modelName,
+                        temp_notes: notesStr,
+                        concurrency: concurrencyNum,
+                        avg_prefill_speed: parseFloat(maxPrefill.toFixed(2)),
+                        avg_decode_speed: parseFloat(maxDecode.toFixed(2)),
+                        results: validPoints
+                    });
+                } catch (e) {
+                    console.error("解析CSV出错:", file.name, e);
+                }
+            }
+
+            event.target.value = ''; // 清空选择
+
+            if (pendingBatchPayloads.length === 0) {
+                alert('未解析到任何有效的测试数据记录。');
+            } else {
+                openShareModal(true); // Is batch
             }
         }
 
