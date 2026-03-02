@@ -272,25 +272,34 @@ async def upload_result(request: Request, payload: UploadPayload):
 
 @app.get("/api/results")
 async def get_results(
+    search: Optional[str] = None,
     user_code: Optional[str] = None,
-    model_name: Optional[str] = None,
     sort_by: Optional[str] = "created_at",
-    limit: int = 50
+    limit: int = 100,
+    offset: int = 0
 ):
     """查询排行榜数据"""
-    limit = min(limit, 200)
+    limit = min(limit, 100)
     
     # 允许按时间和速度排序
     order_col = "created_at" if sort_by == "created_at" else "avg_decode_speed"
     
-    params = f"status=eq.public&order={order_col}.desc&limit={limit}"
+    params = f"status=eq.public&order={order_col}.desc&limit={limit}&offset={offset}"
     
     if user_code:
         uc = user_code.strip().upper()
         params += f"&user_code=eq.{uc}"
-    if model_name:
-        # 模糊匹配
-        params += f"&model_name=ilike.*{model_name}*"
+        
+    if search:
+        s = search.strip()
+        import uuid
+        try:
+            val = uuid.UUID(s)
+            params += f"&id=eq.{str(val)}"
+        except ValueError:
+            # Not a UUID, so do a fuzzy search on model_name or nickname or exact match on user_code
+            safe_s = s.replace(",", "").replace(".", "").replace('"', '')
+            params += f"&or=(nickname.ilike.*{safe_s}*,model_name.ilike.*{safe_s}*,user_code.eq.{safe_s.upper()})"
 
     resp = await _supabase_request(
         "GET", f"{SUPABASE_TABLE}?{params}&select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,created_at,results_json",

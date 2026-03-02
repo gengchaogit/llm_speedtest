@@ -206,6 +206,15 @@
                 指定用户</button>
             <button id="tabModel" class="tab-btn" style="display:none;" onclick="loadLeaderboard('model')">🏷️
                 指定模型</button>
+            <button id="tabSearchId" class="tab-btn" style="display:none;" onclick="loadLeaderboard('search_id')">🔍
+                搜索结果</button>
+
+            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                <input type="text" id="searchInput" placeholder="搜索 用户名/模型名/分享ID"
+                    style="padding:4px 8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-panel); color:var(--text-color); font-size:13px; width:250px;"
+                    onkeydown="if(event.key==='Enter') searchUnified()">
+                <button class="tab-btn" onclick="searchUnified()" style="margin:0; padding:4px 10px;">🔍 搜索</button>
+            </div>
         </div>
 
         <div class="table-container">
@@ -214,6 +223,7 @@
                 <thead>
                     <tr>
                         <th>时间</th>
+                        <th>分享 ID</th>
                         <th>用户</th>
                         <th>模型</th>
                         <th>硬件 / 框架 / 量化</th>
@@ -227,6 +237,14 @@
                     <!-- Data goes here -->
                 </tbody>
             </table>
+
+            <div id="paginationControls" style="display:none; margin-top:20px; text-align:center;">
+                <button id="btnPrevPage" class="tab-btn" onclick="changePage(-1)"
+                    style="padding:4px 12px; margin:0 10px;">上一页</button>
+                <span id="pageIndicator" style="color:var(--text-muted); font-size:14px;">第 1 页</span>
+                <button id="btnNextPage" class="tab-btn" onclick="changePage(1)"
+                    style="padding:4px 12px; margin:0 10px;">下一页</button>
+            </div>
         </div>
     </div>
 
@@ -255,6 +273,9 @@
         let currentMode = 'global';
         let currentTargetUserCode = null;
         let currentTargetModelName = null;
+        let currentTargetSearch = null;
+        let currentPage = 1;
+        const PAGE_SIZE = 100;
         let resultsDataMap = {}; // store details for chart generation
         let currentFetchController = null; // To prevent race conditions on tab switch
 
@@ -270,7 +291,10 @@
             loadLeaderboard('global');
         };
 
-        async function loadLeaderboard(mode) {
+        async function loadLeaderboard(mode, resetPage = true) {
+            if (resetPage) {
+                currentPage = 1;
+            }
             currentMode = mode;
             document.getElementById('tabGlobal').classList.toggle('active', mode === 'global');
             document.getElementById('tabPersonal').classList.toggle('active', mode === 'personal');
@@ -291,9 +315,21 @@
                 tabModel.classList.remove('active');
             }
 
+            const tabSearchId = document.getElementById('tabSearchId');
+            if (mode === 'search_id') {
+                tabSearchId.style.display = 'inline-block';
+                tabSearchId.classList.add('active');
+            } else {
+                tabSearchId.classList.remove('active');
+            }
+
             const tbody = document.getElementById('resultsBody');
             const loading = document.getElementById('loadingIndicator');
             const table = document.getElementById('resultsTable');
+            const pagination = document.getElementById('paginationControls');
+            const pageIndicator = document.getElementById('pageIndicator');
+            const btnPrev = document.getElementById('btnPrevPage');
+            const btnNext = document.getElementById('btnNextPage');
 
             // Abort previous fetch if any
             if (currentFetchController) {
@@ -304,11 +340,13 @@
 
             tbody.innerHTML = '';
             table.style.display = 'none';
+            pagination.style.display = 'none';
             loading.style.display = 'block';
             loading.textContent = '加载中... ⏳';
 
             try {
-                let url = `${BACKEND_BASE}/api/results?sort_by=created_at&limit=100`;
+                const offset = (currentPage - 1) * PAGE_SIZE;
+                let url = `${BACKEND_BASE}/api/results?sort_by=created_at&limit=${PAGE_SIZE}&offset=${offset}`;
                 if (mode === 'personal') {
                     const uc = localStorage.getItem(USER_CODE_KEY);
                     if (!uc) {
@@ -320,6 +358,8 @@
                     url += `&user_code=${currentTargetUserCode}`;
                 } else if (mode === 'model' && currentTargetModelName) {
                     url += `&model_name=${encodeURIComponent(currentTargetModelName)}`;
+                } else if (mode === 'search_id' && currentTargetSearch) {
+                    url += `&search=${encodeURIComponent(currentTargetSearch)}`;
                 }
 
                 const response = await fetch(url, { signal });
@@ -359,6 +399,7 @@
 
                     tr.innerHTML = `
                     <td>${dateStr}</td>
+                    <td style="font-family:monospace; font-size:12px; color:#5c6370; user-select:all;">${escapeHtml(row.id)}</td>
                     <td>${userDisplay}</td>
                     <td style="font-weight:bold;">${modelDisplay}</td>
                     <td style="font-size:12px;">${configText}</td>
@@ -372,6 +413,13 @@
 
                 loading.style.display = 'none';
                 table.style.display = 'table';
+
+                // Pagination display logic
+                pagination.style.display = 'block';
+                pageIndicator.textContent = `第 ${currentPage} 页`;
+                btnPrev.style.display = currentPage > 1 ? 'inline-block' : 'none';
+                // If we got fewer results than PAGE_SIZE, we hit the end
+                btnNext.style.display = data.length === PAGE_SIZE ? 'inline-block' : 'none';
 
             } catch (e) {
                 if (e.name === 'AbortError') {
@@ -404,6 +452,22 @@
             currentTargetModelName = modelName;
             document.getElementById('tabModel').style.display = 'inline-block';
             loadLeaderboard('model');
+        }
+
+        function searchUnified() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                alert('请输入搜索内容');
+                return;
+            }
+            currentTargetSearch = query;
+            loadLeaderboard('search_id');
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            if (currentPage < 1) currentPage = 1;
+            loadLeaderboard(currentMode, false);
         }
 
         // --- Chart Generation Logic ---
