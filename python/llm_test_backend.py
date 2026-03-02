@@ -421,6 +421,11 @@ async def execute_single_request(
                                 content_text = choice["delta"]["reasoning_content"]
                                 is_reasoning = True
                                 reasoning_chunk_count += 1
+                            # 思考模型格式：delta.reasoning（思考过程）
+                            elif choice.get("delta", {}).get("reasoning"):
+                                content_text = choice["delta"]["reasoning"]
+                                is_reasoning = True
+                                reasoning_chunk_count += 1
                             elif choice.get("delta", {}).get("content"):
                                 content_text = choice["delta"]["content"]
                                 content_chunk_count += 1

@@ -2533,6 +2533,12 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
                                     isReasoningToken = true;
                                     reasoningChunkCount++;
                                 }
+                                // 思考模型格式：delta.reasoning（思考过程）
+                                else if (choice.delta && choice.delta.reasoning) {
+                                    contentText = choice.delta.reasoning;
+                                    isReasoningToken = true;
+                                    reasoningChunkCount++;
+                                }
                                 // 标准OpenAI流式格式：delta.content（答案或全部内容）
                                 else if (choice.delta && choice.delta.content) {
                                     contentText = choice.delta.content;
