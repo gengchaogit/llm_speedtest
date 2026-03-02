@@ -1144,13 +1144,13 @@
             <!-- v1.9.1: 重置参数 -->
             <button id="resetParams" style="background: #e67e22;">🔄 重置参数</button>
             <!-- 云端分享 -->
-            <button id="shareResults" style="display: none; background: #16a085;">☁️ 分享结果</button>
+            <button id="shareResults" style="display: none; background: #16a085;">上传测试结果</button>
             <!-- v3: Leaderboard & Batch CSV Upload -->
             <button id="btnLeaderboard" style="background: #f1c40f; color: #333; font-weight: bold;"
                 onclick="window.open('LLM_Speed_Test_v2_Leaderboard.html', '_blank')">🏆 查看排行榜</button>
             <button id="btnBatchUpload" style="background: #2980b9;"
-                onclick="document.getElementById('batchCsvInput').click()">📂 批量上传历史 CSV</button>
-            <input type="file" id="batchCsvInput" accept=".csv" multiple style="display:none"
+                onclick="document.getElementById('batchCsvInput').click()">📂 上传历史 CSV</button>
+            <input type="file" id="batchCsvInput" accept=".csv" style="display:none"
                 onchange="handleBatchCsvUpload(event)">
         </div>
         <div class="progress-container">
@@ -1493,7 +1493,7 @@
                 cloudSetUsername: '设置',
                 cloudLoading: '正在从云端加载...',
                 cloudRecover: '🔑 找回识别码',
-                cloudShareBtn: '☁️ 分享结果',
+                cloudShareBtn: '上传测试结果',
                 cloudSetUsernameTitle: '🏷 设置用户名',
                 cloudSetUsernameDesc: '用户名设置后<strong style="color:#e06c75;">不可更改</strong>，请谨慎选择。',
                 cloudUsernameLabel: '用户名',
@@ -6670,18 +6670,19 @@ async function processOllamaResponse(response, promptLength) {
             fwInput.value = localStorage.getItem('llm_speedtest_share_fw') || '';
             qtInput.value = localStorage.getItem('llm_speedtest_share_qt') || '';
 
-            // Load model name from localStorage only
+            // Model name and notes
             const modelInput = document.getElementById('shareModelName');
-            modelInput.value = localStorage.getItem('llm_speedtest_share_model') || '';
-
-            // Auto-fill notes from the main test page
             const shareNotesInput = document.getElementById('shareNotes');
 
-            if (isBatchUploadMode && pendingBatchPayloads.length > 0) {
-                // If batch mode, the model name might be extracted from the first CSV
-                modelInput.value = pendingBatchPayloads[0].temp_model_name || '';
-                shareNotesInput.value = pendingBatchPayloads[0].temp_notes || '';
+            if (isBatchUploadMode) {
+                // User requested model and notes to be ALWAYS empty for CSV to force manual entry
+                modelInput.value = '';
+                shareNotesInput.value = '';
             } else {
+                // Load model name from localStorage
+                modelInput.value = localStorage.getItem('llm_speedtest_share_model') || '';
+
+                // Auto-fill notes from the main test page
                 const mainNotes = document.getElementById('notes')?.value?.trim();
                 shareNotesInput.value = mainNotes || '';
             }
@@ -6872,12 +6873,12 @@ async function processOllamaResponse(response, promptLength) {
             pendingBatchPayloads = []; // clear
         }
 
-        // ---- 批量上传历史 CSV ----
+        // ---- 上传历史 CSV ----
         async function handleBatchCsvUpload(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
-            if (files.length > 10) {
-                alert('为了防止滥用，一次最多只能批量上传 10 个 CSV 文件。');
+            if (files.length > 1) {
+                alert('一次只能上传 1 个 CSV 文件。');
                 event.target.value = '';
                 return;
             }
