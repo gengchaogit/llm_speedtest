@@ -1918,7 +1918,7 @@
         let comparisonPrefillChartInstance = null;
         let comparisonOutputChartInstance = null;
 
-        let testResultsData = [];
+        window.testResultsData = []; let testResultsData = window.testResultsData;
         let totalTests = 0;
         let completedTests = 0;
         let isTestingRunning = false;
@@ -3726,7 +3726,7 @@
             //
             const wasManuallyStopped = !isTestingRunning;
             if (typeof window._onTestComplete === 'function') {
-                window._onTestComplete();
+                window._onTestComplete(); window.testResultsData = testResultsData;
             }
 
             // 无论测试是完成还是被手动停止，只要有数据就显示统计
@@ -5276,7 +5276,7 @@
             if(mn)localStorage.setItem('llm_speedtest_share_model',mn);
             if(uploadBtn){uploadBtn.disabled=true;uploadBtn.textContent='上传中...';}if(msgDiv)msgDiv.style.display='none';
             if(_batchMode){await _doBatchUpload(hw,fw,qt,nick,notes,mn);return;}
-            const vp=(window.testResultsData||[]).filter(r=>r.prefillSpeed!=='N/A'&&r.outputSpeed!=='N/A');
+            const vp=(typeof testResultsData !== 'undefined' ? testResultsData : (window.testResultsData||[])).filter(r=>r.prefillSpeed!=='N/A'&&r.outputSpeed!=='N/A');
             if(!vp.length){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;';msgDiv.textContent='❌ 没有可上传的测试数据，请先完成测试';}if(uploadBtn){uploadBtn.disabled=false;uploadBtn.textContent='📤 上传分享';}return;}
             const userCode=getOrCreateUserCode();
             const maxP=vp.reduce((m,r)=>Math.max(m,parseFloat(r.prefillSpeed)),0);
