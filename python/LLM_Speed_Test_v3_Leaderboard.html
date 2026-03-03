@@ -30,7 +30,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -144,8 +144,8 @@
             margin: 5% auto;
             padding: 30px;
             border: 1px solid var(--border-color);
-            width: 90%;
-            max-width: 1200px;
+            width: 95%;
+            max-width: 1600px;
             border-radius: 12px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
             position: relative;
@@ -176,6 +176,64 @@
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 15px;
+        }
+
+        /* Tooltip for Notes */
+        .notes-cell {
+            position: relative;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-muted);
+            max-width: 150px;
+            white-space: nowrap;
+        }
+
+        .notes-text {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+        }
+
+        .notes-tooltip {
+            visibility: hidden;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            text-align: left;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: normal;
+            min-width: 200px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            /* Prevent tooltip from interfering with hover */
+        }
+
+        .notes-cell:hover .notes-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Small arrow for tooltip */
+        .notes-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--border-color) transparent transparent transparent;
         }
 
         @media (max-width: 900px) {
@@ -405,7 +463,10 @@
                     <td>${userDisplay}</td>
                     <td style="font-weight:bold;">${modelDisplay}</td>
                     <td style="font-size:12px;">${configText}</td>
-                    <td style="font-size:12px; color:var(--text-muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notesText}">${notesText}</td>
+                    <td class="notes-cell">
+                        <span class="notes-text">${notesText}</span>
+                        ${row.notes ? `<div class="notes-tooltip">${notesText}</div>` : ''}
+                    </td>
                     <td>${row.concurrency}</td>
                     <td style="color:#98c379; font-weight:bold;">${row.avg_prefill_speed.toFixed(1)}</td>
                     <td style="color:#c678dd; font-weight:bold;">${row.avg_decode_speed.toFixed(1)}</td>
