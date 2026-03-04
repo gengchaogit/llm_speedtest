@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
-    <!-- v2.2 (chao魔改版):
+<!-- v2.2 (chao魔改版):
     可以在下面的github地址获取最新版的更新
     https://github.com/gengchaogit/llm_speedtest
     1. (v2.2) 【图表标题国际化】修复所有图表标题的翻译问题，支持中英文动态切换
@@ -237,14 +237,16 @@
             border-collapse: collapse;
             margin: 0;
             font-family: "Courier New", Courier, monospace;
-            font-size: 0.85em; /* 稍微减小字体 */
+            font-size: 0.85em;
+            /* 稍微减小字体 */
             table-layout: fixed;
         }
 
         #results th,
         #results td {
             border: 1px solid #444;
-            padding: 6px 4px; /* 减小内边距 */
+            padding: 6px 4px;
+            /* 减小内边距 */
             text-align: left;
             color: #abb2bf;
             white-space: normal;
@@ -453,8 +455,13 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .history-modal-content {
@@ -473,6 +480,7 @@
                 transform: translateY(-50px);
                 opacity: 0;
             }
+
             to {
                 transform: translateY(0);
                 opacity: 1;
@@ -759,7 +767,8 @@
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             width: 95%;
-            max-width: 1400px; /* 增加宽度 */
+            max-width: 1400px;
+            /* 增加宽度 */
             max-height: 90vh;
             overflow: auto;
             animation: slideDown 0.3s;
@@ -962,9 +971,12 @@
         }
 
         @keyframes pulse-warning {
-            0%, 100% {
+
+            0%,
+            100% {
                 box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
             }
+
             50% {
                 box-shadow: 0 4px 20px rgba(255, 107, 107, 0.6);
             }
@@ -979,9 +991,9 @@
         }
 
         #chartContainer h3 {
-             color: #333;
-             margin-bottom: 10px;
-             text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
         }
 
         #outputChart {
@@ -1003,7 +1015,15 @@
 
 <body>
     <div class="container">
-        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8 (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
+        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8
+                (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
+
+        <div
+            style="text-align: center; margin-bottom: 20px; font-size: 15px; background: #fffbf0; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; color: #d35400;">
+            ❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank"
+                style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub 仓库</a> 随手点个
+            ⭐️ Star 支持一下！非常感谢！🙏
+        </div>
 
         <div class="api-selector">
             <div class="api-option active" data-type="openai">OpenAI兼容接口</div>
@@ -1101,7 +1121,7 @@
                 </div>
             </div>
             <div class="form-row">
-                 <div class="form-group">
+                <div class="form-group">
                     <label for="presencePenaltyInput">Presence Penalty</label>
                     <input type="number" id="presencePenaltyInput" value="" step="0.1" min="-2" max="2">
                 </div>
@@ -1148,7 +1168,8 @@
             <div class="action-buttons" style="margin-top: 15px;">
                 <button id="startComparison" style="background: #27ae60; width: 160px; flex: none;">生成对比图表</button>
                 <!-- 截图功能 -->
-                <button id="screenshotComparison" style="display: none; background: #8e44ad; width: 160px; flex: none;">📸 截图对比结果</button>
+                <button id="screenshotComparison"
+                    style="display: none; background: #8e44ad; width: 160px; flex: none;">📸 截图对比结果</button>
             </div>
             <p class="notes" style="margin-top: 10px;">说明：先“开始测试”运行一次，然后再导入其他CSV文件，点击“生成对比图表”</p>
         </div>
@@ -1167,7 +1188,8 @@
         </div>
 
         <!-- v1.8: 新的对比绘图区域 -->
-        <div id="comparisonChartContainer" style="display: none; margin-top: 30px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        <div id="comparisonChartContainer"
+            style="display: none; margin-top: 30px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
             <h3>对比 - 预填充 (Prefill) 吞吐</h3>
             <canvas id="comparisonPrefillChart"></canvas>
 
@@ -1175,7 +1197,8 @@
             <canvas id="comparisonOutputChart"></canvas>
 
             <!-- v1.8: 对比图表导出按钮 -->
-            <button id="exportComparisonChart" style="display: none; background: #8e44ad; margin-top: 15px;">导出一张对比图</button>
+            <button id="exportComparisonChart"
+                style="display: none; background: #8e44ad; margin-top: 15px;">导出一张对比图</button>
         </div>
 
 
@@ -1192,11 +1215,15 @@
                     <div id="historyListView">
                         <div class="history-actions">
                             <div class="history-actions-left">
-                                <button id="generateHistoryComparison" class="history-btn-primary" disabled>生成对比图表</button>
-                                <button id="selectAllHistory" class="history-btn-secondary" style="margin-left: 10px;">全选</button>
+                                <button id="generateHistoryComparison" class="history-btn-primary"
+                                    disabled>生成对比图表</button>
+                                <button id="selectAllHistory" class="history-btn-secondary"
+                                    style="margin-left: 10px;">全选</button>
                                 <button id="deselectAllHistory" class="history-btn-secondary">反选</button>
-                                <button id="deleteSelectedHistory" class="history-btn-danger" style="margin-left: 10px;" disabled>删除选中</button>
-                                <span id="selectedCount" style="color: #666; font-size: 14px; margin-left: 10px;">已选择 0 条</span>
+                                <button id="deleteSelectedHistory" class="history-btn-danger" style="margin-left: 10px;"
+                                    disabled>删除选中</button>
+                                <span id="selectedCount" style="color: #666; font-size: 14px; margin-left: 10px;">已选择 0
+                                    条</span>
                             </div>
                             <button id="clearAllHistory" class="history-btn-danger">清空全部</button>
                         </div>
@@ -1751,13 +1778,13 @@
         }
 
         // 绑定语言切换按钮
-        document.getElementById('langToggle').addEventListener('click', function() {
+        document.getElementById('langToggle').addEventListener('click', function () {
             const newLang = currentLang === 'zh' ? 'en' : 'zh';
             switchLanguage(newLang);
         });
 
         // 页面加载时应用保存的语言
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             switchLanguage(currentLang);
         });
 
@@ -2656,7 +2683,7 @@
                 if (!firstTokenTime) {
                     const hasContent = (reasoningContent + outputContent).length > 0;
                     if (!hasContent) {
-                       throw new Error("未收到任何token (stream ended)");
+                        throw new Error("未收到任何token (stream ended)");
                     }
                     firstTokenTime = endTime;
                 }
@@ -2751,7 +2778,7 @@
             if (allPrefillSpeeds.length > 0) {
                 concurrencyStats.avgPrefillSpeed = allPrefillSpeeds.reduce((sum, speed) => sum + speed, 0) / allPrefillSpeeds.length;
             }
-             if (allOutputSpeeds.length > 0) {
+            if (allOutputSpeeds.length > 0) {
                 concurrencyStats.avgOutputSpeed = allOutputSpeeds.reduce((sum, speed) => sum + speed, 0) / allOutputSpeeds.length;
             }
         }
@@ -2866,7 +2893,7 @@
 
         // 【修复】测试Ollama接口
         async function testOllama(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout, maxLength) {
-             for (let length of testLengths) {
+            for (let length of testLengths) {
                 if (!isTestingRunning) break;
 
                 // F12控制台日志
@@ -3001,7 +3028,7 @@
                     }
 
                     if (concurrencyResults.length === 0) {
-                         throw new Error(`${translations[currentLang].msgAllRequestsFailed}: ${failedMessages.join(', ')}`);
+                        throw new Error(`${translations[currentLang].msgAllRequestsFailed}: ${failedMessages.join(', ')}`);
                     }
 
                     const avgPrefillTimeMs = concurrencyResults.reduce((sum, res) => sum + res.prefillTimeMs, 0) / concurrencyResults.length;
@@ -3605,7 +3632,7 @@
             // 计算测试点列表（指数增长）
             const testLengths = [];
             let stepIndex = 0;
-            
+
             if (stepMultiplier === 1) {
                 // 倍数为1时，使用线性步长
                 let currentLength = minLength;
@@ -3624,7 +3651,7 @@
                     stepIndex++;
                 }
             }
-            
+
             console.log(`[步长计算] 基础步长: ${step}, 倍数: ${stepMultiplier}, 测试点: ${testLengths.join(', ')}`);
 
             totalTests = testLengths.length;
@@ -3664,7 +3691,7 @@
 
             const notesMessage = document.createElement('p');
             notesMessage.className = 'notes';
-            notesMessage.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${concurrency} | ${t.labelTimeoutPrefix} ${timeout/1000}s`;
+            notesMessage.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${concurrency} | ${t.labelTimeoutPrefix} ${timeout / 1000}s`;
             resultsDiv.appendChild(notesMessage);
 
             if (concurrency > 6) {
@@ -3763,11 +3790,11 @@
 
             // 根据测试是否被手动停止来显示不同的最终消息
             if (wasManuallyStopped) {
-                 const stopRow = document.createElement('tr');
+                const stopRow = document.createElement('tr');
                 stopRow.innerHTML = `<td colspan="8" class="info">${t.msgTestStopped}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(stopRow);
             } else if (!testResultsData.some(r => r.status === t.statusSuccess)) {
-                 const noDataRow = document.createElement('tr');
+                const noDataRow = document.createElement('tr');
                 noDataRow.innerHTML = `<td colspan="8" class="info">${t.msgTestCompleteNoData}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(noDataRow);
             }
@@ -3824,12 +3851,12 @@
                 .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
                 .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
                 .substring(0, 80);                // 限制模型名长度
-            
+
             const cleanNotes = notes
                 .replace(/[<>:"\/\\|?*]/g, '_')  // 替换Windows禁止字符
                 .replace(/[\s\t\n\r]+/g, '_')    // 替换空白字符
                 .substring(0, 60);                // 限制备注长度
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `${cleanModelName}_${cleanNotes}_c${concurrencyValue}_${timestamp}.csv`
                 .substring(0, 200);  // 确保总长度<200字符
@@ -3903,7 +3930,7 @@
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 80);
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
 
             downloadCombinedChart(
@@ -3918,20 +3945,20 @@
         // 截图功能：截取表格+Prefill+Decode图表并复制到剪贴板
         screenshotComparisonBtn.addEventListener('click', async () => {
             const t = translations[currentLang];
-            
+
             try {
                 // 1. 获取图表容器的实际显示宽度（不含padding）
                 const chartContainer = document.getElementById('chartContainer');
                 const containerStyle = window.getComputedStyle(chartContainer);
-                const containerWidth = chartContainer.clientWidth - 
-                    parseFloat(containerStyle.paddingLeft) - 
+                const containerWidth = chartContainer.clientWidth -
+                    parseFloat(containerStyle.paddingLeft) -
                     parseFloat(containerStyle.paddingRight);
-                
+
                 // 2. 创建一个临时容器，宽度与图表显示区域一致
                 const tempContainer = document.createElement('div');
                 tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: white; padding: 20px; width: ${containerWidth + 40}px;`;
                 document.body.appendChild(tempContainer);
-                
+
                 // 3. 克隆表格，让其自适应容器宽度
                 const resultsClone = resultsDiv.cloneNode(true);
                 resultsClone.style.width = '100%';
@@ -3941,7 +3968,7 @@
                     tableInClone.style.width = '100%';
                 }
                 tempContainer.appendChild(resultsClone);
-                
+
                 // 4. 添加Prefill图表标题和canvas
                 const prefillTitle = document.createElement('h3');
                 prefillTitle.textContent = t.chartPrefillTitle;
@@ -3949,7 +3976,7 @@
                 tempContainer.appendChild(prefillTitle);
                 const prefillClone = prefillChartCanvas.cloneNode(true);
                 tempContainer.appendChild(prefillClone);
-                
+
                 // 5. 添加Decode图表标题和canvas
                 const decodeTitle = document.createElement('h3');
                 decodeTitle.textContent = t.chartDecodeTitle;
@@ -3957,13 +3984,13 @@
                 tempContainer.appendChild(decodeTitle);
                 const decodeClone = outputChartCanvas.cloneNode(true);
                 tempContainer.appendChild(decodeClone);
-                
+
                 // 6. 将canvas内容绘制到克隆的canvas上
                 const prefillCloneCtx = prefillClone.getContext('2d');
                 prefillCloneCtx.drawImage(prefillChartCanvas, 0, 0);
                 const decodeCloneCtx = decodeClone.getContext('2d');
                 decodeCloneCtx.drawImage(outputChartCanvas, 0, 0);
-                
+
                 // 7. 使用html2canvas截图（降低scale提高速度）
                 const canvas = await html2canvas(tempContainer, {
                     backgroundColor: '#ffffff',
@@ -3971,10 +3998,10 @@
                     logging: false,
                     useCORS: true
                 });
-                
+
                 // 8. 清理临时容器
                 document.body.removeChild(tempContainer);
-                
+
                 // 9. 将canvas转换为blob并复制到剪贴板
                 canvas.toBlob(async (blob) => {
                     try {
@@ -4001,11 +4028,11 @@
             // v1.8: 从 comparisonData 动态生成文件名（优化文件名安全性）
             const labels = comparisonData.map(d =>
                 d.label.replace(/【.*?】/g, '') // 移除【导入】
-                       .replace(/[<>:"\/\\|?*]/g, '_') // 替换Windows禁止字符
-                       .replace(/[\s\t\n\r\(\),]/g, '_') // 替换空白字符和括号
-                       .replace(/_+/g, '_') // 移除连续的下划线
+                    .replace(/[<>:"\/\\|?*]/g, '_') // 替换Windows禁止字符
+                    .replace(/[\s\t\n\r\(\),]/g, '_') // 替换空白字符和括号
+                    .replace(/_+/g, '_') // 移除连续的下划线
             );
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `Comparison_${labels.join('_vs_')}_${timestamp}.png`.substring(0, 200);
 
@@ -4702,7 +4729,7 @@
             // 创建备注信息
             const notesMessage = document.createElement('p');
             notesMessage.className = 'notes';
-            notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.config.concurrency} | ${t.labelTimeoutPrefix} ${record.config.timeout/1000}s`;
+            notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.config.concurrency} | ${t.labelTimeoutPrefix} ${record.config.timeout / 1000}s`;
             resultsDiv.appendChild(notesMessage);
 
             // 创建表格
@@ -4813,12 +4840,12 @@
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 80);
-            
+
             const cleanNotes = record.notes
                 .replace(/[<>:"\/\\|?*]/g, '_')
                 .replace(/[\s\t\n\r]+/g, '_')
                 .substring(0, 60);
-            
+
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '_');
             const filename = `history_${cleanModelName}_${cleanNotes}_${timestamp}.csv`
                 .substring(0, 200);
@@ -4998,7 +5025,7 @@
 
         // v1.9.1: 重置参数按钮
         const resetParamsBtn = document.getElementById('resetParams');
-        resetParamsBtn.addEventListener('click', function() {
+        resetParamsBtn.addEventListener('click', function () {
             // 只重置测试参数配置，不重置API配置
             document.getElementById('minLength').value = d_minLength;
             document.getElementById('maxLength').value = d_maxLength;
@@ -5023,7 +5050,7 @@
 
         // 更新语言切换函数中的按钮文本更新
         const originalSwitchLanguage = switchLanguage;
-        switchLanguage = function(lang) {
+        switchLanguage = function (lang) {
             originalSwitchLanguage(lang);
             const t = translations[lang];
             viewHistoryBtn.textContent = t.historyBtn;
@@ -5051,320 +5078,400 @@
     <!-- ============================================================
      云端分享：识别码组件 + 弹窗
      ============================================================ -->
-    <div id="userCodeWidget" style="position:fixed;bottom:20px;right:20px;z-index:9000;background:#2f343a;border:1px solid #444;border-radius:10px;padding:10px 14px;font-size:12px;color:#abb2bf;box-shadow:0 2px 16px rgba(0,0,0,0.5);min-width:200px;">
-        <div id="nicknameRow" style="display:none;margin-bottom:5px;"><span id="cloudUsernameLabel2" style="color:#888;font-size:11px;">用户名：</span><strong id="nicknameDisplay" style="color:#e5c07b;font-size:13px;"></strong></div>
-        <div id="setNicknameHint" style="display:none;margin-bottom:5px;"><span id="cloudNoUsernameText" style="color:#888;font-size:11px;">未设置用户名</span><button id="cloudSetUsernameBtn" onclick="openNicknameModal()" style="margin-left:6px;background:#2c4a35;border:1px solid #3a6b47;color:#98c379;padding:1px 7px;border-radius:4px;cursor:pointer;font-size:11px;">设置</button></div>
-        <div><span id="cloudUserCodeLabel" style="color:#888;">识别码：</span><strong id="userCodeDisplay" style="color:#61afef;font-family:monospace;letter-spacing:2px;"></strong><button onclick="copyUserCode()" title="复制" style="margin-left:6px;background:none;border:none;color:#61afef;cursor:pointer;font-size:13px;padding:0;vertical-align:middle;">⧉</button></div>
+    <div id="userCodeWidget"
+        style="position:fixed;bottom:20px;right:20px;z-index:9000;background:#2f343a;border:1px solid #444;border-radius:10px;padding:10px 14px;font-size:12px;color:#abb2bf;box-shadow:0 2px 16px rgba(0,0,0,0.5);min-width:200px;">
+        <div id="nicknameRow" style="display:none;margin-bottom:5px;"><span id="cloudUsernameLabel2"
+                style="color:#888;font-size:11px;">用户名：</span><strong id="nicknameDisplay"
+                style="color:#e5c07b;font-size:13px;"></strong></div>
+        <div id="setNicknameHint" style="display:none;margin-bottom:5px;"><span id="cloudNoUsernameText"
+                style="color:#888;font-size:11px;">未设置用户名</span><button id="cloudSetUsernameBtn"
+                onclick="openNicknameModal()"
+                style="margin-left:6px;background:#2c4a35;border:1px solid #3a6b47;color:#98c379;padding:1px 7px;border-radius:4px;cursor:pointer;font-size:11px;">设置</button>
+        </div>
+        <div><span id="cloudUserCodeLabel" style="color:#888;">识别码：</span><strong id="userCodeDisplay"
+                style="color:#61afef;font-family:monospace;letter-spacing:2px;"></strong><button
+                onclick="copyUserCode()" title="复制"
+                style="margin-left:6px;background:none;border:none;color:#61afef;cursor:pointer;font-size:13px;padding:0;vertical-align:middle;">⧉</button>
+        </div>
         <div id="profileLoading" style="color:#666;font-size:11px;margin-top:3px;">正在从云端加载...</div>
-        <div style="margin-top:5px;border-top:1px solid #3a3f47;padding-top:5px;"><button id="cloudRecoverLink" onclick="openRecoverModal()" style="background:none;border:none;color:#666;font-size:11px;cursor:pointer;padding:0;text-decoration:underline;">🔑 找回识别码</button></div>
+        <div style="margin-top:5px;border-top:1px solid #3a3f47;padding-top:5px;"><button id="cloudRecoverLink"
+                onclick="openRecoverModal()"
+                style="background:none;border:none;color:#666;font-size:11px;cursor:pointer;padding:0;text-decoration:underline;">🔑
+                找回识别码</button></div>
     </div>
 
-    <div id="nicknameModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;align-items:center;justify-content:center;">
-        <div style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:400px;max-width:95vw;color:#abb2bf;">
+    <div id="nicknameModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;align-items:center;justify-content:center;">
+        <div
+            style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:400px;max-width:95vw;color:#abb2bf;">
             <h3 style="margin:0 0 8px;color:#e5c07b;">🏷 设置用户名</h3>
-            <p style="margin:0 0 14px;font-size:12px;color:#666;">设置后<strong style="color:#e06c75;">不可更改</strong>，请谨慎选择。</p>
-            <div style="margin-bottom:6px;"><label style="display:block;margin-bottom:4px;font-size:12px;color:#888;">用户名 <span style="color:#e06c75;">*</span></label><input id="nicknameInput" type="text" maxlength="20" placeholder="2-20位，字母开头，可含数字/下划线/横线" oninput="onNicknameInput()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;font-family:monospace;"></div>
+            <p style="margin:0 0 14px;font-size:12px;color:#666;">设置后<strong style="color:#e06c75;">不可更改</strong>，请谨慎选择。
+            </p>
+            <div style="margin-bottom:6px;"><label
+                    style="display:block;margin-bottom:4px;font-size:12px;color:#888;">用户名 <span
+                        style="color:#e06c75;">*</span></label><input id="nicknameInput" type="text" maxlength="20"
+                    placeholder="2-20位，字母开头，可含数字/下划线/横线" oninput="onNicknameInput()"
+                    style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;font-family:monospace;">
+            </div>
             <div id="nicknameCheckMsg" style="min-height:18px;font-size:12px;margin-bottom:10px;padding:0 2px;"></div>
-            <div style="margin-bottom:6px;"><label style="display:block;margin-bottom:4px;font-size:12px;color:#888;">密码（可选）<span style="color:#555;font-size:11px;"> — 用于找回识别码</span></label><input id="nicknamePassword" type="password" maxlength="72" placeholder="至少6位，丢失后无法找回识别码" oninput="onPasswordInput()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;"><div id="passwordCheckMsg" style="font-size:11px;margin-top:4px;color:#888;min-height:16px;"></div></div>
+            <div style="margin-bottom:6px;"><label
+                    style="display:block;margin-bottom:4px;font-size:12px;color:#888;">密码（可选）<span
+                        style="color:#555;font-size:11px;"> — 用于找回识别码</span></label><input id="nicknamePassword"
+                    type="password" maxlength="72" placeholder="至少6位，丢失后无法找回识别码" oninput="onPasswordInput()"
+                    style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                <div id="passwordCheckMsg" style="font-size:11px;margin-top:4px;color:#888;min-height:16px;"></div>
+            </div>
             <p style="margin:10px 0 14px;font-size:11px;color:#555;">以字母开头 · 2~20字符 · 可含字母/数字/下划线/横线 · 全局唯一</p>
-            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeNicknameModal()" style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button id="confirmNicknameBtn" onclick="confirmSetNickname()" disabled style="background:#b8860b;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:not-allowed;font-weight:bold;opacity:0.5;">确认设置</button></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeNicknameModal()"
+                    style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button
+                    id="confirmNicknameBtn" onclick="confirmSetNickname()" disabled
+                    style="background:#b8860b;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:not-allowed;font-weight:bold;opacity:0.5;">确认设置</button>
+            </div>
         </div>
     </div>
 
-    <div id="recoverModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;align-items:center;justify-content:center;">
-        <div style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:380px;max-width:95vw;color:#abb2bf;">
+    <div id="recoverModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10001;align-items:center;justify-content:center;">
+        <div
+            style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:380px;max-width:95vw;color:#abb2bf;">
             <h3 style="margin:0 0 8px;color:#61afef;">🔑 找回识别码</h3>
             <p style="margin:0 0 14px;font-size:12px;color:#666;">输入用户名和密码，找回并恢复识别码。</p>
-            <div style="margin-bottom:10px;"><label style="display:block;margin-bottom:4px;font-size:12px;color:#888;">用户名</label><input id="recoverNickname" type="text" maxlength="20" placeholder="你设置的用户名" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;font-family:monospace;"></div>
-            <div style="margin-bottom:14px;"><label style="display:block;margin-bottom:4px;font-size:12px;color:#888;">密码</label><input id="recoverPassword" type="password" maxlength="72" placeholder="你设置的密码" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;"></div>
-            <div id="recoverMsg" style="display:none;margin-bottom:12px;padding:8px;border-radius:6px;font-size:13px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeRecoverModal()" style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button id="doRecoverBtn" onclick="doRecover()" style="background:#2980b9;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">找回识别码</button></div>
+            <div style="margin-bottom:10px;"><label
+                    style="display:block;margin-bottom:4px;font-size:12px;color:#888;">用户名</label><input
+                    id="recoverNickname" type="text" maxlength="20" placeholder="你设置的用户名"
+                    style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;font-family:monospace;">
+            </div>
+            <div style="margin-bottom:14px;"><label
+                    style="display:block;margin-bottom:4px;font-size:12px;color:#888;">密码</label><input
+                    id="recoverPassword" type="password" maxlength="72" placeholder="你设置的密码"
+                    style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #555;border-radius:6px;background:#1e2227;color:#abb2bf;font-size:14px;">
+            </div>
+            <div id="recoverMsg" style="display:none;margin-bottom:12px;padding:8px;border-radius:6px;font-size:13px;">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeRecoverModal()"
+                    style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button
+                    id="doRecoverBtn" onclick="doRecover()"
+                    style="background:#2980b9;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">找回识别码</button>
+            </div>
             <p style="margin:10px 0 0;font-size:11px;color:#555;">成功后将覆盖当前识别码并刷新页面。</p>
         </div>
     </div>
 
-    <div id="shareModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
-        <div style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:440px;max-width:95vw;color:#abb2bf;">
+    <div id="shareModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
+        <div
+            style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:440px;max-width:95vw;color:#abb2bf;">
             <h3 style="margin:0 0 16px;color:#61afef;">☁️ 分享测试结果</h3>
-            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">模型名称</label><input id="shareModelName" type="text" maxlength="100" placeholder="自动获取或手动修改" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;"></div>
-            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">硬件 <span style="color:#e06c75;">*</span><span style="color:#888;font-size:11px;">（如 RTX 4090、M4 Pro）</span></label><input id="shareHardware" type="text" maxlength="100" placeholder="必填" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;"></div>
-            <div style="display:flex;gap:12px;margin-bottom:12px;"><div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">推理框架</label><input id="shareFramework" type="text" maxlength="50" placeholder="llama.cpp / vllm" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;"></div><div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">量化方式</label><input id="shareQuantization" type="text" maxlength="20" placeholder="Q4_K_M / FP16" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;"></div></div>
-            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">显示名称<span id="nicknameSourceHint" style="color:#888;font-size:11px;"></span></label><input id="shareNickname" type="text" maxlength="50" placeholder="（未设置用户名则匿名）" readonly style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #444;border-radius:4px;background:#161a1f;color:#888;font-size:14px;cursor:default;"></div>
-            <div style="margin-bottom:20px;"><label style="display:block;margin-bottom:4px;font-size:13px;">备注（可选，200字以内）</label><textarea id="shareNotes" maxlength="200" rows="2" placeholder="如版本、特殊配置等" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;resize:vertical;"></textarea></div>
-            <div id="shareResultMsg" style="display:none;margin-bottom:16px;padding:10px;border-radius:6px;font-size:13px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeShareModal()" style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button id="doUploadBtn" onclick="doUpload()" style="background:#16a085;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">📤 上传分享</button></div>
-            <p style="margin:12px 0 0;font-size:11px;color:#666;">识别码 <strong id="shareModalUserCode" style="color:#61afef;font-family:monospace;"></strong> · 上传后数据公开可见，不可删除</p>
+            <div style="margin-bottom:12px;"><label
+                    style="display:block;margin-bottom:4px;font-size:13px;">模型名称</label><input id="shareModelName"
+                    type="text" maxlength="100" placeholder="自动获取或手动修改"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+            </div>
+            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">硬件 <span
+                        style="color:#e06c75;">*</span><span style="color:#888;font-size:11px;">（如 RTX 4090、M4
+                        Pro）</span></label><input id="shareHardware" type="text" maxlength="100" placeholder="必填"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:12px;">
+                <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">推理框架</label><input
+                        id="shareFramework" type="text" maxlength="50" placeholder="llama.cpp / vllm"
+                        style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                </div>
+                <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">量化方式</label><input
+                        id="shareQuantization" type="text" maxlength="20" placeholder="Q4_K_M / FP16"
+                        style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                </div>
+            </div>
+            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">显示名称<span
+                        id="nicknameSourceHint" style="color:#888;font-size:11px;"></span></label><input
+                    id="shareNickname" type="text" maxlength="50" placeholder="（未设置用户名则匿名）" readonly
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #444;border-radius:4px;background:#161a1f;color:#888;font-size:14px;cursor:default;">
+            </div>
+            <div style="margin-bottom:20px;"><label
+                    style="display:block;margin-bottom:4px;font-size:13px;">备注（可选，200字以内）</label><textarea
+                    id="shareNotes" maxlength="200" rows="2" placeholder="如版本、特殊配置等"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;resize:vertical;"></textarea>
+            </div>
+            <div id="shareResultMsg"
+                style="display:none;margin-bottom:16px;padding:10px;border-radius:6px;font-size:13px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeShareModal()"
+                    style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button
+                    id="doUploadBtn" onclick="doUpload()"
+                    style="background:#16a085;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">📤
+                    上传分享</button></div>
+            <p style="margin:12px 0 0;font-size:11px;color:#666;">识别码 <strong id="shareModalUserCode"
+                    style="color:#61afef;font-family:monospace;"></strong> · 上传后数据公开可见，不可删除</p>
         </div>
     </div>
 
     <script>
-    // ============================================================
-    // Cloud Share + Username System (direct Supabase REST API)
-    // ============================================================
-    (function() {
-        const SUPABASE_URL = 'https://cvezaerrczywfzqcaqmx.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2ZXphZXJyY3p5d2Z6cWNhcW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc0OTAsImV4cCI6MjA4ODA1MzQ5MH0.-9l2Wcj38m6xh9sz9qMdhdNbnAZ_XoFBSHPhEud9DmQ';
-        const SB_HEADERS = {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-        const USER_CODE_KEY = 'llm_speedtest_user_code';
-        let _nick = null, _nickTimer = null;
-        let _batchMode = false, _batchPayloads = [];
+        // ============================================================
+        // Cloud Share + Username System (direct Supabase REST API)
+        // ============================================================
+        (function () {
+            const SUPABASE_URL = 'https://cvezaerrczywfzqcaqmx.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2ZXphZXJyY3p5d2Z6cWNhcW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc0OTAsImV4cCI6MjA4ODA1MzQ5MH0.-9l2Wcj38m6xh9sz9qMdhdNbnAZ_XoFBSHPhEud9DmQ';
+            const SB_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+            const USER_CODE_KEY = 'llm_speedtest_user_code';
+            let _nick = null, _nickTimer = null;
+            let _batchMode = false, _batchPayloads = [];
 
-        function generateUserCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            return Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
-        }
-        window.getOrCreateUserCode = function() {
-            let c = localStorage.getItem(USER_CODE_KEY);
-            if (!c || c.length !== 8) { c = generateUserCode(); localStorage.setItem(USER_CODE_KEY, c); }
-            return c;
-        };
-        window.copyUserCode = function() {
-            navigator.clipboard.writeText(getOrCreateUserCode()).then(() => {
-                const btn = document.querySelector('#userCodeWidget button[onclick="copyUserCode()"]');
-                if (btn) { const orig = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = orig, 1500); }
-            });
-        };
-        async function initUserCode() {
-            const code = getOrCreateUserCode();
-            document.getElementById('userCodeDisplay').textContent = code;
-            document.getElementById('shareModalUserCode').textContent = code;
-            try {
-                const r = await fetch(SUPABASE_URL+'/rest/v1/user_profiles?user_code=eq.'+code+'&select=nickname&limit=1', {headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-                if (r.ok) { const d=await r.json(); if(d.length&&d[0].nickname) _setNick(d[0].nickname); else _showNickHint(); }
-                else _showNickHint();
-            } catch { _showNickHint(); }
-            finally { const pl=document.getElementById('profileLoading'); if(pl) pl.style.display='none'; }
-        }
-        function _setNick(nick) {
-            _nick = nick;
-            document.getElementById('nicknameDisplay').textContent = nick;
-            document.getElementById('nicknameRow').style.display = 'block';
-            document.getElementById('setNicknameHint').style.display = 'none';
-            const sn = document.getElementById('shareNickname'), sh = document.getElementById('nicknameSourceHint');
-            if (sn) sn.value = nick;
-            if (sh) sh.textContent = (typeof translations!=='undefined'&&currentLang) ? translations[currentLang].cloudDisplayNameFromUser||'（来自已设置的用户名）' : '（来自已设置的用户名）';
-        }
-        function _showNickHint() {
-            _nick = null;
-            document.getElementById('nicknameRow').style.display = 'none';
-            document.getElementById('setNicknameHint').style.display = 'block';
-            const sn = document.getElementById('shareNickname'), sh = document.getElementById('nicknameSourceHint');
-            if (sn) sn.value = '';
-            if (sh) sh.textContent = (typeof translations!=='undefined'&&currentLang) ? translations[currentLang].cloudDisplayNameNone||'（未设置用户名）' : '（未设置用户名）';
-        }
-        window.openNicknameModal = function() {
-            ['nicknameInput','nicknamePassword'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-            ['nicknameCheckMsg','passwordCheckMsg'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='';});
-            const btn=document.getElementById('confirmNicknameBtn');
-            if(btn){btn.disabled=true;btn.style.opacity='0.5';btn.style.cursor='not-allowed';}
-            document.getElementById('nicknameModal').style.display='flex';
-            setTimeout(()=>{const e=document.getElementById('nicknameInput');if(e)e.focus();},50);
-        };
-        window.closeNicknameModal = function() { document.getElementById('nicknameModal').style.display='none'; };
-        window.onNicknameInput = function() {
-            clearTimeout(_nickTimer);
-            const val=(document.getElementById('nicknameInput')||{}).value?.trim()||'';
-            const msgDiv=document.getElementById('nicknameCheckMsg');
-            const confirmBtn=document.getElementById('confirmNicknameBtn');
-            if(confirmBtn){confirmBtn.disabled=true;confirmBtn.style.opacity='0.5';confirmBtn.style.cursor='not-allowed';}
-            if(!val){if(msgDiv)msgDiv.textContent='';return;}
-            if(!/^[a-zA-Z][a-zA-Z0-9_-]{1,19}$/.test(val)){if(msgDiv){msgDiv.style.color='#e06c75';msgDiv.textContent='✗ 格式不正确：以字母开头,2~20字符';}return;}
-            if(msgDiv){msgDiv.style.color='#888';msgDiv.textContent='检查中...';}
-            _nickTimer=setTimeout(async()=>{
-                try{
-                    const r=await fetch(SUPABASE_URL+'/rest/v1/user_profiles?nickname=eq.'+encodeURIComponent(val)+'&select=nickname&limit=1',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-                    const d=await r.json();
-                    if(r.ok&&d.length===0){if(msgDiv){msgDiv.style.color='#98c379';msgDiv.textContent='✓ 该用户名可用';}if(confirmBtn){confirmBtn.disabled=false;confirmBtn.style.opacity='1';confirmBtn.style.cursor='pointer';confirmBtn.style.background='#e5c07b';}}
-                    else{if(msgDiv){msgDiv.style.color='#e06c75';msgDiv.textContent='✗ 该用户名已被使用';}}
-                }catch{if(msgDiv){msgDiv.style.color='#888';msgDiv.textContent='无法连接到云端';}}
-            },600);
-        };
-        window.onPasswordInput = function() {
-            const val=(document.getElementById('nicknamePassword')||{}).value||'';
-            const msg=document.getElementById('passwordCheckMsg');
-            if(!msg)return;
-            if(!val){msg.textContent='';return;}
-            msg.style.color=val.length<6?'#e06c75':'#98c379';
-            msg.textContent=val.length<6?'密码至少6位':'✓ 密码格式正确';
-        };
-        async function _sha256(str){
-            const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-            return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-        }
-        window.confirmSetNickname = async function() {
-            const nick=(document.getElementById('nicknameInput')||{}).value?.trim()||'';
-            const pwd=(document.getElementById('nicknamePassword')||{}).value||'';
-            const msgDiv=document.getElementById('nicknameCheckMsg');
-            const confirmBtn=document.getElementById('confirmNicknameBtn');
-            if(pwd&&pwd.length<6){const pm=document.getElementById('passwordCheckMsg');if(pm){pm.style.color='#e06c75';pm.textContent='密码至少6位';}return;}
-            if(confirmBtn){confirmBtn.disabled=true;confirmBtn.textContent='设置中...';}
-            try{
-                const chk=await fetch(SUPABASE_URL+'/rest/v1/user_profiles?user_code=eq.'+getOrCreateUserCode()+'&select=nickname&limit=1',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-                const ex=await chk.json();
-                if(ex.length>0&&ex[0].nickname){if(msgDiv){msgDiv.style.color='#e06c75';msgDiv.textContent='✗ 该识别码已设置用户名';}if(confirmBtn)confirmBtn.disabled=false;return;}
-                const pwdHash=pwd?await _sha256(getOrCreateUserCode()+':'+pwd):null;
-                const row={user_code:getOrCreateUserCode(),nickname:nick,...(pwdHash?{password_hash:pwdHash}:{})};
-                const r=await fetch(SUPABASE_URL+'/rest/v1/user_profiles',{method:'POST',headers:SB_HEADERS,body:JSON.stringify(row)});
-                if(r.ok||r.status===201){
-                    _setNick(nick);closeNicknameModal();
-                    const tip=document.createElement('div');
-                    tip.textContent=pwd?'✓ 用户名和密码设置成功':'✓ 用户名设置成功（未设密码）';
-                    tip.style.cssText='color:#98c379;font-size:11px;margin-top:4px;';
-                    const w=document.getElementById('userCodeWidget');if(w)w.appendChild(tip);
-                    setTimeout(()=>tip.remove(),4000);
-                } else {const err=await r.json().catch(()=>({}));if(msgDiv){msgDiv.style.color='#e06c75';msgDiv.textContent='✗ '+(err.message||err.detail||'设置失败');}if(confirmBtn)confirmBtn.disabled=false;}
-            }catch{if(msgDiv){msgDiv.style.color='#e06c75';msgDiv.textContent='✗ 网络错误，请重试';}if(confirmBtn)confirmBtn.disabled=false;}
-            finally{if(confirmBtn)confirmBtn.textContent='确认设置';}
-        };
-        window.openRecoverModal = function() {
-            ['recoverNickname','recoverPassword'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-            const msg=document.getElementById('recoverMsg');if(msg)msg.style.display='none';
-            document.getElementById('recoverModal').style.display='flex';
-            setTimeout(()=>{const e=document.getElementById('recoverNickname');if(e)e.focus();},50);
-        };
-        window.closeRecoverModal = function() { document.getElementById('recoverModal').style.display='none'; };
-        window.doRecover = async function() {
-            const nickname=(document.getElementById('recoverNickname')||{}).value?.trim()||'';
-            const password=(document.getElementById('recoverPassword')||{}).value||'';
-            const msgDiv=document.getElementById('recoverMsg');
-            const btn=document.getElementById('doRecoverBtn');
-            if(!nickname||!password){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:8px;border-radius:6px;font-size:13px;';msgDiv.textContent='请输入用户名和密码';}return;}
-            if(btn){btn.disabled=true;btn.textContent='验证中...';}if(msgDiv)msgDiv.style.display='none';
-            try{
-                const r=await fetch(SUPABASE_URL+'/rest/v1/user_profiles?nickname=eq.'+encodeURIComponent(nickname)+'&select=user_code,password_hash&limit=1',{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});
-                const d=await r.json();
-                if(!r.ok||!d.length)throw new Error('用户名不存在');
-                if(!d[0].password_hash)throw new Error('该用户名未设置密码，无法找回');
-                const inputHash=await _sha256(d[0].user_code.trim()+':'+password);
-                if(inputHash!==d[0].password_hash)throw new Error('密码错误');
-                localStorage.setItem(USER_CODE_KEY,d[0].user_code.trim());
-                if(msgDiv){msgDiv.style.cssText='display:block;background:#0d2b1e;color:#98c379;padding:8px;border-radius:6px;font-size:13px;';msgDiv.textContent='✅ 找回成功！识别码：'+d[0].user_code.trim()+'。即将刷新页面…';}
-                setTimeout(()=>location.reload(),1800);
-            }catch(e){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:8px;border-radius:6px;font-size:13px;';msgDiv.textContent='❌ '+e.message;}if(btn)btn.disabled=false;}
-            finally{if(btn)btn.textContent='找回识别码';}
-        };
-        window.showShareButton = function() { const b=document.getElementById('shareResults');if(b)b.style.display=''; };
-        window.openShareModal = function(isBatch) {
-            _batchMode=(isBatch===true);
-            const msg=document.getElementById('shareResultMsg');if(msg)msg.style.display='none';
-            const hw=document.getElementById('shareHardware'),fw=document.getElementById('shareFramework'),qt=document.getElementById('shareQuantization');
-            if(hw)hw.value=localStorage.getItem('llm_speedtest_share_hw')||'';
-            if(fw)fw.value=localStorage.getItem('llm_speedtest_share_fw')||'';
-            if(qt)qt.value=localStorage.getItem('llm_speedtest_share_qt')||'';
-            const mn=document.getElementById('shareModelName'),sn=document.getElementById('shareNotes');
-            if(_batchMode){if(mn)mn.value='';if(sn)sn.value='';}
-            else{if(mn)mn.value=localStorage.getItem('llm_speedtest_share_model')||document.getElementById('modelName')?.value?.trim()||'';if(sn)sn.value=document.getElementById('notes')?.value?.trim()||'';}
-            document.getElementById('shareModal').style.display='flex';
-        };
-        window.closeShareModal = function() { document.getElementById('shareModal').style.display='none';_batchMode=false;_batchPayloads=[]; };
-        async function _sbInsert(payload){
-            return await fetch(SUPABASE_URL+'/rest/v1/speed_results',{method:'POST',headers:SB_HEADERS,body:JSON.stringify(payload)});
-        }
-        window.doUpload = async function() {
-            const hw=(document.getElementById('shareHardware')||{}).value?.trim()||'';
-            const fw=(document.getElementById('shareFramework')||{}).value?.trim()||'';
-            const qt=(document.getElementById('shareQuantization')||{}).value?.trim()||'';
-            const nick=(document.getElementById('shareNickname')||{}).value?.trim()||'';
-            const notes=(document.getElementById('shareNotes')||{}).value?.trim()||'';
-            const msgDiv=document.getElementById('shareResultMsg');
-            const uploadBtn=document.getElementById('doUploadBtn');
-            if(!hw){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;';msgDiv.textContent='❌ 请填写硬件信息（必填）';}return;}
-            localStorage.setItem('llm_speedtest_share_hw',hw);
-            if(fw)localStorage.setItem('llm_speedtest_share_fw',fw);
-            if(qt)localStorage.setItem('llm_speedtest_share_qt',qt);
-            const mn=document.getElementById('shareModelName')?.value?.trim();
-            if(mn)localStorage.setItem('llm_speedtest_share_model',mn);
-            if(uploadBtn){uploadBtn.disabled=true;uploadBtn.textContent='上传中...';}if(msgDiv)msgDiv.style.display='none';
-            if(_batchMode){await _doBatchUpload(hw,fw,qt,nick,notes,mn);return;}
-            const vp=(typeof testResultsData !== 'undefined' ? testResultsData : (window.testResultsData||[])).filter(r=>r.prefillSpeed!=='N/A'&&r.outputSpeed!=='N/A');
-            if(!vp.length){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;';msgDiv.textContent='❌ 没有可上传的测试数据，请先完成测试';}if(uploadBtn){uploadBtn.disabled=false;uploadBtn.textContent='📤 上传分享';}return;}
-            const userCode=getOrCreateUserCode();
-            const maxP=vp.reduce((m,r)=>Math.max(m,parseFloat(r.prefillSpeed)),0);
-            const maxD=vp.reduce((m,r)=>Math.max(m,parseFloat(r.outputSpeed)),0);
-            const concurrency=parseInt(document.getElementById('concurrency')?.value)||1;
-            const payload={user_code:userCode,nickname:nick||null,model_name:mn||'未知模型',hardware:hw,framework:fw||null,quantization:qt||null,notes:notes||null,concurrency,avg_prefill_speed:parseFloat(maxP.toFixed(2)),avg_decode_speed:parseFloat(maxD.toFixed(2)),results_json:JSON.stringify(vp.map(r=>({prompt_length:parseFloat(r.promptLength),prefill_speed:parseFloat(r.prefillSpeed),output_speed:parseFloat(r.outputSpeed),prefill_time_ms:parseFloat(r.prefillTimeMs)||0,output_time_ms:parseFloat(r.outputTimeMs)||0,concurrency:parseInt(r.concurrency)||concurrency,successful:parseInt(r.successful)||1})))};
-            try{
-                const r=await _sbInsert(payload);
-                if(!r.ok){const err=await r.json().catch(()=>({message:r.statusText}));throw new Error(err.message||'HTTP '+r.status);}
-                const data=await r.json();const shareId=(Array.isArray(data)?data[0]:data)?.id;
-                if (msgDiv) {
-                    msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;';
-                    msgDiv.innerHTML = `✅ 上传成功！<br>分享ID：<strong style="font-family:monospace;color:#61afef;">${shareId}</strong> <button onclick="navigator.clipboard.writeText('${shareId}')" style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">复制</button>`;
-                }
-            }catch(e){if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;';msgDiv.textContent='❌ 上传失败：'+e.message;}}
-            finally{if(uploadBtn){uploadBtn.disabled=false;uploadBtn.textContent='📤 上传分享';}}
-        };
-        async function _doBatchUpload(hw,fw,qt,nickname,notes,modelName){
-            const t=(typeof translations!=='undefined'&&currentLang)?translations[currentLang]:{};
-            const userCode=getOrCreateUserCode();
-            const msgDiv=document.getElementById('shareResultMsg'),uploadBtn=document.getElementById('doUploadBtn');
-            let ok=0,fail=0,lastErr='';
-            for(const bd of _batchPayloads){
-                const payload={user_code:userCode,nickname:nickname||null,model_name:modelName||bd.model||'未知模型',hardware:hw,framework:fw||null,quantization:qt||null,notes:notes||bd.notes||null,concurrency:bd.concurrency,avg_prefill_speed:bd.maxPrefill,avg_decode_speed:bd.maxDecode,results_json:JSON.stringify(bd.points)};
-                try{const r=await _sbInsert(payload);if(r.ok||r.status===201)ok++;else{const err=await r.json().catch(()=>({message:r.statusText}));throw new Error(err.message);}}
-                catch(e){fail++;lastErr=e.message;}
+            function generateUserCode() {
+                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
             }
-            if(uploadBtn){uploadBtn.disabled=false;uploadBtn.textContent=t.cloudUploadBtn||'📤 上传分享';}
-            if(!fail){if(msgDiv){msgDiv.style.cssText='display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;';msgDiv.innerHTML=(t.batchUploadSuccess||'✅ 批量上传成功！共上传 {count} 个测试记录。').replace('{count}',ok);}}
-            else{if(msgDiv){msgDiv.style.cssText='display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;';msgDiv.innerHTML=(t.batchUploadResult||'⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}').replace('{success}',ok).replace('{fail}',fail).replace('{error}',lastErr);}}
-            _batchPayloads=[];
-        }
-        window.handleBatchCsvUpload = async function(event) {
-            const t=(typeof translations!=='undefined'&&currentLang)?translations[currentLang]:{batchUploadLimit:'一次只能上传 1 个 CSV 文件。',batchUploadNoData:'未解析到任何有效的测试数据记录。',batchUploadUnknownModel:'未知历史模型'};
-            const files=event.target.files;
-            if(!files||!files.length)return;
-            if(files.length>1){alert(t.batchUploadLimit);event.target.value='';return;}
-            _batchPayloads=[];
-            for(const file of files){
-                try{
-                    const lines=(await file.text()).trim().split('\n');
-                    if(lines.length<5)continue;
-                    const model=(lines[0].split(',')[1]||'').trim()||t.batchUploadUnknownModel;
-                    let notes=(lines[1].split(',').slice(1).join(',')||'').trim();
-                    if(notes.startsWith('"')&&notes.endsWith('"'))notes=notes.slice(1,-1).replace(/""/g,'"');
-                    const conc=parseInt((lines[2].split(',')[1]||'1').trim())||1;
-                    let dsi=4;for(let j=0;j<5;j++)if(lines[j]&&(lines[j].includes('预填充速度')||lines[j].includes('Prefill Speed'))){dsi=j+1;break;}
-                    const pts=[];
-                    for(let r=dsi;r<lines.length;r++){
-                        if(!lines[r].trim())continue;
-                        const c=lines[r].split(',');
-                        let pl,ps,os,pt,ot;
-                        if(c.length>=9){pl=parseFloat(c[0]);pt=parseFloat(c[4]);ps=parseFloat(c[5]);ot=parseFloat(c[7]);os=parseFloat(c[8]);}
-                        else if(c.length>=7){pl=parseFloat(c[0]);pt=parseFloat(c[1]);ps=parseFloat(c[2]);ot=parseFloat(c[4]);os=parseFloat(c[5]);}
-                        else continue;
-                        if(isNaN(ps)||isNaN(os))continue;
-                        pts.push({prompt_length:pl,prefill_speed:ps,output_speed:os,prefill_time_ms:pt||0,output_time_ms:ot||0,concurrency:conc,successful:1});
-                    }
-                    if(!pts.length)continue;
-                    _batchPayloads.push({model,notes,concurrency:conc,maxPrefill:parseFloat(pts.reduce((m,r)=>Math.max(m,r.prefill_speed),0).toFixed(2)),maxDecode:parseFloat(pts.reduce((m,r)=>Math.max(m,r.output_speed),0).toFixed(2)),points:pts});
-                }catch(e){console.error('解析CSV出错:',file.name,e);}
-            }
-            event.target.value='';
-            if(!_batchPayloads.length)alert(t.batchUploadNoData);else openShareModal(true);
-        };
-
-        // Init after DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            initUserCode();
-            const shareBtn = document.getElementById('shareResults');
-            if (shareBtn) shareBtn.addEventListener('click', function() { openShareModal(false); });
-            ['shareModal','nicknameModal','recoverModal'].forEach(function(id) {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.addEventListener('click', function(e) {
-                    if (e.target !== el) return;
-                    if (id==='shareModal') closeShareModal();
-                    else if (id==='nicknameModal') closeNicknameModal();
-                    else closeRecoverModal();
+            window.getOrCreateUserCode = function () {
+                let c = localStorage.getItem(USER_CODE_KEY);
+                if (!c || c.length !== 8) { c = generateUserCode(); localStorage.setItem(USER_CODE_KEY, c); }
+                return c;
+            };
+            window.copyUserCode = function () {
+                navigator.clipboard.writeText(getOrCreateUserCode()).then(() => {
+                    const btn = document.querySelector('#userCodeWidget button[onclick="copyUserCode()"]');
+                    if (btn) { const orig = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = orig, 1500); }
                 });
+            };
+            async function initUserCode() {
+                const code = getOrCreateUserCode();
+                document.getElementById('userCodeDisplay').textContent = code;
+                document.getElementById('shareModalUserCode').textContent = code;
+                try {
+                    const r = await fetch(SUPABASE_URL + '/rest/v1/user_profiles?user_code=eq.' + code + '&select=nickname&limit=1', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+                    if (r.ok) { const d = await r.json(); if (d.length && d[0].nickname) _setNick(d[0].nickname); else _showNickHint(); }
+                    else _showNickHint();
+                } catch { _showNickHint(); }
+                finally { const pl = document.getElementById('profileLoading'); if (pl) pl.style.display = 'none'; }
+            }
+            function _setNick(nick) {
+                _nick = nick;
+                document.getElementById('nicknameDisplay').textContent = nick;
+                document.getElementById('nicknameRow').style.display = 'block';
+                document.getElementById('setNicknameHint').style.display = 'none';
+                const sn = document.getElementById('shareNickname'), sh = document.getElementById('nicknameSourceHint');
+                if (sn) sn.value = nick;
+                if (sh) sh.textContent = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang].cloudDisplayNameFromUser || '（来自已设置的用户名）' : '（来自已设置的用户名）';
+            }
+            function _showNickHint() {
+                _nick = null;
+                document.getElementById('nicknameRow').style.display = 'none';
+                document.getElementById('setNicknameHint').style.display = 'block';
+                const sn = document.getElementById('shareNickname'), sh = document.getElementById('nicknameSourceHint');
+                if (sn) sn.value = '';
+                if (sh) sh.textContent = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang].cloudDisplayNameNone || '（未设置用户名）' : '（未设置用户名）';
+            }
+            window.openNicknameModal = function () {
+                ['nicknameInput', 'nicknamePassword'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+                ['nicknameCheckMsg', 'passwordCheckMsg'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = ''; });
+                const btn = document.getElementById('confirmNicknameBtn');
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+                document.getElementById('nicknameModal').style.display = 'flex';
+                setTimeout(() => { const e = document.getElementById('nicknameInput'); if (e) e.focus(); }, 50);
+            };
+            window.closeNicknameModal = function () { document.getElementById('nicknameModal').style.display = 'none'; };
+            window.onNicknameInput = function () {
+                clearTimeout(_nickTimer);
+                const val = (document.getElementById('nicknameInput') || {}).value?.trim() || '';
+                const msgDiv = document.getElementById('nicknameCheckMsg');
+                const confirmBtn = document.getElementById('confirmNicknameBtn');
+                if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.style.opacity = '0.5'; confirmBtn.style.cursor = 'not-allowed'; }
+                if (!val) { if (msgDiv) msgDiv.textContent = ''; return; }
+                if (!/^[a-zA-Z][a-zA-Z0-9_-]{1,19}$/.test(val)) { if (msgDiv) { msgDiv.style.color = '#e06c75'; msgDiv.textContent = '✗ 格式不正确：以字母开头,2~20字符'; } return; }
+                if (msgDiv) { msgDiv.style.color = '#888'; msgDiv.textContent = '检查中...'; }
+                _nickTimer = setTimeout(async () => {
+                    try {
+                        const r = await fetch(SUPABASE_URL + '/rest/v1/user_profiles?nickname=eq.' + encodeURIComponent(val) + '&select=nickname&limit=1', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+                        const d = await r.json();
+                        if (r.ok && d.length === 0) { if (msgDiv) { msgDiv.style.color = '#98c379'; msgDiv.textContent = '✓ 该用户名可用'; } if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.style.opacity = '1'; confirmBtn.style.cursor = 'pointer'; confirmBtn.style.background = '#e5c07b'; } }
+                        else { if (msgDiv) { msgDiv.style.color = '#e06c75'; msgDiv.textContent = '✗ 该用户名已被使用'; } }
+                    } catch { if (msgDiv) { msgDiv.style.color = '#888'; msgDiv.textContent = '无法连接到云端'; } }
+                }, 600);
+            };
+            window.onPasswordInput = function () {
+                const val = (document.getElementById('nicknamePassword') || {}).value || '';
+                const msg = document.getElementById('passwordCheckMsg');
+                if (!msg) return;
+                if (!val) { msg.textContent = ''; return; }
+                msg.style.color = val.length < 6 ? '#e06c75' : '#98c379';
+                msg.textContent = val.length < 6 ? '密码至少6位' : '✓ 密码格式正确';
+            };
+            async function _sha256(str) {
+                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+                return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+            window.confirmSetNickname = async function () {
+                const nick = (document.getElementById('nicknameInput') || {}).value?.trim() || '';
+                const pwd = (document.getElementById('nicknamePassword') || {}).value || '';
+                const msgDiv = document.getElementById('nicknameCheckMsg');
+                const confirmBtn = document.getElementById('confirmNicknameBtn');
+                if (pwd && pwd.length < 6) { const pm = document.getElementById('passwordCheckMsg'); if (pm) { pm.style.color = '#e06c75'; pm.textContent = '密码至少6位'; } return; }
+                if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '设置中...'; }
+                try {
+                    const chk = await fetch(SUPABASE_URL + '/rest/v1/user_profiles?user_code=eq.' + getOrCreateUserCode() + '&select=nickname&limit=1', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+                    const ex = await chk.json();
+                    if (ex.length > 0 && ex[0].nickname) { if (msgDiv) { msgDiv.style.color = '#e06c75'; msgDiv.textContent = '✗ 该识别码已设置用户名'; } if (confirmBtn) confirmBtn.disabled = false; return; }
+                    const pwdHash = pwd ? await _sha256(getOrCreateUserCode() + ':' + pwd) : null;
+                    const row = { user_code: getOrCreateUserCode(), nickname: nick, ...(pwdHash ? { password_hash: pwdHash } : {}) };
+                    const r = await fetch(SUPABASE_URL + '/rest/v1/user_profiles', { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(row) });
+                    if (r.ok || r.status === 201) {
+                        _setNick(nick); closeNicknameModal();
+                        const tip = document.createElement('div');
+                        tip.textContent = pwd ? '✓ 用户名和密码设置成功' : '✓ 用户名设置成功（未设密码）';
+                        tip.style.cssText = 'color:#98c379;font-size:11px;margin-top:4px;';
+                        const w = document.getElementById('userCodeWidget'); if (w) w.appendChild(tip);
+                        setTimeout(() => tip.remove(), 4000);
+                    } else { const err = await r.json().catch(() => ({})); if (msgDiv) { msgDiv.style.color = '#e06c75'; msgDiv.textContent = '✗ ' + (err.message || err.detail || '设置失败'); } if (confirmBtn) confirmBtn.disabled = false; }
+                } catch { if (msgDiv) { msgDiv.style.color = '#e06c75'; msgDiv.textContent = '✗ 网络错误，请重试'; } if (confirmBtn) confirmBtn.disabled = false; }
+                finally { if (confirmBtn) confirmBtn.textContent = '确认设置'; }
+            };
+            window.openRecoverModal = function () {
+                ['recoverNickname', 'recoverPassword'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+                const msg = document.getElementById('recoverMsg'); if (msg) msg.style.display = 'none';
+                document.getElementById('recoverModal').style.display = 'flex';
+                setTimeout(() => { const e = document.getElementById('recoverNickname'); if (e) e.focus(); }, 50);
+            };
+            window.closeRecoverModal = function () { document.getElementById('recoverModal').style.display = 'none'; };
+            window.doRecover = async function () {
+                const nickname = (document.getElementById('recoverNickname') || {}).value?.trim() || '';
+                const password = (document.getElementById('recoverPassword') || {}).value || '';
+                const msgDiv = document.getElementById('recoverMsg');
+                const btn = document.getElementById('doRecoverBtn');
+                if (!nickname || !password) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:8px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '请输入用户名和密码'; } return; }
+                if (btn) { btn.disabled = true; btn.textContent = '验证中...'; } if (msgDiv) msgDiv.style.display = 'none';
+                try {
+                    const r = await fetch(SUPABASE_URL + '/rest/v1/user_profiles?nickname=eq.' + encodeURIComponent(nickname) + '&select=user_code,password_hash&limit=1', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+                    const d = await r.json();
+                    if (!r.ok || !d.length) throw new Error('用户名不存在');
+                    if (!d[0].password_hash) throw new Error('该用户名未设置密码，无法找回');
+                    const inputHash = await _sha256(d[0].user_code.trim() + ':' + password);
+                    if (inputHash !== d[0].password_hash) throw new Error('密码错误');
+                    localStorage.setItem(USER_CODE_KEY, d[0].user_code.trim());
+                    if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:8px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '✅ 找回成功！识别码：' + d[0].user_code.trim() + '。即将刷新页面…'; }
+                    setTimeout(() => location.reload(), 1800);
+                } catch (e) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:8px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ ' + e.message; } if (btn) btn.disabled = false; }
+                finally { if (btn) btn.textContent = '找回识别码'; }
+            };
+            window.showShareButton = function () { const b = document.getElementById('shareResults'); if (b) b.style.display = ''; };
+            window.openShareModal = function (isBatch) {
+                _batchMode = (isBatch === true);
+                const msg = document.getElementById('shareResultMsg'); if (msg) msg.style.display = 'none';
+                const hw = document.getElementById('shareHardware'), fw = document.getElementById('shareFramework'), qt = document.getElementById('shareQuantization');
+                if (hw) hw.value = localStorage.getItem('llm_speedtest_share_hw') || '';
+                if (fw) fw.value = localStorage.getItem('llm_speedtest_share_fw') || '';
+                if (qt) qt.value = localStorage.getItem('llm_speedtest_share_qt') || '';
+                const mn = document.getElementById('shareModelName'), sn = document.getElementById('shareNotes');
+                if (_batchMode) { if (mn) mn.value = ''; if (sn) sn.value = ''; }
+                else { if (mn) mn.value = localStorage.getItem('llm_speedtest_share_model') || document.getElementById('modelName')?.value?.trim() || ''; if (sn) sn.value = document.getElementById('notes')?.value?.trim() || ''; }
+                document.getElementById('shareModal').style.display = 'flex';
+            };
+            window.closeShareModal = function () { document.getElementById('shareModal').style.display = 'none'; _batchMode = false; _batchPayloads = []; };
+            async function _sbInsert(payload) {
+                return await fetch(SUPABASE_URL + '/rest/v1/speed_results', { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
+            }
+            window.doUpload = async function () {
+                const hw = (document.getElementById('shareHardware') || {}).value?.trim() || '';
+                const fw = (document.getElementById('shareFramework') || {}).value?.trim() || '';
+                const qt = (document.getElementById('shareQuantization') || {}).value?.trim() || '';
+                const nick = (document.getElementById('shareNickname') || {}).value?.trim() || '';
+                const notes = (document.getElementById('shareNotes') || {}).value?.trim() || '';
+                const msgDiv = document.getElementById('shareResultMsg');
+                const uploadBtn = document.getElementById('doUploadBtn');
+                if (!hw) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 请填写硬件信息（必填）'; } return; }
+                localStorage.setItem('llm_speedtest_share_hw', hw);
+                if (fw) localStorage.setItem('llm_speedtest_share_fw', fw);
+                if (qt) localStorage.setItem('llm_speedtest_share_qt', qt);
+                const mn = document.getElementById('shareModelName')?.value?.trim();
+                if (mn) localStorage.setItem('llm_speedtest_share_model', mn);
+                if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = '上传中...'; } if (msgDiv) msgDiv.style.display = 'none';
+                if (_batchMode) { await _doBatchUpload(hw, fw, qt, nick, notes, mn); return; }
+                const vp = (typeof testResultsData !== 'undefined' ? testResultsData : (window.testResultsData || [])).filter(r => r.prefillSpeed !== 'N/A' && r.outputSpeed !== 'N/A');
+                if (!vp.length) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 没有可上传的测试数据，请先完成测试'; } if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '📤 上传分享'; } return; }
+                const userCode = getOrCreateUserCode();
+                const maxP = vp.reduce((m, r) => Math.max(m, parseFloat(r.prefillSpeed)), 0);
+                const maxD = vp.reduce((m, r) => Math.max(m, parseFloat(r.outputSpeed)), 0);
+                const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
+                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(maxP.toFixed(2)), avg_decode_speed: parseFloat(maxD.toFixed(2)), results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
+                try {
+                    const r = await _sbInsert(payload);
+                    if (!r.ok) { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message || 'HTTP ' + r.status); }
+                    const data = await r.json(); const shareId = (Array.isArray(data) ? data[0] : data)?.id;
+                    if (msgDiv) {
+                        msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;';
+                        msgDiv.innerHTML = `✅ 上传成功！<br>分享ID：<strong style="font-family:monospace;color:#61afef;">${shareId}</strong> <button onclick="navigator.clipboard.writeText('${shareId}')" style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">复制</button>`;
+                    }
+                } catch (e) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 上传失败：' + e.message; } }
+                finally { if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '📤 上传分享'; } }
+            };
+            async function _doBatchUpload(hw, fw, qt, nickname, notes, modelName) {
+                const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
+                const userCode = getOrCreateUserCode();
+                const msgDiv = document.getElementById('shareResultMsg'), uploadBtn = document.getElementById('doUploadBtn');
+                let ok = 0, fail = 0, lastErr = '';
+                for (const bd of _batchPayloads) {
+                    const payload = { user_code: userCode, nickname: nickname || null, model_name: modelName || bd.model || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || bd.notes || null, concurrency: bd.concurrency, avg_prefill_speed: bd.maxPrefill, avg_decode_speed: bd.maxDecode, results_json: JSON.stringify(bd.points) };
+                    try { const r = await _sbInsert(payload); if (r.ok || r.status === 201) ok++; else { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message); } }
+                    catch (e) { fail++; lastErr = e.message; }
+                }
+                if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 上传分享'; }
+                if (!fail) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.innerHTML = (t.batchUploadSuccess || '✅ 批量上传成功！共上传 {count} 个测试记录。').replace('{count}', ok); } }
+                else { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.innerHTML = (t.batchUploadResult || '⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}').replace('{success}', ok).replace('{fail}', fail).replace('{error}', lastErr); } }
+                _batchPayloads = [];
+            }
+            window.handleBatchCsvUpload = async function (event) {
+                const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : { batchUploadLimit: '一次只能上传 1 个 CSV 文件。', batchUploadNoData: '未解析到任何有效的测试数据记录。', batchUploadUnknownModel: '未知历史模型' };
+                const files = event.target.files;
+                if (!files || !files.length) return;
+                if (files.length > 1) { alert(t.batchUploadLimit); event.target.value = ''; return; }
+                _batchPayloads = [];
+                for (const file of files) {
+                    try {
+                        const lines = (await file.text()).trim().split('\n');
+                        if (lines.length < 5) continue;
+                        const model = (lines[0].split(',')[1] || '').trim() || t.batchUploadUnknownModel;
+                        let notes = (lines[1].split(',').slice(1).join(',') || '').trim();
+                        if (notes.startsWith('"') && notes.endsWith('"')) notes = notes.slice(1, -1).replace(/""/g, '"');
+                        const conc = parseInt((lines[2].split(',')[1] || '1').trim()) || 1;
+                        let dsi = 4; for (let j = 0; j < 5; j++)if (lines[j] && (lines[j].includes('预填充速度') || lines[j].includes('Prefill Speed'))) { dsi = j + 1; break; }
+                        const pts = [];
+                        for (let r = dsi; r < lines.length; r++) {
+                            if (!lines[r].trim()) continue;
+                            const c = lines[r].split(',');
+                            let pl, ps, os, pt, ot;
+                            if (c.length >= 9) { pl = parseFloat(c[0]); pt = parseFloat(c[4]); ps = parseFloat(c[5]); ot = parseFloat(c[7]); os = parseFloat(c[8]); }
+                            else if (c.length >= 7) { pl = parseFloat(c[0]); pt = parseFloat(c[1]); ps = parseFloat(c[2]); ot = parseFloat(c[4]); os = parseFloat(c[5]); }
+                            else continue;
+                            if (isNaN(ps) || isNaN(os)) continue;
+                            pts.push({ prompt_length: pl, prefill_speed: ps, output_speed: os, prefill_time_ms: pt || 0, output_time_ms: ot || 0, concurrency: conc, successful: 1 });
+                        }
+                        if (!pts.length) continue;
+                        _batchPayloads.push({ model, notes, concurrency: conc, maxPrefill: parseFloat(pts.reduce((m, r) => Math.max(m, r.prefill_speed), 0).toFixed(2)), maxDecode: parseFloat(pts.reduce((m, r) => Math.max(m, r.output_speed), 0).toFixed(2)), points: pts });
+                    } catch (e) { console.error('解析CSV出错:', file.name, e); }
+                }
+                event.target.value = '';
+                if (!_batchPayloads.length) alert(t.batchUploadNoData); else openShareModal(true);
+            };
+
+            // Init after DOM is ready
+            document.addEventListener('DOMContentLoaded', function () {
+                initUserCode();
+                const shareBtn = document.getElementById('shareResults');
+                if (shareBtn) shareBtn.addEventListener('click', function () { openShareModal(false); });
+                ['shareModal', 'nicknameModal', 'recoverModal'].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.addEventListener('click', function (e) {
+                        if (e.target !== el) return;
+                        if (id === 'shareModal') closeShareModal();
+                        else if (id === 'nicknameModal') closeNicknameModal();
+                        else closeRecoverModal();
+                    });
+                });
+                const ni = document.getElementById('nicknameInput');
+                if (ni) ni.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !document.getElementById('confirmNicknameBtn').disabled) confirmSetNickname(); });
+                const rp = document.getElementById('recoverPassword');
+                if (rp) rp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doRecover(); });
+                window._onTestComplete = showShareButton;
             });
-            const ni = document.getElementById('nicknameInput');
-            if (ni) ni.addEventListener('keydown', function(e) { if(e.key==='Enter'&&!document.getElementById('confirmNicknameBtn').disabled) confirmSetNickname(); });
-            const rp = document.getElementById('recoverPassword');
-            if (rp) rp.addEventListener('keydown', function(e) { if(e.key==='Enter') doRecover(); });
-            window._onTestComplete = showShareButton;
-        });
-    })();
+        })();
     </script>
 
 </body>
