@@ -1995,18 +1995,53 @@
             }
         }
 
-        function refreshModelDatalist(query) {
-            if (!_modelNameCache || _modelNameCache.length === 0) return;
-            const dl = document.getElementById('modelSuggest');
-            if (!dl) return;
-            const q = (query || '').toLowerCase().trim();
-            if (!q) { dl.innerHTML = ''; return; }
-            const matches = _modelNameCache
-                .filter(name => name.toLowerCase().includes(q))
-                .slice(0, 30);
-            // 如果只有一个匹配且完全等于当前输入，说明用户已选中，清空避免重复弹出
-            if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
-            dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+        let _customModelNameCache = {}; // { 'http://...': ['model1', 'model2'] }
+        let _isFetchingCustomModels = false;
+
+        async function fetchCustomModels(apiUrl) {
+            if (!apiUrl) return null;
+            let endpoint = '';
+            let isOllama = false;
+            if (apiUrl.endsWith('/v1/chat/completions')) {
+                endpoint = apiUrl.replace('/v1/chat/completions', '/v1/models');
+            } else if (apiUrl.endsWith('/api/chat')) {
+                endpoint = apiUrl.replace('/api/chat', '/api/tags');
+                isOllama = true;
+            } else {
+                return null;
+            }
+
+            if (_customModelNameCache[endpoint]) return _customModelNameCache[endpoint];
+            if (_isFetchingCustomModels) return null;
+
+            _isFetchingCustomModels = true;
+            try {
+                console.log(`[ModelSuggest] 开始从接口拉取模型: ${endpoint}`);
+                const apiKey = document.getElementById('apiKey')?.value?.trim() || '';
+                const headers = { 'Accept': 'application/json' };
+                if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+                const resp = await fetch(endpoint, { headers, signal: AbortSignal.timeout(3000) });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const json = await resp.json();
+
+                let names = [];
+                if (isOllama && json.models) {
+                    names = json.models.map(m => m.name);
+                } else if (json.data && Array.isArray(json.data)) {
+                    names = json.data.map(m => m.id);
+                }
+                names = names.filter(Boolean).sort();
+                _customModelNameCache[endpoint] = names;
+                console.log(`[ModelSuggest] 从接口 ${endpoint} 成功拉取 ${names.length} 个模型`);
+                return names;
+            } catch (err) {
+                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, err.message);
+                _customModelNameCache[endpoint] = []; // 避免重复请求
+                return [];
+            } finally {
+                _isFetchingCustomModels = false;
+            }
         }
 
         // 异步在后台加载，不阻塞页面
@@ -2014,26 +2049,62 @@
             // 加载完成后，如果用户已经在输入框中有内容，立即触发一次联想
             const modelInput = document.getElementById('modelName');
             if (modelInput && modelInput.value.trim()) {
-                refreshModelDatalist(modelInput.value);
+                modelInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
         });
 
         // 绑定事件（使用事件委托，避免弹窗DOM晚于script执行导致getElementById返回null）
         function _modelSuggestHandler(e) {
             const id = e.target && e.target.id;
-            if (!_modelNameCache || _modelNameCache.length === 0) return;
-            if (id === 'modelName') {
-                refreshModelDatalist(e.target.value);
-            } else if (id === 'shareModelName') {
-                const dl = document.getElementById('modelSuggestModal');
-                if (!dl) return;
-                const q = (e.target.value || '').toLowerCase().trim();
-                if (!q) { dl.innerHTML = ''; return; }
-                const matches = _modelNameCache.filter(name => name.toLowerCase().includes(q)).slice(0, 30);
-                // 如果只有一个匹配且完全等于当前输入，清空避免重复弹出
-                if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
-                dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+            if (id !== 'modelName' && id !== 'shareModelName') return;
+
+            const q = (e.target.value || '').toLowerCase().trim();
+            const dlId = id === 'modelName' ? 'modelSuggest' : 'modelSuggestModal';
+            const dl = document.getElementById(dlId);
+            if (!dl) return;
+
+            // 获取当前 API URL
+            const apiUrlInput = document.getElementById('apiUrl');
+            const apiUrl = apiUrlInput ? apiUrlInput.value.trim() : '';
+
+            let customModels = null;
+            // 批量上传时的 shareModelName 不需要依赖主页的 apiUrl，但加上也无妨，因为弹窗也可以单用
+            if (apiUrl) {
+                let endpoint = '';
+                if (apiUrl.endsWith('/v1/chat/completions')) endpoint = apiUrl.replace('/v1/chat/completions', '/v1/models');
+                else if (apiUrl.endsWith('/api/chat')) endpoint = apiUrl.replace('/api/chat', '/api/tags');
+
+                if (endpoint) {
+                    if (_customModelNameCache[endpoint]) {
+                        customModels = _customModelNameCache[endpoint];
+                    } else if (!_isFetchingCustomModels) {
+                        // 异步拉取
+                        fetchCustomModels(apiUrl).then(models => {
+                            if (models && models.length > 0 && document.activeElement === e.target) {
+                                // 拉取成功后如果用户还在输入框，刷新提示
+                                e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        });
+                    }
+                }
             }
+
+            const sourceList = (customModels && customModels.length > 0) ? customModels : _modelNameCache;
+            if (!sourceList || sourceList.length === 0) {
+                dl.innerHTML = ''; return;
+            }
+
+            let matches = [];
+            if (!q) {
+                // 如果为空，展示自定义模型的前 50 个（不展示全网 OpenRouter，太吵）
+                if (sourceList !== _modelNameCache) matches = sourceList.slice(0, 50);
+                else { dl.innerHTML = ''; return; }
+            } else {
+                matches = sourceList.filter(name => name.toLowerCase().includes(q)).slice(0, 30);
+            }
+
+            if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
+            dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
         }
         // input 事件（打字）
         document.addEventListener('input', _modelSuggestHandler, true);
