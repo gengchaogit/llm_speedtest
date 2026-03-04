@@ -2291,6 +2291,9 @@
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
                     const avgOutputTimeMs = concurrencyResults.reduce((sum, res) => sum + res.outputTimeMs, 0) / concurrencyResults.length;
 
+                    const avgTtftMs = concurrencyResults.reduce((sum, res) => sum + res.ttftMs || 0, 0) / concurrencyResults.length;
+                    const avgItlMean = concurrencyResults.reduce((sum, res) => sum + res.itlMean || 0, 0) / concurrencyResults.length;
+
                     //  获取实际的prompt token数（API返回的准确值）
                     // 防御性编程：处理undefined的情况
                     const avgActualPromptTokens = concurrencyResults.reduce((sum, res) => {
@@ -2343,13 +2346,17 @@
                         outputSpeed: totalOutputSpeed.toFixed(2),
                         status: translations[currentLang].statusSuccess,
                         concurrency: concurrency,
+                        avgTtftMs: avgTtftMs.toFixed(2),
+                        avgItlMean: avgItlMean.toFixed(2),
                         // 保存并发详情（用于P50/P90/P95统计）
                         concurrentDetails: concurrencyResults.map(res => ({
                             prefillTimeMs: res.prefillTimeMs,
                             prefillSpeed: res.prefillSpeed,
                             outputTokens: res.outputTokens,
                             outputTimeMs: res.outputTimeMs,
-                            outputSpeed: res.outputSpeed
+                            outputSpeed: res.outputSpeed,
+                            ttftMs: res.ttftMs,
+                            itlMean: res.itlMean
                         })),
                         // 详情数据：保存第一个请求的prompt和output
                         promptText: firstPrompt,
@@ -2734,6 +2741,9 @@
                 console.log(`[速度统计] 时间来源: ${timeSource}`);
                 console.log(`[速度统计] Prefill: ${prefillSpeed.toFixed(2)} tok/s (${prefillTimeMs.toFixed(2)}ms), Decode: ${outputSpeed.toFixed(2)} tok/s (${outputTimeMs.toFixed(2)}ms, ${receivedTokens} tokens)`);
 
+                const ttftMs = firstTokenTime - startTime;
+                const itlMean = receivedTokens > 1 ? outputTimeMs / (receivedTokens - 1) : 0;
+
                 return {
                     prefillTimeMs,
                     prefillSpeed,
@@ -2749,7 +2759,9 @@
                     // 添加时间戳用于计算并发总吞吐
                     startTimestamp: startTime,
                     firstTokenTimestamp: firstTokenTime,
-                    endTimestamp: endTime
+                    endTimestamp: endTime,
+                    ttftMs,
+                    itlMean
                 };
             } catch (error) {
                 console.error(`[Error] executeAndMeasureRequest异常:`, error);
@@ -3035,6 +3047,9 @@
                     const avgOutputTokens = concurrencyResults.reduce((sum, res) => sum + res.outputTokens, 0) / concurrencyResults.length;
                     const avgOutputTimeMs = concurrencyResults.reduce((sum, res) => sum + res.outputTimeMs, 0) / concurrencyResults.length;
 
+                    const avgTtftMs = concurrencyResults.reduce((sum, res) => sum + res.ttftMs || 0, 0) / concurrencyResults.length;
+                    const avgItlMean = concurrencyResults.reduce((sum, res) => sum + res.itlMean || 0, 0) / concurrencyResults.length;
+
                     //  获取实际的prompt token数（Ollama API返回的准确值）
                     // 防御性编程：处理undefined的情况
                     const avgActualPromptTokens = concurrencyResults.reduce((sum, res) => {
@@ -3082,13 +3097,17 @@
                         outputSpeed: totalOutputSpeed.toFixed(2),
                         status: translations[currentLang].statusSuccess,
                         concurrency: concurrency,
+                        avgTtftMs: avgTtftMs.toFixed(2),
+                        avgItlMean: avgItlMean.toFixed(2),
                         // 保存并发详情（用于P50/P90/P95统计）
                         concurrentDetails: concurrencyResults.map(res => ({
                             prefillTimeMs: res.prefillTimeMs,
                             prefillSpeed: res.prefillSpeed,
                             outputTokens: res.outputTokens,
                             outputTimeMs: res.outputTimeMs,
-                            outputSpeed: res.outputSpeed
+                            outputSpeed: res.outputSpeed,
+                            ttftMs: res.ttftMs,
+                            itlMean: res.itlMean
                         })),
                         // 详情数据：保存第一个请求的prompt和output
                         promptText: firstPrompt,
@@ -3215,7 +3234,9 @@
                 tokenSource: 'API',  // Ollama总是返回准确的token统计
                 // 添加虚拟时间戳（Ollama不是流式，但需要兼容并发吞吐计算）
                 serverPrefillDurationMs: prefillDurationMs,  // 服务器返回的真实prefill时间
-                serverOutputDurationMs: outputDurationMs     // 服务器返回的真实output时间
+                serverOutputDurationMs: outputDurationMs,     // 服务器返回的真实output时间
+                ttftMs: prefillDurationMs,
+                itlMean: actualOutputTokens > 1 ? outputDurationMs / (actualOutputTokens - 1) : 0
             };
         }
 
@@ -5389,7 +5410,7 @@
                 const maxP = vp.reduce((m, r) => Math.max(m, parseFloat(r.prefillSpeed)), 0);
                 const maxD = vp.reduce((m, r) => Math.max(m, parseFloat(r.outputSpeed)), 0);
                 const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
-                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(maxP.toFixed(2)), avg_decode_speed: parseFloat(maxD.toFixed(2)), results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
+                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(maxP.toFixed(2)), avg_decode_speed: parseFloat(maxD.toFixed(2)), results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, avg_ttft_ms: parseFloat(r.avgTtftMs) || 0, avg_itl_mean: parseFloat(r.avgItlMean) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
                 try {
                     const r = await _sbInsert(payload);
                     if (!r.ok) { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message || 'HTTP ' + r.status); }
@@ -5435,12 +5456,13 @@
                         for (let r = dsi; r < lines.length; r++) {
                             if (!lines[r].trim()) continue;
                             const c = lines[r].split(',');
-                            let pl, ps, os, pt, ot;
-                            if (c.length >= 9) { pl = parseFloat(c[0]); pt = parseFloat(c[4]); ps = parseFloat(c[5]); ot = parseFloat(c[7]); os = parseFloat(c[8]); }
-                            else if (c.length >= 7) { pl = parseFloat(c[0]); pt = parseFloat(c[1]); ps = parseFloat(c[2]); ot = parseFloat(c[4]); os = parseFloat(c[5]); }
+                            let pl, ps, os, pt, ot, ttft, itl;
+                            if (c.length >= 10) { pl = parseFloat(c[0]); ttft = parseFloat(c[1]); itl = parseFloat(c[2]); pt = parseFloat(c[4]); ps = parseFloat(c[5]); ot = parseFloat(c[7]); os = parseFloat(c[8]); }
+                            else if (c.length >= 9) { pl = parseFloat(c[0]); pt = parseFloat(c[4]); ps = parseFloat(c[5]); ot = parseFloat(c[7]); os = parseFloat(c[8]); ttft = 0; itl = 0; }
+                            else if (c.length >= 7) { pl = parseFloat(c[0]); pt = parseFloat(c[1]); ps = parseFloat(c[2]); ot = parseFloat(c[4]); os = parseFloat(c[5]); ttft = 0; itl = 0; }
                             else continue;
                             if (isNaN(ps) || isNaN(os)) continue;
-                            pts.push({ prompt_length: pl, prefill_speed: ps, output_speed: os, prefill_time_ms: pt || 0, output_time_ms: ot || 0, concurrency: conc, successful: 1 });
+                            pts.push({ prompt_length: pl, prefill_speed: ps, output_speed: os, prefill_time_ms: pt || 0, output_time_ms: ot || 0, avg_ttft_ms: ttft || 0, avg_itl_mean: itl || 0, concurrency: conc, successful: 1 });
                         }
                         if (!pts.length) continue;
                         _batchPayloads.push({ model, notes, concurrency: conc, maxPrefill: parseFloat(pts.reduce((m, r) => Math.max(m, r.prefill_speed), 0).toFixed(2)), maxDecode: parseFloat(pts.reduce((m, r) => Math.max(m, r.output_speed), 0).toFixed(2)), points: pts });
