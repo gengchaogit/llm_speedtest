@@ -77,7 +77,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v2.2 Python后端版</title>
+    <title>本地大模型推理速度测试工具 v3 Python后端版</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1017,7 +1017,12 @@
     <div class="container">
         <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8
                 (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
-
+        <div
+            style="text-align: center; margin-bottom: 20px; font-size: 15px; background: #fffbf0; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; color: #d35400;">
+            ❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank"
+                style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub 仓库</a> 随手点个
+            ⭐️ Star 支持一下！非常感谢！🙏
+        </div>
         <div class="api-selector">
             <div class="api-option active" data-type="openai">OpenAI兼容接口</div>
             <div class="api-option" data-type="ollama">Ollama接口</div>
@@ -1540,7 +1545,7 @@
                 batchUploadUnknownModel: '未知历史模型'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v2.2 (chao mod)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3 (chao mod)',
                 langToggle: '中文',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',
