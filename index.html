@@ -1050,7 +1050,9 @@
                 </div>
                 <div class="form-group">
                     <label for="modelName">模型名称</label>
-                    <input type="text" id="modelName" value="">
+                    <input type="text" id="modelName" value="" list="modelSuggest" autocomplete="off"
+                        placeholder="输入模型名称，将自动联想...">
+                    <datalist id="modelSuggest"></datalist>
                 </div>
             </div>
             <div class="form-row">
@@ -1953,6 +1955,78 @@
         let currentModelName = '/model';
         let api_key = '';
         let notes = '';
+
+        // =====================================================================
+        // 模型名称自动联想 - OpenRouter API (异步缓存)
+        // =====================================================================
+        let _modelNameCache = null; // null=未加载, []=[已加载列表]
+        const MODEL_CACHE_KEY = 'llmModelNameCache';
+        const MODEL_CACHE_TTL = 6 * 60 * 60 * 1000; // 6小时
+
+        async function loadModelNamesFromOpenRouter() {
+            try {
+                // 尝试从 localStorage 读取缓存
+                const rawCache = localStorage.getItem(MODEL_CACHE_KEY);
+                if (rawCache) {
+                    const parsed = JSON.parse(rawCache);
+                    if (parsed && parsed.ts && (Date.now() - parsed.ts < MODEL_CACHE_TTL) && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                        _modelNameCache = parsed.data;
+                        console.log(`[ModelSuggest] 从本地缓存加载 ${_modelNameCache.length} 个模型名`);
+                        return;
+                    }
+                }
+
+                console.log('[ModelSuggest] 开始从 OpenRouter API 拉取模型列表...');
+                const resp = await fetch('https://openrouter.ai/api/v1/models', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const json = await resp.json();
+                const names = (json.data || []).map(m => m.id).filter(Boolean).sort();
+                _modelNameCache = names;
+                // 存入 localStorage
+                try {
+                    localStorage.setItem(MODEL_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: names }));
+                } catch (e) { /* 存储满了也没关系 */ }
+                console.log(`[ModelSuggest] 已缓存 ${names.length} 个模型名`);
+            } catch (err) {
+                console.warn('[ModelSuggest] 加载模型列表失败，联想功能暂不可用:', err.message);
+                _modelNameCache = []; // 标记为已尝试，不再重试
+            }
+        }
+
+        function refreshModelDatalist(query) {
+            if (!_modelNameCache || _modelNameCache.length === 0) return;
+            const dl = document.getElementById('modelSuggest');
+            if (!dl) return;
+            const q = (query || '').toLowerCase().trim();
+            if (!q) { dl.innerHTML = ''; return; }
+            const matches = _modelNameCache
+                .filter(name => name.toLowerCase().includes(q))
+                .slice(0, 30); // 最多显示30条
+            dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+        }
+
+        // 异步在后台加载，不阻塞页面
+        loadModelNamesFromOpenRouter().then(() => {
+            // 加载完成后，如果用户已经在输入框中有内容，立即触发一次联想
+            const modelInput = document.getElementById('modelName');
+            if (modelInput && modelInput.value.trim()) {
+                refreshModelDatalist(modelInput.value);
+            }
+        });
+
+        // 绑定事件（input + paste 均触发）
+        document.addEventListener('DOMContentLoaded', () => { }, false); // 确保DOM已加载
+        (function bindModelSuggest() {
+            const modelInput = document.getElementById('modelName');
+            if (!modelInput) return;
+            modelInput.addEventListener('input', (e) => refreshModelDatalist(e.target.value));
+            modelInput.addEventListener('paste', (e) => {
+                // paste 事件触发时 value 还没更新，setTimeout 让其生效后再触发
+                setTimeout(() => refreshModelDatalist(modelInput.value), 50);
+            });
+        })();
         let concurrencyStats = {
             minPrefillSpeed: Infinity,
             maxPrefillSpeed: 0,
@@ -3647,6 +3721,15 @@
             // 验证输入
             if (!apiUrl || !currentModelName || !minLength || !maxLength || !step || !outputLength || !timeout) {
                 alert("请填写所有必填的配置参数！");
+                return;
+            }
+
+            // 安全拦截：Mixed Content 检查
+            if (window.location.protocol === 'https:' && apiUrl.startsWith('http://')) {
+                const msg = currentLang === 'en'
+                    ? "Security Warning: Mixed Content Blocked!\n\nYou are trying to request an HTTP API from an HTTPS page. Browsers block this.\n\nSolutions:\n1. Use an HTTPS API URL.\n2. Download this HTML file and open it locally.\n3. Use the Python backend tool."
+                    : "安全警告：跨协议请求 (Mixed Content) 被浏览器拦截！\n\n原因：在 HTTPS 在线测试网页上无法直接发送请求到 HTTP 接口。\n\n解决办法：\n1. 使用含有 HTTPS 的接口地址。\n2. （推荐）将本在线网页右键保存或下载到本地，双击用浏览器打开运行（本地文件不存在跨协议安全限制）。";
+                alert(msg);
                 return;
             }
 
