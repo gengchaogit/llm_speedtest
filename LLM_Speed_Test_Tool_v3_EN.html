@@ -3812,15 +3812,6 @@
                 return;
             }
 
-            // 安全拦截：Mixed Content 检查
-            if (window.location.protocol === 'https:' && apiUrl.startsWith('http://')) {
-                const msg = currentLang === 'en'
-                    ? "Security Warning: Mixed Content Blocked!\n\nYou are trying to request an HTTP API from an HTTPS page. Browsers block this.\n\nSolutions:\n1. Use an HTTPS API URL.\n2. Download this HTML file and open it locally.\n3. Use the Python backend tool."
-                    : "安全警告：跨协议请求 (Mixed Content) 被浏览器拦截！\n\n原因：在 HTTPS 在线测试网页上无法直接发送请求到 HTTP 接口。\n\n解决办法：\n1. 使用含有 HTTPS 的接口地址。\n2. （推荐）将本在线网页右键保存或下载到本地，双击用浏览器打开运行（本地文件不存在跨协议安全限制）。";
-                alert(msg);
-                return;
-            }
-
             // 计算测试点列表（指数增长）
             const testLengths = [];
             let stepIndex = 0;
