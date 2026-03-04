@@ -1050,7 +1050,9 @@
                 </div>
                 <div class="form-group">
                     <label for="modelName">模型名称</label>
-                    <input type="text" id="modelName" value="">
+                    <input type="text" id="modelName" value="" list="modelSuggest" autocomplete="off"
+                        placeholder="输入模型名称，将自动联想...">
+                    <datalist id="modelSuggest"></datalist>
                 </div>
             </div>
             <div class="form-row">
@@ -1953,6 +1955,95 @@
         let currentModelName = '/model';
         let api_key = '';
         let notes = '';
+
+        // =====================================================================
+        // 模型名称自动联想 - OpenRouter API (异步缓存)
+        // =====================================================================
+        let _modelNameCache = null; // null=未加载, []=[已加载列表]
+        const MODEL_CACHE_KEY = 'llmModelNameCache';
+        const MODEL_CACHE_TTL = 6 * 60 * 60 * 1000; // 6小时
+
+        async function loadModelNamesFromOpenRouter() {
+            try {
+                // 尝试从 localStorage 读取缓存
+                const rawCache = localStorage.getItem(MODEL_CACHE_KEY);
+                if (rawCache) {
+                    const parsed = JSON.parse(rawCache);
+                    if (parsed && parsed.ts && (Date.now() - parsed.ts < MODEL_CACHE_TTL) && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                        _modelNameCache = parsed.data;
+                        console.log(`[ModelSuggest] 从本地缓存加载 ${_modelNameCache.length} 个模型名`);
+                        return;
+                    }
+                }
+
+                console.log('[ModelSuggest] 开始从 OpenRouter API 拉取模型列表...');
+                const resp = await fetch('https://openrouter.ai/api/v1/models', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const json = await resp.json();
+                const names = (json.data || []).map(m => m.id).filter(Boolean).sort();
+                _modelNameCache = names;
+                // 存入 localStorage
+                try {
+                    localStorage.setItem(MODEL_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: names }));
+                } catch (e) { /* 存储满了也没关系 */ }
+                console.log(`[ModelSuggest] 已缓存 ${names.length} 个模型名`);
+            } catch (err) {
+                console.warn('[ModelSuggest] 加载模型列表失败，联想功能暂不可用:', err.message);
+                _modelNameCache = []; // 标记为已尝试，不再重试
+            }
+        }
+
+        function refreshModelDatalist(query) {
+            if (!_modelNameCache || _modelNameCache.length === 0) return;
+            const dl = document.getElementById('modelSuggest');
+            if (!dl) return;
+            const q = (query || '').toLowerCase().trim();
+            if (!q) { dl.innerHTML = ''; return; }
+            const matches = _modelNameCache
+                .filter(name => name.toLowerCase().includes(q))
+                .slice(0, 30);
+            // 如果只有一个匹配且完全等于当前输入，说明用户已选中，清空避免重复弹出
+            if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
+            dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+        }
+
+        // 异步在后台加载，不阻塞页面
+        loadModelNamesFromOpenRouter().then(() => {
+            // 加载完成后，如果用户已经在输入框中有内容，立即触发一次联想
+            const modelInput = document.getElementById('modelName');
+            if (modelInput && modelInput.value.trim()) {
+                refreshModelDatalist(modelInput.value);
+            }
+        });
+
+        // 绑定事件（使用事件委托，避免弹窗DOM晚于script执行导致getElementById返回null）
+        function _modelSuggestHandler(e) {
+            const id = e.target && e.target.id;
+            if (!_modelNameCache || _modelNameCache.length === 0) return;
+            if (id === 'modelName') {
+                refreshModelDatalist(e.target.value);
+            } else if (id === 'shareModelName') {
+                const dl = document.getElementById('modelSuggestModal');
+                if (!dl) return;
+                const q = (e.target.value || '').toLowerCase().trim();
+                if (!q) { dl.innerHTML = ''; return; }
+                const matches = _modelNameCache.filter(name => name.toLowerCase().includes(q)).slice(0, 30);
+                // 如果只有一个匹配且完全等于当前输入，清空避免重复弹出
+                if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
+                dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+            }
+        }
+        // input 事件（打字）
+        document.addEventListener('input', _modelSuggestHandler, true);
+        // paste 事件：value 在事件时机还没更新，延迟一帧再手动触发 input
+        document.addEventListener('paste', (e) => {
+            const id = e.target && e.target.id;
+            if (id === 'modelName' || id === 'shareModelName') {
+                setTimeout(() => e.target.dispatchEvent(new Event('input', { bubbles: true })), 50);
+            }
+        }, true);
         let concurrencyStats = {
             minPrefillSpeed: Infinity,
             maxPrefillSpeed: 0,
@@ -3650,6 +3741,15 @@
                 return;
             }
 
+            // 安全拦截：Mixed Content 检查
+            if (window.location.protocol === 'https:' && apiUrl.startsWith('http://')) {
+                const msg = currentLang === 'en'
+                    ? "Security Warning: Mixed Content Blocked!\n\nYou are trying to request an HTTP API from an HTTPS page. Browsers block this.\n\nSolutions:\n1. Use an HTTPS API URL.\n2. Download this HTML file and open it locally.\n3. Use the Python backend tool."
+                    : "安全警告：跨协议请求 (Mixed Content) 被浏览器拦截！\n\n原因：在 HTTPS 在线测试网页上无法直接发送请求到 HTTP 接口。\n\n解决办法：\n1. 使用含有 HTTPS 的接口地址。\n2. （推荐）将本在线网页右键保存或下载到本地，双击用浏览器打开运行（本地文件不存在跨协议安全限制）。";
+                alert(msg);
+                return;
+            }
+
             // 计算测试点列表（指数增长）
             const testLengths = [];
             let stepIndex = 0;
@@ -5185,8 +5285,9 @@
             <h3 style="margin:0 0 16px;color:#61afef;">☁️ 分享测试结果</h3>
             <div style="margin-bottom:12px;"><label
                     style="display:block;margin-bottom:4px;font-size:13px;">模型名称</label><input id="shareModelName"
-                    type="text" maxlength="100" placeholder="自动获取或手动修改"
+                    type="text" maxlength="100" placeholder="自动获取或手动修改" list="modelSuggestModal" autocomplete="off"
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                <datalist id="modelSuggestModal"></datalist>
             </div>
             <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">硬件 <span
                         style="color:#e06c75;">*</span><span style="color:#888;font-size:11px;">（如 RTX 4090、M4
@@ -5196,11 +5297,103 @@
             <div style="display:flex;gap:12px;margin-bottom:12px;">
                 <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">推理框架</label><input
                         id="shareFramework" type="text" maxlength="50" placeholder="llama.cpp / vllm"
+                        list="frameworkSuggest" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                    <datalist id="frameworkSuggest">
+                        <!-- 本地推理框架 -->
+                        <option value="llama.cpp">
+                        <option value="llama-server">
+                        <option value="Ollama">
+                        <option value="LM Studio">
+                        <option value="Jan">
+                        <option value="vLLM">
+                        <option value="SGLang">
+                        <option value="TGI (Text Generation Inference)">
+                        <option value="KTransformers">
+                        <option value="ExLlamaV2">
+                        <option value="MLC-LLM">
+                        <option value="ftllm">
+                        <option value="Xinference">
+                        <option value="LocalAI">
+                        <option value="GPT4All">
+                            <!-- 云API -->
+                        <option value="API (OpenAI)">
+                        <option value="API (Gemini)">
+                        <option value="API (Claude / Anthropic)">
+                        <option value="API (DeepSeek)">
+                        <option value="API (Qwen / 阿里云)">
+                        <option value="API (Doubao / 字节跳动)">
+                        <option value="API (Kimi / 月之暗面)">
+                        <option value="API (智谱 GLM)">
+                        <option value="API (百度文心)">
+                        <option value="API (Grok / xAI)">
+                        <option value="API (Mistral)">
+                        <option value="API (Cohere)">
+                        <option value="API (Groq)">
+                        <option value="API (Together AI)">
+                        <option value="API (Fireworks AI)">
+                        <option value="API (OpenRouter)">
+                        <option value="API (其他云服务)">
+                    </datalist>
                 </div>
                 <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">量化方式</label><input
                         id="shareQuantization" type="text" maxlength="20" placeholder="Q4_K_M / FP16"
+                        list="quantizationSuggest" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
+                    <datalist id="quantizationSuggest">
+                        <!-- 浮点及新型格式 -->
+                        <option value="FP32">
+                        <option value="BF16">
+                        <option value="FP16">
+                        <option value="FP8">
+                        <option value="INT8">
+                        <option value="INT4">
+                        <option value="NV-FP4">
+                        <option value="FP6">
+                            <!-- GGUF (llama.cpp) -->
+                        <option value="Q8_0">
+                        <option value="Q6_K">
+                        <option value="Q5_K_M">
+                        <option value="Q5_K_S">
+                        <option value="Q4_K_M">
+                        <option value="Q4_K_S">
+                        <option value="Q4_0">
+                        <option value="Q3_K_L">
+                        <option value="Q3_K_M">
+                        <option value="Q3_K_S">
+                        <option value="Q2_K">
+                        <option value="IQ4_XS">
+                        <option value="IQ4_NL">
+                        <option value="IQ3_M">
+                        <option value="IQ3_XS">
+                        <option value="IQ2_M">
+                        <option value="IQ2_XS">
+                        <option value="IQ1_M">
+                        <option value="IQ1_S">
+                            <!-- GPTQ -->
+                        <option value="GPTQ-2bit">
+                        <option value="GPTQ-3bit">
+                        <option value="GPTQ-4bit">
+                        <option value="GPTQ-8bit">
+                            <!-- AWQ (AutoAWQ) -->
+                        <option value="AWQ-2bit">
+                        <option value="AWQ-3bit">
+                        <option value="AWQ-4bit">
+                        <option value="AWQ-4bit-g32">
+                        <option value="AWQ-4bit-g64">
+                        <option value="AWQ-4bit-g128">
+                        <option value="AWQ-8bit">
+                            <!-- EXL2 (ExLlamaV2) -->
+                        <option value="EXL2-2.0bpw">
+                        <option value="EXL2-2.4bpw">
+                        <option value="EXL2-3.0bpw">
+                        <option value="EXL2-3.5bpw">
+                        <option value="EXL2-4.0bpw">
+                        <option value="EXL2-4.25bpw">
+                        <option value="EXL2-5.0bpw">
+                        <option value="EXL2-6.0bpw">
+                        <option value="EXL2-8.0bpw">
+                    </datalist>
                 </div>
             </div>
             <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">显示名称<span
@@ -5380,8 +5573,14 @@
                 if (fw) fw.value = localStorage.getItem('llm_speedtest_share_fw') || '';
                 if (qt) qt.value = localStorage.getItem('llm_speedtest_share_qt') || '';
                 const mn = document.getElementById('shareModelName'), sn = document.getElementById('shareNotes');
-                if (_batchMode) { if (mn) mn.value = ''; if (sn) sn.value = ''; }
-                else { if (mn) mn.value = localStorage.getItem('llm_speedtest_share_model') || document.getElementById('modelName')?.value?.trim() || ''; if (sn) sn.value = document.getElementById('notes')?.value?.trim() || ''; }
+                if (_batchMode) {
+                    // 批量CSV模式：从第一个解析好的记录里预填充模型名，方便用户确认/修改，且让联想立即可用
+                    if (mn) { mn.value = (_batchPayloads[0] && _batchPayloads[0].model) ? _batchPayloads[0].model : ''; mn.dispatchEvent(new Event('input')); }
+                    if (sn) sn.value = '';
+                } else {
+                    if (mn) mn.value = localStorage.getItem('llm_speedtest_share_model') || document.getElementById('modelName')?.value?.trim() || '';
+                    if (sn) sn.value = document.getElementById('notes')?.value?.trim() || '';
+                }
                 document.getElementById('shareModal').style.display = 'flex';
             };
             window.closeShareModal = function () { document.getElementById('shareModal').style.display = 'none'; _batchMode = false; _batchPayloads = []; };
