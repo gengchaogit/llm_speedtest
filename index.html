@@ -2068,8 +2068,8 @@
             const apiUrl = apiUrlInput ? apiUrlInput.value.trim() : '';
 
             let customModels = null;
-            // 批量上传时的 shareModelName 不需要依赖主页的 apiUrl，但加上也无妨，因为弹窗也可以单用
-            if (apiUrl) {
+            // 批量上传和普通上传的模型列表，默认加载openroute那个全部的列表，以防止本地部署模型名字不准
+            if (id === 'modelName' && apiUrl) {
                 let endpoint = '';
                 if (apiUrl.endsWith('/v1/chat/completions')) endpoint = apiUrl.replace('/v1/chat/completions', '/v1/models');
                 else if (apiUrl.endsWith('/api/chat')) endpoint = apiUrl.replace('/api/chat', '/api/tags');
