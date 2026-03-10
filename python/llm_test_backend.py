@@ -91,7 +91,12 @@ async def serve_frontend():
 
 @app.get("/LLM_Speed_Test_v3_Leaderboard.html")
 async def get_leaderboard_page():
-    html_path = os.path.join(os.path.dirname(__file__), "LLM_Speed_Test_v3_Leaderboard.html")
+    base_dir = os.path.dirname(__file__)
+    # Prefer the repository-root leaderboard so Python/backend and pure-web share one source.
+    root_html_path = os.path.abspath(os.path.join(base_dir, "..", "LLM_Speed_Test_v3_Leaderboard.html"))
+    local_html_path = os.path.join(base_dir, "LLM_Speed_Test_v3_Leaderboard.html")
+
+    html_path = root_html_path if os.path.exists(root_html_path) else local_html_path
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return {"message": "Leaderboard HTML not found"}

@@ -6669,6 +6669,20 @@ async function processOllamaResponse(response, promptLength) {
 
         let isBatchUploadMode = false;
         let pendingBatchPayloads = [];
+        const PUBLIC_LEADERBOARD_URL = 'https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html';
+
+        function buildShareReportUrl(shareId) {
+            if (!shareId) return '';
+            const url = new URL(PUBLIC_LEADERBOARD_URL);
+            url.searchParams.set('id', shareId);
+            return url.toString();
+        }
+
+        function buildShareLinkBlock(shareUrl, label) {
+            if (!shareUrl) return '';
+            const shareUrlLiteral = JSON.stringify(shareUrl);
+            return `<br>${label}：<a href="${shareUrl}" target="_blank" rel="noopener" style="color:#61afef;word-break:break-all;">${shareUrl}</a> <button onclick='navigator.clipboard.writeText(${shareUrlLiteral})' style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">复制链接</button>`;
+        }
 
         function showShareButton() {
             const btn = document.getElementById('shareResults');
@@ -6811,13 +6825,16 @@ async function processOllamaResponse(response, promptLength) {
                 }
                 const data = await resp.json();
                 const shareId = data.share_id || data.id;
+                const shareUrl = data.share_url || buildShareReportUrl(shareId);
+                const shareIdLiteral = JSON.stringify(String(shareId || ''));
                 msgDiv.style.cssText = 'display:block; background:#0d2b1e; color:#98c379; padding:10px; border-radius:6px; font-size:13px;';
                 msgDiv.innerHTML = `✅ 上传成功！<br>
-            分享ID：<strong style="font-family:monospace; color:#61afef; user-select:all;">${shareId}</strong>
-            <button onclick="navigator.clipboard.writeText('${shareId}')" style="
+            分享ID：<strong style="font-family:monospace; color:#61afef; user-select:all;">${shareId || '-'}</strong>
+            <button onclick='navigator.clipboard.writeText(${shareIdLiteral})' style="
                 margin-left:8px; background:#16a085; border:none; color:#fff;
-                padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px;">复制</button><br>
-            <span style="color:#888; font-size:11px;">将此ID分享给他人，即可查看你的完整测试图表</span>`;
+                padding:2px 8px; border-radius:4px; cursor:pointer; font-size:11px;">复制ID</button>
+            ${buildShareLinkBlock(shareUrl, '报告链接')}<br>
+            <span style="color:#888; font-size:11px;">将此链接分享给他人，即可直达你的完整测试图表</span>`;
             } catch (e) {
                 msgDiv.style.cssText = 'display:block; background:#3a1515; color:#e06c75; padding:10px; border-radius:6px; font-size:13px;';
                 msgDiv.textContent = `❌ 上传失败：${e.message}`;
@@ -6837,6 +6854,7 @@ async function processOllamaResponse(response, promptLength) {
             let successCount = 0;
             let failCount = 0;
             let lastError = '';
+            let firstShareUrl = '';
 
             for (let i = 0; i < pendingBatchPayloads.length; i++) {
                 const batchData = pendingBatchPayloads[i];
@@ -6864,6 +6882,11 @@ async function processOllamaResponse(response, promptLength) {
 
                     if (resp.ok) {
                         successCount++;
+                        const data = await resp.json().catch(() => null);
+                        const shareId = data?.share_id || data?.id;
+                        if (!firstShareUrl && shareId) {
+                            firstShareUrl = data?.share_url || buildShareReportUrl(shareId);
+                        }
                     } else if (resp.status === 429) {
                         alert(t.batchUploadDailyLimit);
                         failCount += (pendingBatchPayloads.length - i);
@@ -6881,14 +6904,15 @@ async function processOllamaResponse(response, promptLength) {
 
             uploadBtn.disabled = false;
             uploadBtn.textContent = t.cloudUploadBtn;
+            const batchLinkBlock = buildShareLinkBlock(firstShareUrl, successCount > 1 ? '示例报告链接（第一条）' : '报告链接');
 
             msgDiv.style.display = 'block';
             if (failCount === 0) {
                 msgDiv.style.cssText = 'display:block; background:#0d2b1e; color:#98c379; padding:10px; border-radius:6px; font-size:13px;';
-                msgDiv.innerHTML = t.batchUploadSuccess.replace('{count}', successCount);
+                msgDiv.innerHTML = t.batchUploadSuccess.replace('{count}', successCount) + batchLinkBlock;
             } else {
                 msgDiv.style.cssText = 'display:block; background:#3a1515; color:#e06c75; padding:10px; border-radius:6px; font-size:13px;';
-                msgDiv.innerHTML = t.batchUploadResult.replace('{success}', successCount).replace('{fail}', failCount).replace('{error}', lastError);
+                msgDiv.innerHTML = t.batchUploadResult.replace('{success}', successCount).replace('{fail}', failCount).replace('{error}', lastError) + (successCount > 0 ? batchLinkBlock : '');
             }
 
             pendingBatchPayloads = []; // clear

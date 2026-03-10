@@ -329,6 +329,7 @@
         const SUPABASE_URL = 'https://cvezaerrczywfzqcaqmx.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2ZXphZXJyY3p5d2Z6cWNhcW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc0OTAsImV4cCI6MjA4ODA1MzQ5MH0.-9l2Wcj38m6xh9sz9qMdhdNbnAZ_XoFBSHPhEud9DmQ';
         const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+        const BACKEND_BASE = '';
         const USER_CODE_KEY = 'llm_speedtest_user_code';
 
         let currentMode = 'global';
@@ -352,6 +353,101 @@
         function getShareIdFromUrl() {
             const params = new URLSearchParams(window.location.search || '');
             return (params.get('id') || params.get('share_id') || params.get('shareId') || '').trim();
+        }
+
+        function getForcedDataSource() {
+            const source = (new URLSearchParams(window.location.search || '').get('source') || '').trim().toLowerCase();
+            return (source === 'backend' || source === 'supabase') ? source : null;
+        }
+
+        function getDefaultDataSource() {
+            const host = (window.location.hostname || '').toLowerCase();
+            if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return 'backend';
+            return 'supabase';
+        }
+
+        function buildBackendResultsUrl(mode, offset, personalUserCode) {
+            let url = `${BACKEND_BASE}/api/results?sort_by=created_at&limit=${PAGE_SIZE}&offset=${offset}`;
+            if (mode === 'personal' && personalUserCode) {
+                url += `&user_code=${personalUserCode}`;
+            } else if (mode === 'user' && currentTargetUserCode) {
+                url += `&user_code=${currentTargetUserCode}`;
+            } else if (mode === 'model' && currentTargetModelName) {
+                url += `&model_name=${encodeURIComponent(currentTargetModelName)}`;
+            } else if (mode === 'search_id' && currentTargetSearch) {
+                url += `&search=${encodeURIComponent(currentTargetSearch)}`;
+            }
+            return url;
+        }
+
+        function buildSupabaseResultsUrl(mode, offset, personalUserCode) {
+            const sbBase = SUPABASE_URL + '/rest/v1/speed_results';
+            const select = 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,results_json,created_at';
+            const order = 'order=created_at.desc';
+            const range = `limit=${PAGE_SIZE}&offset=${offset}`;
+            let filters = '';
+
+            if (mode === 'personal' && personalUserCode) {
+                filters = `&user_code=eq.${personalUserCode}`;
+            } else if (mode === 'user' && currentTargetUserCode) {
+                filters = `&user_code=eq.${currentTargetUserCode}`;
+            } else if (mode === 'model' && currentTargetModelName) {
+                filters = `&model_name=eq.${encodeURIComponent(currentTargetModelName)}`;
+            } else if (mode === 'search_id' && currentTargetSearch) {
+                const q = currentTargetSearch.trim();
+                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+                if (isUUID) {
+                    filters = '&id=eq.' + q;
+                } else {
+                    const eq = encodeURIComponent(q);
+                    const like = encodeURIComponent('%' + q + '%');
+                    filters = '&or=(user_code.eq.' + eq + ',nickname.ilike.' + like + ',model_name.ilike.' + like + ')';
+                }
+            }
+
+            return `${sbBase}?${select}&${order}&${range}${filters}`;
+        }
+
+        async function fetchRowsBySource(source, mode, offset, signal, personalUserCode) {
+            if (source === 'backend') {
+                const url = buildBackendResultsUrl(mode, offset, personalUserCode);
+                const response = await fetch(url, { signal });
+                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                return await response.json();
+            }
+
+            const url = buildSupabaseResultsUrl(mode, offset, personalUserCode);
+            const response = await fetch(url, { signal, headers: SB_HEADERS });
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            return await response.json();
+        }
+
+        async function fetchLeaderboardRows(mode, offset, signal, personalUserCode) {
+            const forced = getForcedDataSource();
+            if (forced) {
+                return await fetchRowsBySource(forced, mode, offset, signal, personalUserCode);
+            }
+
+            const preferred = getDefaultDataSource();
+            const fallback = preferred === 'backend' ? 'supabase' : 'backend';
+            try {
+                return await fetchRowsBySource(preferred, mode, offset, signal, personalUserCode);
+            } catch (e) {
+                if (e.name === 'AbortError') throw e;
+                console.warn(`Data source ${preferred} failed, fallback to ${fallback}:`, e);
+                return await fetchRowsBySource(fallback, mode, offset, signal, personalUserCode);
+            }
+        }
+
+        function normalizeLeaderboardRows(data) {
+            return (Array.isArray(data) ? data : []).map(row => {
+                let details = row.results_json ?? row.results ?? [];
+                if (typeof details === 'string') {
+                    try { details = JSON.parse(details); } catch { details = []; }
+                }
+                if (!Array.isArray(details)) details = [];
+                return { ...row, results_json: details };
+            });
         }
 
         window.onload = () => {
@@ -422,49 +518,17 @@
 
             try {
                 const offset = (currentPage - 1) * PAGE_SIZE;
-                // Build Supabase REST API query
-                const sbBase = SUPABASE_URL + '/rest/v1/speed_results';
-                const select = 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,results_json,created_at';
-                const order = 'order=created_at.desc';
-                const range = `limit=${PAGE_SIZE}&offset=${offset}`;
-                let filters = '';
-
+                let personalUserCode = null;
                 if (mode === 'personal') {
-                    const uc = localStorage.getItem(USER_CODE_KEY);
-                    if (!uc) {
+                    personalUserCode = localStorage.getItem(USER_CODE_KEY);
+                    if (!personalUserCode) {
                         loading.textContent = '暂无本地用户识别码，无法查询个人记录。请先运行测试。';
                         return;
                     }
-                    filters = `&user_code=eq.${uc}`;
-                } else if (mode === 'user' && currentTargetUserCode) {
-                    filters = `&user_code=eq.${currentTargetUserCode}`;
-                } else if (mode === 'model' && currentTargetModelName) {
-                    filters = `&model_name=eq.${encodeURIComponent(currentTargetModelName)}`;
-                } else if (mode === 'search_id' && currentTargetSearch) {
-                    const q = currentTargetSearch.trim();
-                    // UUID regex: 8-4-4-4-12 hex chars
-                    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
-                    if (isUUID) {
-                        // Exact match by record ID
-                        filters = '&id=eq.' + q;
-                    } else {
-                        // 8-char user_code exact match OR nickname/model_name substring
-                        const eq = encodeURIComponent(q);
-                        const like = encodeURIComponent('%' + q + '%');
-                        filters = '&or=(user_code.eq.' + eq + ',nickname.ilike.' + like + ',model_name.ilike.' + like + ')';
-                    }
                 }
 
-                const url = `${sbBase}?${select}&${order}&${range}${filters}`;
-                const response = await fetch(url, { signal, headers: SB_HEADERS });
-                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-
-                let data = await response.json();
-                // Supabase returns results_json as already parsed JSON (if stored as jsonb)
-                data = data.map(row => ({
-                    ...row,
-                    results_json: typeof row.results_json === 'string' ? JSON.parse(row.results_json) : (row.results_json || [])
-                }));
+                let data = await fetchLeaderboardRows(mode, offset, signal, personalUserCode);
+                data = normalizeLeaderboardRows(data);
 
                 if (!data || data.length === 0) {
                     loading.textContent = '暂无数据 📭';
@@ -607,8 +671,28 @@
             document.getElementById('chartModal').style.display = 'block';
 
             const rawResults = row.results_json || [];
-            // Sort by prompt_length
-            const sortedData = [...rawResults].sort((a, b) => a.prompt_length - b.prompt_length);
+            // Normalize per-point schema so both snake_case and camelCase records render correctly.
+            const sortedData = (Array.isArray(rawResults) ? rawResults : []).map(item => {
+                const promptLength = Number(item?.prompt_length ?? item?.promptLength ?? item?.prompt_tokens);
+                const prefillSpeed = Number(item?.prefill_speed ?? item?.prefillSpeed);
+                const outputSpeed = Number(item?.output_speed ?? item?.outputSpeed ?? item?.decode_speed ?? item?.decodeSpeed);
+                const avgTtftMs = Number(item?.avg_ttft_ms ?? item?.avgTtftMs);
+                const avgItlMean = Number(item?.avg_itl_mean ?? item?.avgItlMean);
+                const successRaw = item?.successful;
+                const successful = successRaw !== undefined && successRaw !== null
+                    ? Number(successRaw)
+                    : ((Number.isFinite(prefillSpeed) || Number.isFinite(outputSpeed)) ? 1 : 0);
+
+                return {
+                    ...item,
+                    prompt_length: Number.isFinite(promptLength) ? promptLength : null,
+                    prefill_speed: Number.isFinite(prefillSpeed) ? prefillSpeed : null,
+                    output_speed: Number.isFinite(outputSpeed) ? outputSpeed : null,
+                    avg_ttft_ms: Number.isFinite(avgTtftMs) ? avgTtftMs : null,
+                    avg_itl_mean: Number.isFinite(avgItlMean) ? avgItlMean : null,
+                    successful: successful ? 1 : 0
+                };
+            }).sort((a, b) => (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER));
 
             // ================== Build Detail Data Table ==================
             const dataContainer = document.getElementById('modalDataContainer');
@@ -641,7 +725,7 @@
 
                 tableHtml += `
                     <tr style="border-bottom:1px solid var(--border-color);">
-                        <td style="padding:10px;">${r.prompt_length}</td>
+                        <td style="padding:10px;">${r.prompt_length ?? 'N/A'}</td>
                         <td style="padding:10px;">${ttft}</td>
                         <td style="padding:10px;">${itl}</td>
                         <td style="padding:10px;">${pSpeed}</td>
@@ -718,7 +802,7 @@
             dataContainer.innerHTML = tableHtml;
             // ==============================================================
 
-            const labels = sortedData.map(d => d.prompt_length.toString());
+            const labels = sortedData.map(d => (d.prompt_length ?? 'N/A').toString());
 
             // Extract datasets robustly
             const mapToNullIfNaN = (val) => (val === null || val === undefined || isNaN(val)) ? null : val;
