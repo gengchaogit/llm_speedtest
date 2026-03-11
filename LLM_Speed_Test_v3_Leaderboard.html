@@ -50,9 +50,42 @@
         /* Tabs */
         .tabs {
             display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
             justify-content: center;
             margin-bottom: 20px;
             gap: 15px;
+        }
+
+        .tabs-side {
+            margin-left: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .tabs-utility {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .tabs-search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tabs-community {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-main);
         }
 
         .tab-btn {
@@ -249,6 +282,66 @@
             font-size: 16px;
         }
 
+        .entry-link-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 0 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.14);
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .entry-link-btn:hover {
+            border-color: var(--accent-blue);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .entry-link-btn.primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #11161d;
+        }
+
+        .community-title {
+            color: var(--accent-yellow);
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(229, 192, 123, 0.12);
+            white-space: nowrap;
+        }
+
+        .community-meta {
+            color: var(--text-main);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .community-copy-btn {
+            background: transparent;
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            border-radius: 999px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .community-copy-btn:hover {
+            opacity: 0.9;
+        }
+
         .model-tags-panel {
             margin-bottom: 18px;
             padding: 14px;
@@ -424,6 +517,29 @@
         }
 
         @media (max-width: 700px) {
+            .tabs {
+                align-items: stretch;
+            }
+
+            .tabs-side {
+                width: 100%;
+                margin-left: 0;
+                align-items: stretch;
+            }
+
+            .tabs-utility,
+            .tabs-search {
+                justify-content: flex-start;
+            }
+
+            .tabs-search {
+                flex-wrap: wrap;
+            }
+
+            .tabs-search input {
+                width: 100% !important;
+            }
+
             .model-tags-header {
                 flex-direction: column;
                 align-items: flex-start;
@@ -465,11 +581,23 @@
             <button id="tabSearchId" class="tab-btn" style="display:none;" onclick="loadLeaderboard('search_id')">🔍
                 搜索结果</button>
 
-            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-                <input type="text" id="searchInput" placeholder="搜索 识别码/用户/模型/ID"
-                    style="padding:4px 8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-panel); color:var(--text-main); font-size:13px; width:220px;"
-                    onkeydown="if(event.key==='Enter') searchUnified()">
-                <button class="tab-btn" onclick="searchUnified()" style="margin:0; padding:4px 10px;">🔍 搜索</button>
+            <div class="tabs-side">
+                <div class="tabs-utility">
+                    <a class="entry-link-btn primary" href="https://gengchaogit.github.io/llm_speedtest/" target="_blank" rel="noopener noreferrer">去测速</a>
+                    <a class="entry-link-btn" href="https://github.com/gengchaogit/llm_speedtest" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <span class="tabs-community">
+                        <span class="community-title">QQ群</span>
+                        <span class="community-meta">本地部署deepseek-r1:671b纯GPU方案 · 1028429001</span>
+                    </span>
+                    <button type="button" class="community-copy-btn" onclick="copyCommunityGroup(this)">复制群号</button>
+                    <a class="entry-link-btn" href="https://qm.qq.com/q/cgkaE89wDm" target="_blank" rel="noopener noreferrer">加入群聊</a>
+                </div>
+                <div class="tabs-search">
+                    <input type="text" id="searchInput" placeholder="搜索 识别码/用户/模型/ID"
+                        style="padding:4px 8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-panel); color:var(--text-main); font-size:13px; width:220px;"
+                        onkeydown="if(event.key==='Enter') searchUnified()">
+                    <button class="tab-btn" onclick="searchUnified()" style="margin:0; padding:4px 10px;">🔍 搜索</button>
+                </div>
             </div>
         </div>
 
@@ -845,6 +973,20 @@
                 }
             } catch {
                 window.prompt('复制分享链接：', shareUrl);
+            }
+        }
+
+        async function copyCommunityGroup(btn) {
+            const groupNumber = '1028429001';
+            try {
+                await navigator.clipboard.writeText(groupNumber);
+                if (btn) {
+                    const prev = btn.textContent;
+                    btn.textContent = '已复制';
+                    setTimeout(() => btn.textContent = prev, 1200);
+                }
+            } catch {
+                window.prompt('复制QQ群号：', groupNumber);
             }
         }
 
@@ -1351,6 +1493,12 @@
 </body>
 
 </html>
+
+
+
+
+
+
 
 
 
