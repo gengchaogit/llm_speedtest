@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -248,6 +248,196 @@
             color: var(--accent-yellow);
             font-size: 16px;
         }
+
+        .model-tags-panel {
+            margin-bottom: 18px;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(97, 175, 239, 0.14), rgba(33, 37, 43, 0.92));
+        }
+
+        .model-tags-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .model-tags-title {
+            color: var(--accent-blue);
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .model-tags-subtitle {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .model-tag-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .model-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .model-tag:hover {
+            border-color: var(--accent-blue);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .model-tag.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #11161d;
+            font-weight: bold;
+        }
+
+        .model-tag-count {
+            min-width: 20px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            color: inherit;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .leaderboard-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 14px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.16);
+        }
+
+        .tool-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 120px;
+        }
+
+        .tool-group label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .tool-group input,
+        .tool-group select {
+            background: var(--bg-panel);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .rank-cell {
+            font-weight: bold;
+            min-width: 84px;
+        }
+
+        tr.top-rank-1 {
+            background: rgba(229, 192, 123, 0.16);
+        }
+
+        tr.top-rank-2 {
+            background: rgba(171, 178, 191, 0.12);
+        }
+
+        tr.top-rank-3 {
+            background: rgba(198, 120, 221, 0.12);
+        }
+
+        .btn-copy-link {
+            background: transparent;
+            color: var(--accent-blue);
+            border: 1px solid var(--accent-blue);
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 6px;
+        }
+
+        .btn-copy-link:hover {
+            opacity: 0.9;
+        }
+
+        .sortable-header {
+            padding: 0;
+        }
+
+        .sort-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 12px 15px;
+            background: transparent;
+            color: inherit;
+            border: none;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .sort-toggle:hover {
+            color: var(--accent-blue);
+        }
+
+        .sort-label {
+            line-height: 1.35;
+        }
+
+        .sort-indicator {
+            min-width: 18px;
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .sort-indicator.active {
+            color: var(--accent-yellow);
+        }
+
+        @media (max-width: 700px) {
+            .model-tags-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .leaderboard-tools {
+                align-items: stretch;
+            }
+
+            .tool-group {
+                min-width: unset;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
@@ -256,6 +446,14 @@
     <div class="container">
         <h1>LLM Speed Test 🏆 排行榜</h1>
         <div class="header-sub">对比不同硬件和框架下的模型推理性能</div>
+
+        <div id="modelTagsPanel" class="model-tags-panel" style="display:none;">
+            <div class="model-tags-header">
+                <div class="model-tags-title">快速切换模型</div>
+                <div class="model-tags-subtitle">只显示记录数大于 3 条的模型，点击词条即可切换排行榜</div>
+            </div>
+            <div id="modelTagBar" class="model-tag-bar"></div>
+        </div>
 
         <div class="tabs">
             <button id="tabGlobal" class="tab-btn active" onclick="loadLeaderboard('global')">🌎 全网总榜</button>
@@ -275,20 +473,61 @@
             </div>
         </div>
 
+        <div class="leaderboard-tools">
+            <div class="tool-group">
+                <label for="pageSizeSelect">每页条数</label>
+                <select id="pageSizeSelect">
+                    <option value="50">50</option>
+                    <option value="100" selected>100</option>
+                    <option value="200">200</option>
+                </select>
+            </div>
+            <div class="tool-group">
+                <label for="minDecodeInput">Decode 最小值</label>
+                <input type="number" id="minDecodeInput" min="0" step="1" placeholder="例如 100">
+            </div>
+            <div class="tool-group">
+                <label for="minPrefillInput">Prefill 最小值</label>
+                <input type="number" id="minPrefillInput" min="0" step="1" placeholder="例如 1000">
+            </div>
+            <div class="tool-group" style="min-width:220px;">
+                <label for="hardwareFilterInput">硬件关键词</label>
+                <input type="text" id="hardwareFilterInput" placeholder="例如 4090 / H100">
+            </div>
+            <button class="tab-btn" onclick="applyLeaderboardFilters()" style="padding:6px 12px;">应用筛选</button>
+            <button class="tab-btn" onclick="resetLeaderboardFilters()" style="padding:6px 12px;">重置</button>
+        </div>
+
         <div class="table-container">
             <div id="loadingIndicator" class="loading">加载中... ⏳</div>
             <table id="resultsTable" style="display:none;">
                 <thead>
                     <tr>
-                        <th>时间</th>
+                        <th>排名</th>
+                        <th id="sortHeader-created_at" class="sortable-header" aria-sort="descending">
+                            <button type="button" class="sort-toggle" onclick="toggleSort('created_at')">
+                                <span class="sort-label">时间</span>
+                                <span id="sortIndicator-created_at" class="sort-indicator active">↓</span>
+                            </button>
+                        </th>
                         <th>分享 ID</th>
                         <th>用户</th>
                         <th>模型</th>
                         <th>硬件 / 框架 / 量化</th>
                         <th>备注</th>
                         <th>并发</th>
-                        <th>Prefill 速度<br>(tokens/s)</th>
-                        <th>Decode 速度<br>(tokens/s)</th>
+                        <th id="sortHeader-avg_prefill_speed" class="sortable-header" aria-sort="none">
+                            <button type="button" class="sort-toggle" onclick="toggleSort('avg_prefill_speed')">
+                                <span class="sort-label">Prefill 速度<br>(tokens/s)</span>
+                                <span id="sortIndicator-avg_prefill_speed" class="sort-indicator">↕</span>
+                            </button>
+                        </th>
+                        <th id="sortHeader-avg_decode_speed" class="sortable-header" aria-sort="none">
+                            <button type="button" class="sort-toggle" onclick="toggleSort('avg_decode_speed')">
+                                <span class="sort-label">Decode 速度<br>(tokens/s)</span>
+                                <span id="sortIndicator-avg_decode_speed" class="sort-indicator">↕</span>
+                            </button>
+                        </th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -329,8 +568,12 @@
         const SUPABASE_URL = 'https://cvezaerrczywfzqcaqmx.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2ZXphZXJyY3p5d2Z6cWNhcW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc0OTAsImV4cCI6MjA4ODA1MzQ5MH0.-9l2Wcj38m6xh9sz9qMdhdNbnAZ_XoFBSHPhEud9DmQ';
         const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
-        const BACKEND_BASE = '';
         const USER_CODE_KEY = 'llm_speedtest_user_code';
+
+        const SORTABLE_FIELDS = ['created_at', 'avg_prefill_speed', 'avg_decode_speed'];
+        const MODEL_TAG_MIN_COUNT = 4;
+        const MODEL_TAG_PAGE_SIZE = 1000;
+        const MODEL_TAG_FETCH_LIMIT = 3000;
 
         let currentMode = 'global';
         let currentTargetUserCode = null;
@@ -338,8 +581,16 @@
         let currentTargetSearch = null;
         let currentPage = 1;
         const PAGE_SIZE = 100;
+        let currentPageSize = PAGE_SIZE;
+        let currentSortKey = 'created_at';
+        let currentSortDirection = 'desc';
+        let currentMinDecode = 0;
+        let currentMinPrefill = 0;
+        let currentHardwareKeyword = '';
         let resultsDataMap = {}; // store details for chart generation
         let currentFetchController = null; // To prevent race conditions on tab switch
+        let modelTagFetchController = null;
+        let currentModelTags = [];
         let pendingDeepLinkShareId = null;
 
         // Chart instances
@@ -355,75 +606,206 @@
             return (params.get('id') || params.get('share_id') || params.get('shareId') || '').trim();
         }
 
-        function getForcedDataSource() {
-            const source = (new URLSearchParams(window.location.search || '').get('source') || '').trim().toLowerCase();
-            return (source === 'backend' || source === 'supabase') ? source : null;
-        }
-
-        function getDefaultDataSource() {
-            const host = (window.location.hostname || '').toLowerCase();
-            if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return 'backend';
-            return 'supabase';
-        }
-
-        function buildBackendResultsUrl(mode, offset, personalUserCode) {
-            let url = `${BACKEND_BASE}/api/results?sort_by=created_at&limit=${PAGE_SIZE}&offset=${offset}`;
-            if (mode === 'personal' && personalUserCode) {
-                url += `&user_code=${personalUserCode}`;
-            } else if (mode === 'user' && currentTargetUserCode) {
-                url += `&user_code=${currentTargetUserCode}`;
-            } else if (mode === 'model' && currentTargetModelName) {
-                url += `&model_name=${encodeURIComponent(currentTargetModelName)}`;
-            } else if (mode === 'search_id' && currentTargetSearch) {
-                url += `&search=${encodeURIComponent(currentTargetSearch)}`;
+        function buildGlobalFilterParams() {
+            const params = [];
+            if (currentMinDecode > 0) {
+                params.push(`avg_decode_speed=gte.${currentMinDecode}`);
             }
-            return url;
+            if (currentMinPrefill > 0) {
+                params.push(`avg_prefill_speed=gte.${currentMinPrefill}`);
+            }
+            if (currentHardwareKeyword) {
+                params.push(`hardware=ilike.${encodeURIComponent('*' + currentHardwareKeyword + '*')}`);
+            }
+            return params;
         }
 
-        function buildSupabaseResultsUrl(mode, offset, personalUserCode) {
-            const sbBase = SUPABASE_URL + '/rest/v1/speed_results';
-            const select = 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,results_json,created_at';
-            const order = 'order=created_at.desc';
-            const range = `limit=${PAGE_SIZE}&offset=${offset}`;
-            let filters = '';
+        function buildModeFilterParams(mode, personalUserCode) {
+            const params = [];
 
             if (mode === 'personal' && personalUserCode) {
-                filters = `&user_code=eq.${personalUserCode}`;
+                params.push(`user_code=eq.${encodeURIComponent(personalUserCode)}`);
             } else if (mode === 'user' && currentTargetUserCode) {
-                filters = `&user_code=eq.${currentTargetUserCode}`;
+                params.push(`user_code=eq.${encodeURIComponent(currentTargetUserCode)}`);
             } else if (mode === 'model' && currentTargetModelName) {
-                filters = `&model_name=eq.${encodeURIComponent(currentTargetModelName)}`;
+                params.push(`model_name=eq.${encodeURIComponent(currentTargetModelName)}`);
             } else if (mode === 'search_id' && currentTargetSearch) {
                 const q = currentTargetSearch.trim();
                 const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
                 if (isUUID) {
-                    filters = '&id=eq.' + q;
+                    params.push(`id=eq.${encodeURIComponent(q)}`);
                 } else {
                     const eq = encodeURIComponent(q);
-                    const like = encodeURIComponent('%' + q + '%');
-                    filters = '&or=(user_code.eq.' + eq + ',nickname.ilike.' + like + ',model_name.ilike.' + like + ')';
+                    const like = encodeURIComponent(`%${q}%`);
+                    params.push(`or=(user_code.eq.${eq},nickname.ilike.${like},model_name.ilike.${like})`);
                 }
             }
 
-            return `${sbBase}?${select}&${order}&${range}${filters}`;
+            return params;
         }
 
-        async function fetchRowsBySource(source, mode, offset, signal, personalUserCode) {
-            if (source === 'backend') {
-                const url = buildBackendResultsUrl(mode, offset, personalUserCode);
-                const response = await fetch(url, { signal });
-                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-                return await response.json();
-            }
+        function buildSortParam() {
+            if (!SORTABLE_FIELDS.includes(currentSortKey)) currentSortKey = 'created_at';
+            if (currentSortDirection !== 'asc' && currentSortDirection !== 'desc') currentSortDirection = 'desc';
+            const nullsSuffix = currentSortKey === 'created_at' ? '' : '.nullslast';
+            return `order=${currentSortKey}.${currentSortDirection}${nullsSuffix}`;
+        }
 
+        function buildSupabaseResultsUrl(mode, offset, personalUserCode) {
+            const sbBase = SUPABASE_URL + '/rest/v1/speed_results';
+            const queryParts = [
+                'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,results_json,created_at',
+                buildSortParam(),
+                `limit=${currentPageSize}`,
+                `offset=${offset}`,
+                ...buildModeFilterParams(mode, personalUserCode),
+                ...buildGlobalFilterParams()
+            ];
+            return `${sbBase}?${queryParts.join('&')}`;
+        }
+
+        function buildSupabaseModelTagUrl(offset, limit) {
+            const sbBase = SUPABASE_URL + '/rest/v1/speed_results';
+            const queryParts = [
+                'select=model_name',
+                'model_name=not.is.null',
+                `limit=${limit}`,
+                `offset=${offset}`,
+                ...buildGlobalFilterParams()
+            ];
+            return `${sbBase}?${queryParts.join('&')}`;
+        }
+
+        async function fetchLeaderboardRows(mode, offset, signal, personalUserCode) {
             const url = buildSupabaseResultsUrl(mode, offset, personalUserCode);
             const response = await fetch(url, { signal, headers: SB_HEADERS });
             if (!response.ok) throw new Error(`HTTP error ${response.status}`);
             return await response.json();
         }
 
-        async function fetchLeaderboardRows(mode, offset, signal, personalUserCode) {
-            return await fetchRowsBySource('supabase', mode, offset, signal, personalUserCode);
+        async function fetchModelTags(signal) {
+            const counts = new Map();
+            let offset = 0;
+
+            while (offset < MODEL_TAG_FETCH_LIMIT) {
+                const limit = Math.min(MODEL_TAG_PAGE_SIZE, MODEL_TAG_FETCH_LIMIT - offset);
+                const url = buildSupabaseModelTagUrl(offset, limit);
+                const response = await fetch(url, { signal, headers: SB_HEADERS });
+                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+
+                const rows = await response.json();
+                if (!Array.isArray(rows) || rows.length === 0) break;
+
+                rows.forEach((row) => {
+                    const modelName = (row.model_name || '').trim();
+                    if (!modelName) return;
+                    counts.set(modelName, (counts.get(modelName) || 0) + 1);
+                });
+
+                offset += rows.length;
+                if (rows.length < limit) break;
+            }
+
+            return Array.from(counts.entries())
+                .filter(([, count]) => count >= MODEL_TAG_MIN_COUNT)
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
+                .map(([name, count]) => ({ name, count }));
+        }
+
+        async function refreshModelTags() {
+            if (modelTagFetchController) {
+                modelTagFetchController.abort();
+            }
+            modelTagFetchController = new AbortController();
+
+            try {
+                currentModelTags = await fetchModelTags(modelTagFetchController.signal);
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                currentModelTags = [];
+                console.error('Failed to load model tags:', e);
+            }
+
+            renderModelTagBar();
+        }
+
+        function renderModelTagBar() {
+            const panel = document.getElementById('modelTagsPanel');
+            const bar = document.getElementById('modelTagBar');
+            if (!panel || !bar) return;
+
+            const tagsToRender = currentModelTags.slice();
+            if (currentMode === 'model' && currentTargetModelName && !tagsToRender.some((tag) => tag.name === currentTargetModelName)) {
+                tagsToRender.unshift({ name: currentTargetModelName, count: null });
+            }
+
+            if (!tagsToRender.length) {
+                panel.style.display = 'none';
+                bar.innerHTML = '';
+                return;
+            }
+
+            const allActive = currentMode !== 'model' || !currentTargetModelName;
+            const tagHtml = [
+                `<button type="button" class="model-tag${allActive ? ' active' : ''}" onclick="clearModelTagSelection()">全部</button>`
+            ];
+
+            tagsToRender.forEach((tag) => {
+                const active = currentMode === 'model' && currentTargetModelName === tag.name;
+                const countHtml = Number.isFinite(tag.count) ? `<span class="model-tag-count">${tag.count}</span>` : '';
+                tagHtml.push(
+                    `<button type="button" class="model-tag${active ? ' active' : ''}" onclick="selectModelTag('${encodeURIComponent(tag.name)}')"><span>${escapeHtml(tag.name)}</span>${countHtml}</button>`
+                );
+            });
+
+            bar.innerHTML = tagHtml.join('');
+            panel.style.display = 'block';
+        }
+
+        function selectModelTag(encodedModelName) {
+            loadModelLeaderboard(encodedModelName);
+        }
+
+        function clearModelTagSelection() {
+            currentTargetModelName = null;
+            const tabModel = document.getElementById('tabModel');
+            if (tabModel) {
+                tabModel.style.display = 'none';
+                tabModel.classList.remove('active');
+            }
+            loadLeaderboard('global');
+        }
+
+        function getSortIndicator(key) {
+            if (currentSortKey !== key) return '↕';
+            return currentSortDirection === 'asc' ? '↑' : '↓';
+        }
+
+        function updateSortIndicators() {
+            SORTABLE_FIELDS.forEach((key) => {
+                const indicator = document.getElementById(`sortIndicator-${key}`);
+                const header = document.getElementById(`sortHeader-${key}`);
+                const active = currentSortKey === key;
+                if (indicator) {
+                    indicator.textContent = getSortIndicator(key);
+                    indicator.classList.toggle('active', active);
+                }
+                if (header) {
+                    header.setAttribute('aria-sort', active ? (currentSortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+                }
+            });
+        }
+
+        function toggleSort(key) {
+            if (!SORTABLE_FIELDS.includes(key)) return;
+            if (currentSortKey === key) {
+                currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSortKey = key;
+                currentSortDirection = 'desc';
+            }
+            updateSortIndicators();
+            loadLeaderboard(currentMode, true);
         }
 
         function normalizeLeaderboardRows(data) {
@@ -437,7 +819,77 @@
             });
         }
 
+        function formatRankLabel(rank) {
+            if (rank === 1) return '🥇 #1';
+            if (rank === 2) return '🥈 #2';
+            if (rank === 3) return '🥉 #3';
+            return `#${rank}`;
+        }
+
+        function buildShareReportUrl(id) {
+            const url = new URL('https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html');
+            url.searchParams.set('id', id);
+            return url.toString();
+        }
+
+        async function copyShareUrl(encodedId, btn) {
+            const id = decodeURIComponent(encodedId || '');
+            if (!id) return;
+            const shareUrl = buildShareReportUrl(id);
+            try {
+                await navigator.clipboard.writeText(shareUrl);
+                if (btn) {
+                    const prev = btn.textContent;
+                    btn.textContent = '已复制';
+                    setTimeout(() => btn.textContent = prev, 1200);
+                }
+            } catch {
+                window.prompt('复制分享链接：', shareUrl);
+            }
+        }
+
+        function applyLeaderboardFilters() {
+            currentPageSize = parseInt(document.getElementById('pageSizeSelect')?.value || PAGE_SIZE, 10) || PAGE_SIZE;
+            currentMinDecode = parseFloat(document.getElementById('minDecodeInput')?.value || '0') || 0;
+            currentMinPrefill = parseFloat(document.getElementById('minPrefillInput')?.value || '0') || 0;
+            currentHardwareKeyword = (document.getElementById('hardwareFilterInput')?.value || '').trim();
+            refreshModelTags();
+            loadLeaderboard(currentMode, true);
+        }
+
+        function resetLeaderboardFilters() {
+            currentPageSize = PAGE_SIZE;
+            currentMinDecode = 0;
+            currentMinPrefill = 0;
+            currentHardwareKeyword = '';
+            const pageEl = document.getElementById('pageSizeSelect');
+            const minDecodeEl = document.getElementById('minDecodeInput');
+            const minPrefillEl = document.getElementById('minPrefillInput');
+            const hwEl = document.getElementById('hardwareFilterInput');
+            if (pageEl) pageEl.value = String(PAGE_SIZE);
+            if (minDecodeEl) minDecodeEl.value = '';
+            if (minPrefillEl) minPrefillEl.value = '';
+            if (hwEl) hwEl.value = '';
+            refreshModelTags();
+            loadLeaderboard(currentMode, true);
+        }
+
         window.onload = () => {
+            const pageEl = document.getElementById('pageSizeSelect');
+            if (pageEl) pageEl.value = String(currentPageSize);
+            updateSortIndicators();
+
+            ['hardwareFilterInput', 'minDecodeInput', 'minPrefillInput'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') applyLeaderboardFilters();
+                    });
+                }
+            });
+
+            refreshModelTags();
+
             const shareId = getShareIdFromUrl();
             if (shareId) {
                 pendingDeepLinkShareId = shareId;
@@ -455,6 +907,8 @@
                 currentPage = 1;
             }
             currentMode = mode;
+            renderModelTagBar();
+            updateSortIndicators();
             document.getElementById('tabGlobal').classList.toggle('active', mode === 'global');
             document.getElementById('tabPersonal').classList.toggle('active', mode === 'personal');
 
@@ -464,6 +918,7 @@
                 tabUser.classList.add('active');
             } else {
                 tabUser.classList.remove('active');
+                tabUser.style.display = 'none';
             }
 
             const tabModel = document.getElementById('tabModel');
@@ -472,6 +927,7 @@
                 tabModel.classList.add('active');
             } else {
                 tabModel.classList.remove('active');
+                tabModel.style.display = 'none';
             }
 
             const tabSearchId = document.getElementById('tabSearchId');
@@ -480,6 +936,7 @@
                 tabSearchId.classList.add('active');
             } else {
                 tabSearchId.classList.remove('active');
+                tabSearchId.style.display = 'none';
             }
 
             const tbody = document.getElementById('resultsBody');
@@ -504,7 +961,7 @@
             loading.textContent = '加载中... ⏳';
 
             try {
-                const offset = (currentPage - 1) * PAGE_SIZE;
+                const offset = (currentPage - 1) * currentPageSize;
                 let personalUserCode = null;
                 if (mode === 'personal') {
                     personalUserCode = localStorage.getItem(USER_CODE_KEY);
@@ -524,10 +981,12 @@
 
                 resultsDataMap = {};
 
-                data.forEach(row => {
+                data.forEach((row, idx) => {
                     resultsDataMap[row.id] = row;
 
                     const tr = document.createElement('tr');
+                    const rank = offset + idx + 1;
+                    if (currentPage === 1 && rank <= 3) tr.classList.add(`top-rank-${rank}`);
 
                     // Format date
                     const d = new Date(row.created_at);
@@ -538,17 +997,28 @@
                         String(d.getMinutes()).padStart(2, '0') + ':' +
                         String(d.getSeconds()).padStart(2, '0');
 
-                    // Format user display - Clickable to search
-                    const displayName = row.nickname ? escapeHtml(row.nickname) : escapeHtml(row.user_code);
-                    const userDisplay = `<span style="color:#e5c07b; cursor:pointer; text-decoration:underline;" onclick="loadUserLeaderboard('${escapeHtml(row.user_code)}', '${displayName}')" title="点击查看该用户的所有记录">${displayName}</span>`;
+                    // Format user/model display - Clickable to search
+                    const displayName = row.nickname || row.user_code || '匿名用户';
+                    const encodedUserCode = encodeURIComponent(row.user_code || '');
+                    const encodedDisplayName = encodeURIComponent(displayName);
+                    const userDisplay = row.user_code
+                        ? `<span style="color:#e5c07b; cursor:pointer; text-decoration:underline;" onclick="loadUserLeaderboard('${encodedUserCode}', '${encodedDisplayName}')" title="点击查看该用户的所有记录">${escapeHtml(displayName)}</span>`
+                        : escapeHtml(displayName);
 
-                    const modelDisplay = `<span style="color:#61afef; cursor:pointer; text-decoration:underline;" onclick="loadModelLeaderboard('${escapeHtml(row.model_name)}')" title="点击查看所有同名模型记录">${escapeHtml(row.model_name)}</span>`;
+                    const modelName = row.model_name || '';
+                    const encodedModelName = encodeURIComponent(modelName);
+                    const modelDisplay = modelName
+                        ? `<span style="color:#61afef; cursor:pointer; text-decoration:underline;" onclick="loadModelLeaderboard('${encodedModelName}')" title="点击查看所有同名模型记录">${escapeHtml(modelName)}</span>`
+                        : '-';
 
                     // Config text
                     const configText = [row.hardware, row.framework, row.quantization].filter(Boolean).map(escapeHtml).join(' / ');
                     const notesText = row.notes ? escapeHtml(row.notes) : '-';
+                    const prefillText = Number.isFinite(Number(row.avg_prefill_speed)) ? Number(row.avg_prefill_speed).toFixed(1) : '-';
+                    const decodeText = Number.isFinite(Number(row.avg_decode_speed)) ? Number(row.avg_decode_speed).toFixed(1) : '-';
 
                     tr.innerHTML = `
+                    <td class="rank-cell">${formatRankLabel(rank)}</td>
                     <td>${dateStr}</td>
                     <td style="font-family:monospace; font-size:12px; color:#5c6370; user-select:all;">${escapeHtml(row.id)}</td>
                     <td>${userDisplay}</td>
@@ -559,9 +1029,9 @@
                         ${row.notes ? `<div class="notes-tooltip">${notesText}</div>` : ''}
                     </td>
                     <td>${row.concurrency}</td>
-                    <td style="color:#98c379; font-weight:bold;">${row.avg_prefill_speed.toFixed(1)}</td>
-                    <td style="color:#c678dd; font-weight:bold;">${row.avg_decode_speed.toFixed(1)}</td>
-                    <td><button class="btn-detail" onclick="viewDetails('${row.id}')">📊 查看图表</button></td>
+                    <td style="color:#98c379; font-weight:bold;">${prefillText}</td>
+                    <td style="color:#c678dd; font-weight:bold;">${decodeText}</td>
+                    <td><button class="btn-detail" onclick="viewDetails('${row.id}')">📊 查看图表</button><button class="btn-copy-link" onclick="copyShareUrl('${encodeURIComponent(row.id)}', this)">🔗 复制链接</button></td>
                 `;
                     tbody.appendChild(tr);
                 });
@@ -577,10 +1047,10 @@
 
                 // Pagination display logic
                 pagination.style.display = 'block';
-                pageIndicator.textContent = `第 ${currentPage} 页`;
+                pageIndicator.textContent = `第 ${currentPage} 页 · 每页 ${currentPageSize} 条`;
                 btnPrev.style.display = currentPage > 1 ? 'inline-block' : 'none';
                 // If we got fewer results than PAGE_SIZE, we hit the end
-                btnNext.style.display = data.length === PAGE_SIZE ? 'inline-block' : 'none';
+                btnNext.style.display = data.length === currentPageSize ? 'inline-block' : 'none';
 
             } catch (e) {
                 if (e.name === 'AbortError') {
@@ -603,7 +1073,11 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function loadUserLeaderboard(userCode, displayName) {
+        function loadUserLeaderboard(encodedUserCode, encodedDisplayName) {
+            const userCode = decodeURIComponent(encodedUserCode || '');
+            const displayName = decodeURIComponent(encodedDisplayName || encodedUserCode || '');
+            if (!userCode) return;
+
             currentTargetUserCode = userCode;
             const tabUser = document.getElementById('tabUser');
             tabUser.textContent = `🔍 [${displayName || userCode}] 的记录`;
@@ -611,9 +1085,14 @@
             loadLeaderboard('user');
         }
 
-        function loadModelLeaderboard(modelName) {
+        function loadModelLeaderboard(encodedModelName) {
+            const modelName = decodeURIComponent(encodedModelName || '');
+            if (!modelName) return;
+
             currentTargetModelName = modelName;
-            document.getElementById('tabModel').style.display = 'inline-block';
+            const tabModel = document.getElementById('tabModel');
+            tabModel.textContent = `🏷️ [${modelName}] 的记录`;
+            tabModel.style.display = 'inline-block';
             loadLeaderboard('model');
         }
 
@@ -872,3 +1351,7 @@
 </body>
 
 </html>
+
+
+
+
