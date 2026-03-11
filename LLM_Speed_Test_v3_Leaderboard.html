@@ -411,11 +411,40 @@
             flex-wrap: wrap;
             gap: 12px;
             align-items: flex-end;
-            margin-bottom: 14px;
+            margin-bottom: 0;
             padding: 12px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.16);
+        }
+
+        .leaderboard-tools-wrap {
+            margin-bottom: 14px;
+        }
+
+        .mobile-filter-toggle {
+            display: none;
+            width: 100%;
+            margin-bottom: 8px;
+            background: rgba(97, 175, 239, 0.12);
+            color: var(--accent-blue);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .mobile-filter-toggle:hover {
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+
+        .leaderboard-tools-wrap.collapsed .leaderboard-tools {
+            display: none;
         }
 
         .tool-group {
@@ -510,9 +539,34 @@
             color: var(--accent-yellow);
         }
 
-        @media (max-width: 700px) {
+        @media (max-width: 900px) {
+            body {
+                padding: 8px;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            h1 {
+                font-size: 22px;
+                margin: 0 0 4px;
+            }
+
+            .header-sub {
+                font-size: 12px;
+                margin-bottom: 12px;
+            }
+
             .tabs {
+                gap: 8px;
+                margin-bottom: 10px;
                 align-items: stretch;
+            }
+
+            .tab-btn {
+                padding: 7px 10px;
+                font-size: 13px;
             }
 
             .tabs-side {
@@ -523,20 +577,285 @@
 
             .tabs-utility {
                 justify-content: flex-start;
+                gap: 6px;
+            }
+
+            .tabs-community {
+                width: 100%;
+                font-size: 10px;
+            }
+
+            .community-meta {
+                font-size: 10px;
+                line-height: 1.25;
+            }
+
+            .entry-link-btn,
+            .community-copy-btn {
+                min-height: 26px;
+                padding: 0 9px;
+                font-size: 11px;
+            }
+
+            .model-tags-panel {
+                margin-bottom: 8px;
+                padding: 8px;
             }
 
             .model-tags-header {
+                margin-bottom: 6px;
                 flex-direction: column;
                 align-items: flex-start;
+                gap: 4px;
+            }
+
+            .model-tags-title {
+                font-size: 12px;
+            }
+
+            .model-tags-subtitle {
+                font-size: 11px;
+                line-height: 1.3;
+            }
+
+            .model-tag-bar {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                gap: 6px;
+                padding-bottom: 2px;
+            }
+
+            .model-tag {
+                flex: 0 0 auto;
+                padding: 5px 9px;
+                font-size: 11px;
+            }
+
+            .leaderboard-tools-wrap {
+                margin-bottom: 10px;
+            }
+
+            .mobile-filter-toggle {
+                display: block;
             }
 
             .leaderboard-tools {
-                align-items: stretch;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                padding: 8px;
             }
 
-            .tool-group {
-                min-width: unset;
+            .leaderboard-tools .tool-group {
+                width: auto !important;
+                min-width: 0 !important;
+            }
+
+            .leaderboard-tools .tool-group label {
+                font-size: 11px;
+            }
+
+            .leaderboard-tools .tool-group input,
+            .leaderboard-tools .tool-group select {
+                font-size: 12px;
+                padding: 5px 6px;
+            }
+
+            .leaderboard-tools .tab-btn {
                 width: 100%;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .table-container {
+                padding: 8px;
+                border-radius: 6px;
+            }
+
+            #resultsTable {
+                font-size: 11px;
+                table-layout: fixed;
+            }
+
+            #resultsTable th,
+            #resultsTable td {
+                padding: 5px 3px;
+            }
+
+            .sort-toggle {
+                padding: 5px 3px;
+                gap: 3px;
+            }
+
+            .sort-label {
+                line-height: 1.25;
+                font-size: 11px;
+            }
+
+            .sort-indicator {
+                min-width: 12px;
+                font-size: 10px;
+            }
+
+            .col-rank,
+            .col-time,
+            .col-share-id,
+            .col-user,
+            .col-notes,
+            .col-concurrency {
+                display: none;
+            }
+
+            .col-model,
+            .col-config {
+                white-space: normal;
+                word-break: break-word;
+                line-height: 1.28;
+                vertical-align: top;
+            }
+
+            .col-model {
+                width: 24%;
+                min-width: 78px;
+                font-size: 11px;
+            }
+
+            .col-config {
+                width: 28%;
+                min-width: 90px;
+                font-size: 10px;
+                color: var(--text-muted);
+            }
+
+            .col-prefill,
+            .col-decode {
+                width: 16%;
+                min-width: 54px;
+                text-align: right;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .col-actions {
+                width: 16%;
+                min-width: 58px;
+                text-align: center;
+                position: sticky;
+                right: 0;
+                background: var(--bg-panel);
+                z-index: 3;
+                white-space: nowrap;
+            }
+
+            .btn-detail {
+                font-size: 10px;
+                padding: 4px 5px;
+            }
+
+            .btn-copy-link {
+                display: none;
+            }
+
+            #paginationControls {
+                margin-top: 10px !important;
+            }
+
+            #paginationControls .tab-btn {
+                padding: 4px 8px !important;
+                margin: 0 3px !important;
+                font-size: 12px;
+            }
+
+            .modal-content {
+                width: 98%;
+                margin: 2% auto;
+                padding: 12px;
+            }
+
+            .chart-box {
+                padding: 8px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 6px;
+            }
+
+            h1 {
+                font-size: 19px;
+            }
+
+            .header-sub {
+                font-size: 11px;
+                margin-bottom: 8px;
+            }
+
+            .tabs {
+                gap: 6px;
+            }
+
+            .tab-btn {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .leaderboard-tools {
+                grid-template-columns: 1fr;
+            }
+
+            .col-model {
+                min-width: 72px;
+            }
+
+            .col-config {
+                min-width: 82px;
+            }
+
+            .col-prefill,
+            .col-decode {
+                min-width: 50px;
+            }
+
+            .col-actions {
+                min-width: 54px;
+            }
+        }
+
+        @media (max-width: 560px) {
+            #resultsTable {
+                font-size: 10px;
+            }
+
+            #resultsTable th,
+            #resultsTable td {
+                padding: 5px 3px;
+            }
+
+            .sort-label {
+                font-size: 10px;
+            }
+
+            .col-model {
+                min-width: 68px;
+            }
+
+            .col-config {
+                min-width: 78px;
+            }
+
+            .col-prefill,
+            .col-decode {
+                min-width: 46px;
+            }
+
+            .col-actions {
+                min-width: 54px;
+            }
+
+            .btn-detail {
+                font-size: 10px;
+                padding: 3px 4px;
             }
         }
     </style>
@@ -580,34 +899,37 @@
             </div>
         </div>
 
-        <div class="leaderboard-tools">
-            <div class="tool-group">
-                <label for="pageSizeSelect">每页条数</label>
-                <select id="pageSizeSelect">
-                    <option value="50">50</option>
-                    <option value="100" selected>100</option>
-                    <option value="200">200</option>
-                </select>
+        <div id="leaderboardToolsWrap" class="leaderboard-tools-wrap">
+            <button id="mobileFilterToggle" class="mobile-filter-toggle" type="button" aria-expanded="true" onclick="toggleMobileFilters()">收起筛选条件</button>
+            <div class="leaderboard-tools">
+                <div class="tool-group">
+                    <label for="pageSizeSelect">每页条数</label>
+                    <select id="pageSizeSelect">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+                <div class="tool-group">
+                    <label for="minDecodeInput">Decode 最小值</label>
+                    <input type="number" id="minDecodeInput" min="0" step="1" placeholder="例如 100">
+                </div>
+                <div class="tool-group">
+                    <label for="minPrefillInput">Prefill 最小值</label>
+                    <input type="number" id="minPrefillInput" min="0" step="1" placeholder="例如 1000">
+                </div>
+                <div class="tool-group" style="min-width:220px;">
+                    <label for="hardwareFilterInput">硬件关键词</label>
+                    <input type="text" id="hardwareFilterInput" placeholder="例如 4090 / H100">
+                </div>
+                <div class="tool-group" style="min-width:280px;">
+                    <label for="searchInput">搜索</label>
+                    <input type="text" id="searchInput" placeholder="搜索 识别码/用户/模型/ID"
+                        onkeydown="if(event.key==='Enter') applyLeaderboardFilters()">
+                </div>
+                <button class="tab-btn" onclick="applyLeaderboardFilters()" style="padding:6px 12px;">搜索 / 筛选</button>
+                <button class="tab-btn" onclick="resetLeaderboardFilters()" style="padding:6px 12px;">重置</button>
             </div>
-            <div class="tool-group">
-                <label for="minDecodeInput">Decode 最小值</label>
-                <input type="number" id="minDecodeInput" min="0" step="1" placeholder="例如 100">
-            </div>
-            <div class="tool-group">
-                <label for="minPrefillInput">Prefill 最小值</label>
-                <input type="number" id="minPrefillInput" min="0" step="1" placeholder="例如 1000">
-            </div>
-            <div class="tool-group" style="min-width:220px;">
-                <label for="hardwareFilterInput">硬件关键词</label>
-                <input type="text" id="hardwareFilterInput" placeholder="例如 4090 / H100">
-            </div>
-            <div class="tool-group" style="min-width:280px;">
-                <label for="searchInput">搜索</label>
-                <input type="text" id="searchInput" placeholder="搜索 识别码/用户/模型/ID"
-                    onkeydown="if(event.key==='Enter') applyLeaderboardFilters()">
-            </div>
-            <button class="tab-btn" onclick="applyLeaderboardFilters()" style="padding:6px 12px;">搜索 / 筛选</button>
-            <button class="tab-btn" onclick="resetLeaderboardFilters()" style="padding:6px 12px;">重置</button>
         </div>
 
         <div class="table-container">
@@ -615,32 +937,32 @@
             <table id="resultsTable" style="display:none;">
                 <thead>
                     <tr>
-                        <th>排名</th>
-                        <th id="sortHeader-created_at" class="sortable-header" aria-sort="descending">
+                        <th class="col-rank">排名</th>
+                        <th id="sortHeader-created_at" class="sortable-header col-time" aria-sort="descending">
                             <button type="button" class="sort-toggle" onclick="toggleSort('created_at')">
                                 <span class="sort-label">时间</span>
                                 <span id="sortIndicator-created_at" class="sort-indicator active">↓</span>
                             </button>
                         </th>
-                        <th>分享 ID</th>
-                        <th>用户</th>
-                        <th>模型</th>
-                        <th>硬件 / 框架 / 量化</th>
-                        <th>备注</th>
-                        <th>并发</th>
-                        <th id="sortHeader-avg_prefill_speed" class="sortable-header" aria-sort="none">
+                        <th class="col-share-id">分享 ID</th>
+                        <th class="col-user">用户</th>
+                        <th class="col-model">模型</th>
+                        <th class="col-config">硬件 / 框架 / 量化</th>
+                        <th class="col-notes">备注</th>
+                        <th class="col-concurrency">并发</th>
+                        <th id="sortHeader-avg_prefill_speed" class="sortable-header col-prefill" aria-sort="none">
                             <button type="button" class="sort-toggle" onclick="toggleSort('avg_prefill_speed')">
                                 <span class="sort-label">Prefill 速度<br>(tokens/s)</span>
                                 <span id="sortIndicator-avg_prefill_speed" class="sort-indicator">↕</span>
                             </button>
                         </th>
-                        <th id="sortHeader-avg_decode_speed" class="sortable-header" aria-sort="none">
+                        <th id="sortHeader-avg_decode_speed" class="sortable-header col-decode" aria-sort="none">
                             <button type="button" class="sort-toggle" onclick="toggleSort('avg_decode_speed')">
                                 <span class="sort-label">Decode 速度<br>(tokens/s)</span>
                                 <span id="sortIndicator-avg_decode_speed" class="sort-indicator">↕</span>
                             </button>
                         </th>
-                        <th>操作</th>
+                        <th class="col-actions">操作</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody">
@@ -704,6 +1026,8 @@
         let modelTagFetchController = null;
         let currentModelTags = [];
         let pendingDeepLinkShareId = null;
+        let wasMobileViewport = window.matchMedia('(max-width: 900px)').matches;
+        let mobileFiltersCollapsed = false;
 
         // Chart instances
         let charts = {
@@ -974,6 +1298,36 @@
             }
         }
 
+        function isMobileViewport() {
+            return window.matchMedia('(max-width: 900px)').matches;
+        }
+
+        function setMobileFilterCollapsed(collapsed) {
+            const wrap = document.getElementById('leaderboardToolsWrap');
+            const toggle = document.getElementById('mobileFilterToggle');
+            if (!wrap || !toggle) return;
+
+            mobileFiltersCollapsed = !!collapsed;
+            wrap.classList.toggle('collapsed', mobileFiltersCollapsed);
+            toggle.setAttribute('aria-expanded', mobileFiltersCollapsed ? 'false' : 'true');
+            toggle.textContent = mobileFiltersCollapsed ? '展开筛选条件' : '收起筛选条件';
+        }
+
+        function toggleMobileFilters() {
+            if (!isMobileViewport()) return;
+            setMobileFilterCollapsed(!mobileFiltersCollapsed);
+        }
+
+        function syncMobileFilterPanel(forceCollapse = false) {
+            const mobile = isMobileViewport();
+            if (!mobile) {
+                setMobileFilterCollapsed(false);
+            } else if (forceCollapse || !wasMobileViewport) {
+                setMobileFilterCollapsed(true);
+            }
+            wasMobileViewport = mobile;
+        }
+
         function applyLeaderboardFilters() {
             currentPageSize = parseInt(document.getElementById('pageSizeSelect')?.value || PAGE_SIZE, 10) || PAGE_SIZE;
             currentMinDecode = parseFloat(document.getElementById('minDecodeInput')?.value || '0') || 0;
@@ -982,6 +1336,7 @@
 
             const searchQuery = (document.getElementById('searchInput')?.value || '').trim();
             refreshModelTags();
+            if (isMobileViewport()) setMobileFilterCollapsed(true);
 
             if (searchQuery) {
                 currentTargetSearch = searchQuery;
@@ -1015,6 +1370,7 @@
             if (hwEl) hwEl.value = '';
             if (searchEl) searchEl.value = '';
             refreshModelTags();
+            if (isMobileViewport()) setMobileFilterCollapsed(true);
             if (currentMode === 'search_id') {
                 loadLeaderboard('global', true);
                 return;
@@ -1026,6 +1382,12 @@
             const pageEl = document.getElementById('pageSizeSelect');
             if (pageEl) pageEl.value = String(currentPageSize);
             updateSortIndicators();
+            syncMobileFilterPanel(true);
+            window.addEventListener('resize', () => {
+                if (isMobileViewport() !== wasMobileViewport) {
+                    syncMobileFilterPanel(true);
+                }
+            });
 
             ['hardwareFilterInput', 'minDecodeInput', 'minPrefillInput'].forEach((id) => {
                 const el = document.getElementById(id);
@@ -1166,20 +1528,20 @@
                     const decodeText = Number.isFinite(Number(row.avg_decode_speed)) ? Number(row.avg_decode_speed).toFixed(1) : '-';
 
                     tr.innerHTML = `
-                    <td class="rank-cell">${formatRankLabel(rank)}</td>
-                    <td>${dateStr}</td>
-                    <td style="font-family:monospace; font-size:12px; color:#5c6370; user-select:all;">${escapeHtml(row.id)}</td>
-                    <td>${userDisplay}</td>
-                    <td style="font-weight:bold;">${modelDisplay}</td>
-                    <td style="font-size:12px;">${configText}</td>
-                    <td class="notes-cell">
+                    <td class="rank-cell col-rank">${formatRankLabel(rank)}</td>
+                    <td class="col-time">${dateStr}</td>
+                    <td class="col-share-id" style="font-family:monospace; font-size:12px; color:#5c6370; user-select:all;">${escapeHtml(row.id)}</td>
+                    <td class="col-user">${userDisplay}</td>
+                    <td class="col-model" style="font-weight:bold;">${modelDisplay}</td>
+                    <td class="col-config" style="font-size:12px;">${configText}</td>
+                    <td class="notes-cell col-notes">
                         <span class="notes-text">${notesText}</span>
                         ${row.notes ? `<div class="notes-tooltip">${notesText}</div>` : ''}
                     </td>
-                    <td>${row.concurrency}</td>
-                    <td style="color:#98c379; font-weight:bold;">${prefillText}</td>
-                    <td style="color:#c678dd; font-weight:bold;">${decodeText}</td>
-                    <td><button class="btn-detail" onclick="viewDetails('${row.id}')">📊 查看图表</button><button class="btn-copy-link" onclick="copyShareUrl('${encodeURIComponent(row.id)}', this)">🔗 复制链接</button></td>
+                    <td class="col-concurrency">${row.concurrency}</td>
+                    <td class="col-prefill" style="color:#98c379; font-weight:bold;">${prefillText}</td>
+                    <td class="col-decode" style="color:#c678dd; font-weight:bold;">${decodeText}</td>
+                    <td class="col-actions"><button class="btn-detail" onclick="viewDetails('${row.id}')">查看图表</button><button class="btn-copy-link" onclick="copyShareUrl('${encodeURIComponent(row.id)}', this)">复制链接</button></td>
                 `;
                     tbody.appendChild(tr);
                 });
@@ -1489,4 +1851,9 @@
 </body>
 
 </html>
+
+
+
+
+
 
