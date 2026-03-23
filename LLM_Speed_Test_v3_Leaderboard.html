@@ -1310,18 +1310,18 @@
         }
 
         body.force-desktop-view .table-container {
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
         }
 
         body.force-desktop-view #resultsTable {
-            font-size: 14px;
+            font-size: 13.5px;
             table-layout: auto;
         }
 
         body.force-desktop-view #resultsTable th,
         body.force-desktop-view #resultsTable td {
-            padding: 12px 15px;
+            padding: 10px 8px;
         }
 
         body.force-desktop-view #resultsTable th.col-rank,
@@ -1371,13 +1371,16 @@
         }
 
         body.force-desktop-view .col-model,
-        body.force-desktop-view .col-config {
+        body.force-desktop-view .col-config,
+        body.force-desktop-view .col-user,
+        body.force-desktop-view .col-share-id {
             white-space: normal;
-            word-break: normal;
-            line-height: normal;
+            word-break: break-all;
+            line-height: 1.4;
             vertical-align: middle;
             width: auto;
-            min-width: 0;
+            max-width: 160px;
+            min-width: 60px;
             font-size: inherit;
             color: inherit;
         }
@@ -1396,8 +1399,8 @@
         }
 
         body.force-desktop-view .col-actions {
-            width: 146px;
-            min-width: 146px;
+            width: 130px;
+            min-width: 130px;
             text-align: left;
             position: static;
             right: auto;
