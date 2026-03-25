@@ -9,8 +9,8 @@
 ---
 
 ✨ **在线体验最新纯前端版（无需下载/部署，点开即用）：**
-👉 [**https://gengchaogit.github.io/llm_speedtest/**](https://gengchaogit.github.io/llm_speedtest/)
-
+👉 **测速页面**: [**https://gengchaogit.github.io/llm_speedtest/**](https://gengchaogit.github.io/llm_speedtest/)
+👉 **全网排行榜**: [**https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html**](https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html)
 ---
 
 ## 简介
