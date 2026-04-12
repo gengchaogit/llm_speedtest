@@ -1054,7 +1054,9 @@
                 </div>
                 <div class="form-group">
                     <label for="modelName">模型名称</label>
-                    <input type="text" id="modelName" value="">
+                    <input type="text" id="modelName" value="" list="modelSuggest" autocomplete="off">
+                    <datalist id="modelSuggest"></datalist>
+                    <p id="modelSuggestStatus" class="model-suggest-status" style="margin-top: 5px; font-size: 12px; color: #666;"></p>
                 </div>
             </div>
             <div class="form-row">
@@ -1172,7 +1174,7 @@
             <button id="startComparison" style="background: #27ae60;">生成对比图表</button>
             <button id="screenshotComparison" style="display: none; background: #8e44ad; margin-left: 10px;">📸
                 截图对比结果</button>
-            <p class="notes" style="margin-top: 10px;">说明：先"开始测试"运行一次，然后再导入其他CSV文件，点击"生成对比图表"</p>
+            <p id="comparisonNoteText" class="notes" style="margin-top: 10px;">说明：先"开始测试"运行一次，然后再导入其他CSV文件，点击"生成对比图表"</p>
         </div>
 
         <div id="results">
@@ -1295,6 +1297,13 @@
                 placeholderNotes: '请填写设备信息、模型信息、模型推理框架，以便在结果中显示',
                 labelSaveDetail: '保存测试详情（提示词和输出内容）',
                 noteSaveDetail: '💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。',
+                modelSuggestLoading: '正在加载模型列表...',
+                modelSuggestLoaded: '已加载 {count} 个模型',
+                modelSuggestLoadedFilter: '已加载 {count} 个模型，可继续输入筛选',
+                modelSuggestEmpty: '接口返回了空模型列表',
+                modelSuggestLoadFailed: '模型列表加载失败：{message}',
+                modelSuggestUnsupportedUrl: '当前 API 地址不支持自动获取模型列表',
+                modelSuggestBackendMissing: 'Python 后端未提供 /api/models 接口，请重启后端到最新代码',
                 sectionTestParams: '测试参数配置',
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
@@ -1571,6 +1580,13 @@
                 placeholderNotes: 'Fill in device info, model info, inference framework for display in results',
                 labelSaveDetail: 'Save Test Details (Prompts and Outputs)',
                 noteSaveDetail: '💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.',
+                modelSuggestLoading: 'Loading model list...',
+                modelSuggestLoaded: 'Loaded {count} models',
+                modelSuggestLoadedFilter: 'Loaded {count} models, keep typing to filter',
+                modelSuggestEmpty: 'The API returned an empty model list',
+                modelSuggestLoadFailed: 'Failed to load model list: {message}',
+                modelSuggestUnsupportedUrl: 'The current API URL does not support automatic model discovery',
+                modelSuggestBackendMissing: 'The Python backend does not provide /api/models. Please restart the backend with the latest code',
                 sectionTestParams: 'Test Parameters',
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
@@ -1824,9 +1840,35 @@
 
         // 当前语言 (默认中文)
         let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        const modelSuggestStatusState = {
+            mode: 'raw',
+            message: '',
+            key: '',
+            params: {},
+            isError: false
+        };
 
         // 辅助函数
         function _e(id) { return document.getElementById(id); }
+        function formatI18nText(template, params = {}) {
+            return String(template || '').replace(/\{(\w+)\}/g, (_, key) => {
+                const value = params[key];
+                return value === undefined || value === null ? '' : String(value);
+            });
+        }
+        function renderModelSuggestStatus() {
+            const statusEl = document.getElementById('modelSuggestStatus');
+            if (!statusEl) return;
+
+            let message = modelSuggestStatusState.message || '';
+            if (modelSuggestStatusState.mode === 'key' && modelSuggestStatusState.key) {
+                const t = translations[currentLang] || translations.zh;
+                message = formatI18nText(t[modelSuggestStatusState.key], modelSuggestStatusState.params);
+            }
+
+            statusEl.textContent = message;
+            statusEl.style.color = modelSuggestStatusState.isError ? '#d9534f' : '#666';
+        }
 
         // 切换语言函数
         function switchLanguage(lang) {
@@ -1890,7 +1932,8 @@
             document.getElementById('screenshotComparison').textContent = t.btnScreenshotComparison;
 
             // 更新说明文字
-            document.querySelector('.config-section p.notes').textContent = t.comparisonNote;
+            document.getElementById('comparisonNoteText').textContent = t.comparisonNote;
+            renderModelSuggestStatus();
 
             // 更新图表标题
             document.getElementById('chartPrefillTitle').textContent = t.chartPrefillTitle;
@@ -2065,6 +2108,9 @@
                 apiUrl.value = d_ollama_apiUrl;
                 modelName.value = d_ollama_modelName;
             }
+
+            clearModelSuggestions();
+            scheduleModelFetch();
         }
 
         // 初始化
@@ -2169,6 +2215,9 @@
         let api_key = '';
         let notes = '';
         let currentConcurrency = 1;
+        let _customModelNameCache = {};
+        let _isFetchingCustomModels = false;
+        let _modelFetchDebounceTimer = null;
         let concurrencyStats = {
             minPrefillSpeed: Infinity,
             maxPrefillSpeed: 0,
@@ -2177,6 +2226,213 @@
             avgPrefillSpeed: 0,
             avgOutputSpeed: 0
         };
+
+        function getBackendHttpBase() {
+            const rawValue = document.getElementById('backendUrl')?.value?.trim() || 'ws://localhost:18000';
+            let candidate = rawValue;
+
+            if (!/^[a-z]+:\/\//i.test(candidate)) {
+                candidate = `ws://${candidate}`;
+            }
+
+            try {
+                const parsed = new URL(candidate);
+                const protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:';
+                const basePath = parsed.pathname.replace(/\/ws\/test\/?$/i, '').replace(/\/$/, '');
+                return `${protocol}//${parsed.host}${basePath}`;
+            } catch (error) {
+                return 'http://localhost:18000';
+            }
+        }
+
+        function getModelCatalogEndpoint(apiUrl) {
+            if (!apiUrl) return '';
+            const normalized = apiUrl.trim().replace(/\/+$/, '');
+
+            if (normalized.endsWith('/v1/chat/completions')) return `${normalized.slice(0, -'/v1/chat/completions'.length)}/v1/models`;
+            if (normalized.endsWith('/v1/models')) return normalized;
+            if (normalized.endsWith('/api/chat')) return `${normalized.slice(0, -'/api/chat'.length)}/api/tags`;
+            if (normalized.endsWith('/api/tags')) return normalized;
+            return '';
+        }
+
+        function clearModelSuggestions() {
+            const dl = document.getElementById('modelSuggest');
+            if (dl) dl.innerHTML = '';
+        }
+
+        function setModelSuggestStatus(message = '', isError = false) {
+            modelSuggestStatusState.mode = 'raw';
+            modelSuggestStatusState.message = message;
+            modelSuggestStatusState.key = '';
+            modelSuggestStatusState.params = {};
+            modelSuggestStatusState.isError = isError;
+            renderModelSuggestStatus();
+        }
+
+        function setModelSuggestStatusKey(key = '', params = {}, isError = false) {
+            modelSuggestStatusState.mode = key ? 'key' : 'raw';
+            modelSuggestStatusState.message = '';
+            modelSuggestStatusState.key = key;
+            modelSuggestStatusState.params = params || {};
+            modelSuggestStatusState.isError = isError;
+            renderModelSuggestStatus();
+        }
+
+        function renderModelSuggestions(inputEl) {
+            const dl = document.getElementById('modelSuggest');
+            if (!dl || !inputEl) return;
+
+            const apiUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+            const endpoint = getModelCatalogEndpoint(apiUrl);
+            const sourceList = endpoint ? _customModelNameCache[endpoint] : null;
+            const query = (inputEl.value || '').trim().toLowerCase();
+
+            if (!sourceList || sourceList.length === 0) {
+                dl.innerHTML = '';
+                return;
+            }
+
+            let matches = [];
+            if (!query) {
+                matches = sourceList.slice(0, 50);
+            } else {
+                matches = sourceList.filter(name => name.toLowerCase().includes(query)).slice(0, 30);
+            }
+
+            if (matches.length === 1 && matches[0].toLowerCase() === query) {
+                dl.innerHTML = '';
+                return;
+            }
+
+            dl.innerHTML = matches.map(name => `<option value="${name}"></option>`).join('');
+            setModelSuggestStatusKey('modelSuggestLoadedFilter', { count: sourceList.length });
+        }
+
+        async function fetchCustomModels(apiUrl) {
+            if (!apiUrl) return null;
+
+            const endpoint = getModelCatalogEndpoint(apiUrl);
+            if (!endpoint) return null;
+            if (_customModelNameCache[endpoint]) {
+                const cachedModels = _customModelNameCache[endpoint];
+                setModelSuggestStatusKey(cachedModels.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: cachedModels.length });
+                return cachedModels;
+            }
+            if (_isFetchingCustomModels) return null;
+
+            _isFetchingCustomModels = true;
+            try {
+                const apiKeyValue = document.getElementById('apiKey')?.value?.trim() || '';
+                const backendBase = getBackendHttpBase();
+                setModelSuggestStatusKey('modelSuggestLoading');
+                console.log(`[ModelSuggest] 开始通过后端拉取模型: ${endpoint}`);
+
+                const resp = await fetch(`${backendBase}/api/models`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_url: apiUrl,
+                        api_key: apiKeyValue,
+                        timeout_ms: 5000
+                    })
+                });
+
+                const json = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                    if (resp.status === 404) {
+                        const backendMissingError = new Error('backend-models-endpoint-missing');
+                        backendMissingError.i18nKey = 'modelSuggestBackendMissing';
+                        throw backendMissingError;
+                    }
+                    throw new Error(json.detail || `HTTP ${resp.status}`);
+                }
+
+                const names = Array.isArray(json.models) ? json.models.filter(Boolean).sort() : [];
+                _customModelNameCache[endpoint] = names;
+                console.log(`[ModelSuggest] 已通过后端缓存 ${names.length} 个模型: ${endpoint}`);
+                setModelSuggestStatusKey(names.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: names.length });
+                return names;
+            } catch (error) {
+                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, error.message);
+                delete _customModelNameCache[endpoint];
+                if (error.i18nKey) {
+                    setModelSuggestStatusKey(error.i18nKey, error.params, true);
+                } else {
+                    setModelSuggestStatusKey('modelSuggestLoadFailed', { message: error.message }, true);
+                }
+                return [];
+            } finally {
+                _isFetchingCustomModels = false;
+            }
+        }
+
+        function scheduleModelFetch() {
+            clearTimeout(_modelFetchDebounceTimer);
+            const apiUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+            const endpoint = getModelCatalogEndpoint(apiUrl);
+
+            if (!endpoint) {
+                clearModelSuggestions();
+                if (apiUrl) {
+                    setModelSuggestStatusKey('modelSuggestUnsupportedUrl');
+                } else {
+                    setModelSuggestStatus('');
+                }
+                return;
+            }
+
+            _modelFetchDebounceTimer = setTimeout(async () => {
+                const models = await fetchCustomModels(apiUrl);
+                const modelInput = document.getElementById('modelName');
+                if (modelInput && document.activeElement === modelInput && models && models.length > 0) {
+                    renderModelSuggestions(modelInput);
+                }
+            }, 300);
+        }
+
+        function handleModelSuggestInput(e) {
+            if (!e.target || e.target.id !== 'modelName') return;
+
+            const apiUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+            const endpoint = getModelCatalogEndpoint(apiUrl);
+            if (!endpoint) {
+                clearModelSuggestions();
+                if (apiUrl) {
+                    setModelSuggestStatusKey('modelSuggestUnsupportedUrl');
+                } else {
+                    setModelSuggestStatus('');
+                }
+                return;
+            }
+
+            if (_customModelNameCache[endpoint]) {
+                renderModelSuggestions(e.target);
+                return;
+            }
+
+            setModelSuggestStatusKey('modelSuggestLoading');
+            fetchCustomModels(apiUrl).then(models => {
+                if (models && document.activeElement === e.target) {
+                    renderModelSuggestions(e.target);
+                }
+            });
+        }
+
+        document.addEventListener('input', handleModelSuggestInput, true);
+        document.getElementById('modelName').addEventListener('focus', (e) => {
+            handleModelSuggestInput(e);
+        });
+        document.getElementById('apiUrl').addEventListener('input', scheduleModelFetch);
+        document.getElementById('apiUrl').addEventListener('change', scheduleModelFetch);
+        document.getElementById('apiKey').addEventListener('input', () => {
+            _customModelNameCache = {};
+            scheduleModelFetch();
+        });
+        document.getElementById('backendUrl').addEventListener('change', () => {
+            _customModelNameCache = {};
+            scheduleModelFetch();
+        });
 
         // ===============================================================================
         // 历史记录功能 (History Feature) - v1.9
@@ -5535,6 +5791,7 @@ async function processOllamaResponse(response, promptLength) {
             document.getElementById('topPInput').value = savedTopP || d_top_p;
             document.getElementById('presencePenaltyInput').value = savedPresencePenalty || d_presence_penalty;
             document.getElementById('frequencyPenaltyInput').value = savedFrequencyPenalty || d_frequency_penalty;
+            scheduleModelFetch();
 
             // 提示用户已加载配置
             if (savedApiUrl) {

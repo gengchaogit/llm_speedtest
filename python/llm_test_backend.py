@@ -17,6 +17,7 @@ import httpx
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from urllib.parse import urlparse
 
 # ============================================================
 # Supabase 配置（云端结果共享）
@@ -61,6 +62,11 @@ WORD_LIST = [
     "harmony", "unity", "solidarity", "partnership", "network", "community", "integration", "bond"
 ]
 
+NVIDIA_MODEL_NAME_HINTS = {
+    "minimax/minimax-m2.7": "minimaxai/minimax-m2.7",
+    "minimax/minimax-m2.5": "minimaxai/minimax-m2.5",
+}
+
 app = FastAPI(title="LLM Speed Test Backend")
 
 # 速率限制器
@@ -81,6 +87,23 @@ import os
 from datetime import datetime
 
 current_port = 18000
+
+
+def resolve_model_catalog_endpoint(api_url: str) -> tuple[Optional[str], bool]:
+    """Resolve a chat endpoint into its corresponding model-list endpoint."""
+    if not api_url:
+        return None, False
+
+    normalized = api_url.strip().rstrip("/")
+    if normalized.endswith("/v1/chat/completions"):
+        return normalized[:-len("/v1/chat/completions")] + "/v1/models", False
+    if normalized.endswith("/v1/models"):
+        return normalized, False
+    if normalized.endswith("/api/chat"):
+        return normalized[:-len("/api/chat")] + "/api/tags", True
+    if normalized.endswith("/api/tags"):
+        return normalized, True
+    return None, False
 
 @app.get("/")
 async def serve_frontend():
@@ -105,6 +128,53 @@ async def get_leaderboard_page():
 async def get_port():
     """返回当前后端端口号"""
     return {"port": current_port}
+
+
+class ModelListPayload(BaseModel):
+    api_url: str
+    api_key: str = ""
+    timeout_ms: int = 5000
+
+
+@app.post("/api/models")
+async def get_models(payload: ModelListPayload):
+    endpoint, is_ollama = resolve_model_catalog_endpoint(payload.api_url)
+    if not endpoint:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported API URL. Expected /v1/chat/completions, /v1/models, /api/chat, or /api/tags"
+        )
+
+    headers = {"Accept": "application/json"}
+    if payload.api_key and payload.api_key.strip():
+        headers["Authorization"] = f"Bearer {payload.api_key.strip()}"
+
+    timeout_seconds = max(1.0, min(payload.timeout_ms, 15000) / 1000.0)
+    print(f"[ModelSuggest] 拉取模型列表: {endpoint}", flush=True)
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds, verify=False, follow_redirects=True) as client:
+            response = await client.get(endpoint, headers=headers)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch model list from {endpoint}: {exc}") from exc
+
+    if response.status_code != 200:
+        error_msg = build_http_error_message(endpoint, "", response.status_code, response.content)
+        raise HTTPException(status_code=response.status_code, detail=error_msg)
+
+    try:
+        data = response.json()
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail=f"Invalid JSON returned by {endpoint}") from exc
+
+    if is_ollama:
+        names = [m.get("name") for m in data.get("models", []) if isinstance(m, dict)]
+    else:
+        names = [m.get("id") for m in data.get("data", []) if isinstance(m, dict)]
+
+    names = sorted({name for name in names if name})
+    print(f"[ModelSuggest] 成功拉取 {len(names)} 个模型: {endpoint}", flush=True)
+    return {"endpoint": endpoint, "models": names}
 
 
 # ============================================================
@@ -646,6 +716,28 @@ def generate_prompt(length: int, seed: int = 0) -> str:
     return prompt
 
 
+def build_http_error_message(api_url: str, model_name: str, status_code: int, error_bytes: bytes) -> str:
+    """Build a more actionable HTTP error message for common provider quirks."""
+    error_text = error_bytes.decode(errors="replace")
+    error_msg = f"HTTP {status_code}: {error_text}"
+
+    host = urlparse(api_url).netloc.lower()
+    if status_code == 404 and "integrate.api.nvidia.com" in host:
+        hint_parts = [
+            "NVIDIA 的 /v1/chat/completions 入口通常是对的，404 更像是模型 ID 不存在、命名不匹配，或当前目录下没有路由到该模型。"
+        ]
+
+        suggested_model = NVIDIA_MODEL_NAME_HINTS.get(model_name)
+        if suggested_model:
+            hint_parts.append(f"当前传入的是 '{model_name}'，可优先改试官方命名 '{suggested_model}'。")
+        elif model_name.startswith("minimax/"):
+            hint_parts.append("NVIDIA 文档里的 Minimax 模型前缀通常是 'minimaxai/'，不是 'minimax/'。")
+
+        error_msg = f"{error_msg} | 提示: {' '.join(hint_parts)}"
+
+    return error_msg
+
+
 async def execute_single_request(
     api_url: str,
     api_key: str,
@@ -741,7 +833,7 @@ async def execute_single_request(
                 print(f"[Response] 收到响应，状态码: {response.status_code}", flush=True)
                 if response.status_code != 200:
                     error_text = await response.aread()
-                    error_msg = f"HTTP {response.status_code}: {error_text.decode()}"
+                    error_msg = build_http_error_message(api_url, model_name, response.status_code, error_text)
                     print(f"[Error] {error_msg}")
                     return {
                         "success": False,
