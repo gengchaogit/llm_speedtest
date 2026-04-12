@@ -1078,6 +1078,8 @@
                     <input type="text" id="modelName" value="" list="modelSuggest" autocomplete="off"
                         placeholder="输入模型名称，将自动联想...">
                     <datalist id="modelSuggest"></datalist>
+                    <p id="modelSuggestStatus" class="model-suggest-status"
+                        style="margin-top: 5px; font-size: 12px; color: #666;"></p>
                 </div>
             </div>
             <div class="form-row">
@@ -1198,7 +1200,7 @@
                 <button id="screenshotComparison"
                     style="display: none; background: #8e44ad; width: 160px; flex: none;">📸 截图对比结果</button>
             </div>
-            <p class="notes" style="margin-top: 10px;">说明：先“开始测试”运行一次，然后再导入其他CSV文件，点击“生成对比图表”</p>
+            <p id="comparisonNoteText" class="notes" style="margin-top: 10px;">说明：先“开始测试”运行一次，然后再导入其他CSV文件，点击“生成对比图表”</p>
         </div>
 
         <div id="results">
@@ -1296,6 +1298,14 @@
                 placeholderNotes: '请填写设备信息、模型信息、模型推理框架，以便在结果中显示',
                 labelSaveDetail: '保存测试详情（提示词和输出内容）',
                 noteSaveDetail: '💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。',
+                modelSuggestLoading: '正在加载模型列表...',
+                modelSuggestLoaded: '已加载 {count} 个模型',
+                modelSuggestLoadedFilter: '已加载 {count} 个模型，可继续输入筛选',
+                modelSuggestEmpty: '接口返回了空模型列表',
+                modelSuggestLoadFailed: '模型列表加载失败：{message}',
+                modelSuggestUnsupportedUrl: '当前 API 地址不支持自动获取模型列表',
+                modelSuggestOpenRouterLoaded: 'OpenRouter 联想库已加载 {count} 个模型',
+                modelSuggestOpenRouterLoadedFilter: 'OpenRouter 联想库已加载 {count} 个模型，可继续输入筛选',
                 sectionTestParams: '测试参数配置',
                 labelMinLength: '最小提示词长度',
                 labelMaxLength: '最大提示词长度',
@@ -1519,6 +1529,14 @@
                 placeholderNotes: 'Fill in device info, model info, inference framework for display in results',
                 labelSaveDetail: 'Save Test Details (Prompts and Outputs)',
                 noteSaveDetail: '💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.',
+                modelSuggestLoading: 'Loading model list...',
+                modelSuggestLoaded: 'Loaded {count} models',
+                modelSuggestLoadedFilter: 'Loaded {count} models, keep typing to filter',
+                modelSuggestEmpty: 'The API returned an empty model list',
+                modelSuggestLoadFailed: 'Failed to load model list: {message}',
+                modelSuggestUnsupportedUrl: 'The current API URL does not support automatic model discovery',
+                modelSuggestOpenRouterLoaded: 'OpenRouter suggestion library loaded {count} models',
+                modelSuggestOpenRouterLoadedFilter: 'OpenRouter suggestion library loaded {count} models, keep typing to filter',
                 sectionTestParams: 'Test Parameters',
                 labelMinLength: 'Min Prompt Length',
                 labelMaxLength: 'Max Prompt Length',
@@ -1721,6 +1739,52 @@
 
         // 当前语言
         let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        const modelSuggestStatusState = {
+            mode: 'raw',
+            message: '',
+            key: '',
+            params: {},
+            isError: false
+        };
+
+        function formatI18nText(template, params = {}) {
+            return String(template || '').replace(/\{(\w+)\}/g, (_, key) => {
+                const value = params[key];
+                return value === undefined || value === null ? '' : String(value);
+            });
+        }
+
+        function renderModelSuggestStatus() {
+            const statusEl = document.getElementById('modelSuggestStatus');
+            if (!statusEl) return;
+
+            let message = modelSuggestStatusState.message || '';
+            if (modelSuggestStatusState.mode === 'key' && modelSuggestStatusState.key) {
+                const t = translations[currentLang] || translations.zh;
+                message = formatI18nText(t[modelSuggestStatusState.key], modelSuggestStatusState.params);
+            }
+
+            statusEl.textContent = message;
+            statusEl.style.color = modelSuggestStatusState.isError ? '#d9534f' : '#666';
+        }
+
+        function setModelSuggestStatus(message = '', isError = false) {
+            modelSuggestStatusState.mode = 'raw';
+            modelSuggestStatusState.message = message;
+            modelSuggestStatusState.key = '';
+            modelSuggestStatusState.params = {};
+            modelSuggestStatusState.isError = isError;
+            renderModelSuggestStatus();
+        }
+
+        function setModelSuggestStatusKey(key = '', params = {}, isError = false) {
+            modelSuggestStatusState.mode = key ? 'key' : 'raw';
+            modelSuggestStatusState.message = '';
+            modelSuggestStatusState.key = key;
+            modelSuggestStatusState.params = params || {};
+            modelSuggestStatusState.isError = isError;
+            renderModelSuggestStatus();
+        }
 
         // 切换语言函数
         function switchLanguage(lang) {
@@ -1779,7 +1843,8 @@
             document.getElementById('exportComparisonChart').textContent = t.btnExportComparisonChart;
 
             // 更新说明文字
-            document.querySelector('.config-section p.notes').textContent = t.comparisonNote;
+            document.getElementById('comparisonNoteText').textContent = t.comparisonNote;
+            renderModelSuggestStatus();
 
             // 更新图表标题
             const chartTitles = document.querySelectorAll('#chartContainer h3');
@@ -2138,26 +2203,47 @@
         }
 
         let _customModelNameCache = {}; // { 'http://...': ['model1', 'model2'] }
+        let _customModelFetchState = {}; // { endpoint: { kind: 'success'|'empty'|'error', message?: string } }
         let _isFetchingCustomModels = false;
+
+        function resolveModelCatalogEndpoint(apiUrl) {
+            const normalized = (apiUrl || '').trim().replace(/\/+$/, '');
+            if (!normalized) return { endpoint: '', isOllama: false };
+            if (normalized.endsWith('/v1/chat/completions')) {
+                return { endpoint: `${normalized.slice(0, -'/v1/chat/completions'.length)}/v1/models`, isOllama: false };
+            }
+            if (normalized.endsWith('/v1/models')) {
+                return { endpoint: normalized, isOllama: false };
+            }
+            if (normalized.endsWith('/api/chat')) {
+                return { endpoint: `${normalized.slice(0, -'/api/chat'.length)}/api/tags`, isOllama: true };
+            }
+            if (normalized.endsWith('/api/tags')) {
+                return { endpoint: normalized, isOllama: true };
+            }
+            return { endpoint: '', isOllama: false };
+        }
 
         async function fetchCustomModels(apiUrl) {
             if (!apiUrl) return null;
-            let endpoint = '';
-            let isOllama = false;
-            if (apiUrl.endsWith('/v1/chat/completions')) {
-                endpoint = apiUrl.replace('/v1/chat/completions', '/v1/models');
-            } else if (apiUrl.endsWith('/api/chat')) {
-                endpoint = apiUrl.replace('/api/chat', '/api/tags');
-                isOllama = true;
-            } else {
-                return null;
-            }
+            const { endpoint, isOllama } = resolveModelCatalogEndpoint(apiUrl);
+            if (!endpoint) return null;
 
-            if (_customModelNameCache[endpoint]) return _customModelNameCache[endpoint];
+            if (Object.prototype.hasOwnProperty.call(_customModelNameCache, endpoint)) {
+                const cachedModels = _customModelNameCache[endpoint];
+                const cachedState = _customModelFetchState[endpoint];
+                if (cachedState?.kind === 'error') {
+                    setModelSuggestStatusKey('modelSuggestLoadFailed', { message: cachedState.message || '' }, true);
+                } else {
+                    setModelSuggestStatusKey(cachedModels.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: cachedModels.length });
+                }
+                return cachedModels;
+            }
             if (_isFetchingCustomModels) return null;
 
             _isFetchingCustomModels = true;
             try {
+                setModelSuggestStatusKey('modelSuggestLoading');
                 console.log(`[ModelSuggest] 开始从接口拉取模型: ${endpoint}`);
                 const apiKey = document.getElementById('apiKey')?.value?.trim() || '';
                 const headers = { 'Accept': 'application/json' };
@@ -2175,11 +2261,16 @@
                 }
                 names = names.filter(Boolean).sort();
                 _customModelNameCache[endpoint] = names;
+                _customModelFetchState[endpoint] = { kind: names.length > 0 ? 'success' : 'empty' };
                 console.log(`[ModelSuggest] 从接口 ${endpoint} 成功拉取 ${names.length} 个模型`);
+                setModelSuggestStatusKey(names.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: names.length });
                 return names;
             } catch (err) {
-                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, getFriendlyFetchErrorMessage(err, endpoint));
+                const friendlyMessage = getFriendlyFetchErrorMessage(err, endpoint);
+                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, friendlyMessage);
                 _customModelNameCache[endpoint] = []; // 避免重复请求
+                _customModelFetchState[endpoint] = { kind: 'error', message: friendlyMessage };
+                setModelSuggestStatusKey('modelSuggestLoadFailed', { message: friendlyMessage }, true);
                 return [];
             } finally {
                 _isFetchingCustomModels = false;
@@ -2199,6 +2290,7 @@
         function _modelSuggestHandler(e) {
             const id = e.target && e.target.id;
             if (id !== 'modelName' && id !== 'shareModelName') return;
+            const isMainModelInput = id === 'modelName';
 
             const q = (e.target.value || '').toLowerCase().trim();
             const dlId = id === 'modelName' ? 'modelSuggest' : 'modelSuggestModal';
@@ -2208,48 +2300,81 @@
             // 获取当前 API URL
             const apiUrlInput = document.getElementById('apiUrl');
             const apiUrl = apiUrlInput ? apiUrlInput.value.trim() : '';
+            const hasApiUrl = isMainModelInput && Boolean(apiUrl);
+            const { endpoint } = resolveModelCatalogEndpoint(apiUrl);
+            const shouldUseCustomModels = hasApiUrl;
 
             let customModels = null;
-            // 批量上传和普通上传的模型列表，默认加载openroute那个全部的列表，以防止本地部署模型名字不准
-            if (id === 'modelName' && apiUrl) {
-                let endpoint = '';
-                if (apiUrl.endsWith('/v1/chat/completions')) endpoint = apiUrl.replace('/v1/chat/completions', '/v1/models');
-                else if (apiUrl.endsWith('/api/chat')) endpoint = apiUrl.replace('/api/chat', '/api/tags');
+            if (shouldUseCustomModels) {
+                if (!endpoint) {
+                    dl.innerHTML = '';
+                    setModelSuggestStatusKey('modelSuggestUnsupportedUrl');
+                    return;
+                }
 
-                if (endpoint) {
-                    if (_customModelNameCache[endpoint]) {
-                        customModels = _customModelNameCache[endpoint];
-                    } else if (!_isFetchingCustomModels) {
-                        // 异步拉取
-                        fetchCustomModels(apiUrl).then(models => {
-                            if (models && models.length > 0 && document.activeElement === e.target) {
-                                // 拉取成功后如果用户还在输入框，刷新提示
-                                e.target.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        });
+                if (Object.prototype.hasOwnProperty.call(_customModelNameCache, endpoint)) {
+                    customModels = _customModelNameCache[endpoint];
+                    const cachedState = _customModelFetchState[endpoint];
+                    if (cachedState?.kind === 'error') {
+                        setModelSuggestStatusKey('modelSuggestLoadFailed', { message: cachedState.message || '' }, true);
+                    } else if (cachedState?.kind === 'empty') {
+                        setModelSuggestStatusKey('modelSuggestEmpty');
                     }
+                } else if (!_isFetchingCustomModels) {
+                    fetchCustomModels(apiUrl).then(models => {
+                        if (models && document.activeElement === e.target) {
+                            e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    });
                 }
             }
 
-            const sourceList = (customModels && customModels.length > 0) ? customModels : _modelNameCache;
-            if (!sourceList || sourceList.length === 0) {
-                dl.innerHTML = ''; return;
+            const sourceList = shouldUseCustomModels ? customModels : _modelNameCache;
+            const usingOpenRouterLibrary = !shouldUseCustomModels;
+
+            if (!sourceList) {
+                dl.innerHTML = '';
+                return;
+            }
+
+            if (sourceList.length === 0) {
+                dl.innerHTML = '';
+                if (isMainModelInput && usingOpenRouterLibrary && !modelSuggestStatusState.isError) setModelSuggestStatus('');
+                return;
             }
 
             let matches = [];
             if (!q) {
-                // 如果为空，展示自定义模型的前 50 个（不展示全网 OpenRouter，太吵）
-                if (sourceList !== _modelNameCache) matches = sourceList.slice(0, 50);
-                else { dl.innerHTML = ''; return; }
+                if (!usingOpenRouterLibrary) matches = sourceList.slice(0, 50);
+                else {
+                    dl.innerHTML = '';
+                    if (isMainModelInput) setModelSuggestStatusKey('modelSuggestOpenRouterLoadedFilter', { count: sourceList.length });
+                    return;
+                }
             } else {
                 matches = sourceList.filter(name => name.toLowerCase().includes(q)).slice(0, 30);
             }
 
-            if (matches.length === 1 && matches[0].toLowerCase() === q) { dl.innerHTML = ''; return; }
+            if (matches.length === 1 && matches[0].toLowerCase() === q) {
+                dl.innerHTML = '';
+                if (isMainModelInput) {
+                    setModelSuggestStatusKey(usingOpenRouterLibrary ? 'modelSuggestOpenRouterLoaded' : 'modelSuggestLoaded', { count: sourceList.length });
+                }
+                return;
+            }
             dl.innerHTML = matches.map(m => `<option value="${m}"></option>`).join('');
+            if (isMainModelInput) {
+                setModelSuggestStatusKey(usingOpenRouterLibrary ? 'modelSuggestOpenRouterLoadedFilter' : 'modelSuggestLoadedFilter', { count: sourceList.length });
+            }
         }
         // input 事件（打字）
         document.addEventListener('input', _modelSuggestHandler, true);
+        document.addEventListener('focusin', (e) => {
+            const id = e.target && e.target.id;
+            if (id === 'modelName') {
+                setTimeout(() => e.target.dispatchEvent(new Event('input', { bubbles: true })), 0);
+            }
+        }, true);
         // paste 事件：value 在事件时机还没更新，延迟一帧再手动触发 input
         document.addEventListener('paste', (e) => {
             const id = e.target && e.target.id;
@@ -2257,6 +2382,20 @@
                 setTimeout(() => e.target.dispatchEvent(new Event('input', { bubbles: true })), 50);
             }
         }, true);
+        document.getElementById('apiKey').addEventListener('input', () => {
+            _customModelNameCache = {};
+            _customModelFetchState = {};
+            if (document.activeElement?.id === 'modelName') {
+                document.activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+                setModelSuggestStatus('');
+            }
+        });
+        document.getElementById('apiUrl').addEventListener('input', () => {
+            const dl = document.getElementById('modelSuggest');
+            if (dl) dl.innerHTML = '';
+            setModelSuggestStatus('');
+        });
         let concurrencyStats = {
             minPrefillSpeed: Infinity,
             maxPrefillSpeed: 0,
