@@ -970,6 +970,30 @@
             font-size: 1.2em;
         }
 
+        .browser-env-warning {
+            display: none;
+            margin: 15px 0 20px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid #f0c36d;
+            background: linear-gradient(135deg, #fff9ea 0%, #fff1d3 100%);
+            color: #8a4b00;
+            line-height: 1.7;
+            box-shadow: 0 4px 12px rgba(240, 195, 109, 0.22);
+        }
+
+        .browser-env-warning strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 1em;
+        }
+
+        .browser-env-warning code {
+            background: rgba(138, 75, 0, 0.08);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+
         @keyframes pulse-warning {
 
             0%,
@@ -1040,6 +1064,7 @@
                 <li><strong> 支持思考模型</strong>（DeepSeek-R1、Qwen-QwQ等）：自动统计总吞吐（思考+答案tokens）</li>
             </ul>
         </div>
+        <div id="browserEnvWarning" class="browser-env-warning" style="display: none;"></div>
 
         <div class="config-section">
             <h2>API 信息</h2>
@@ -1777,6 +1802,8 @@
                     infoElem.textContent = t.msgWaiting;
                 }
             }
+
+            updateBrowserEnvironmentWarning();
         }
 
         // 绑定语言切换按钮
@@ -1815,6 +1842,7 @@
         // API类型切换
         const apiOptions = document.querySelectorAll('.api-option');
         const apiDescription = document.getElementById('apiDescription');
+        const browserEnvWarning = document.getElementById('browserEnvWarning');
 
         apiOptions.forEach(option => {
             option.addEventListener('click', () => {
@@ -1824,6 +1852,7 @@
                 const apiType = option.dataset.type;
                 updateApiDescription(apiType);
                 updateDefaultValues(apiType);
+                updateBrowserEnvironmentWarning(apiType);
             });
         });
 
@@ -1868,6 +1897,141 @@
         }
 
         // 初始化
+        function escapeHtml(text) {
+            return String(text ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getSelectedApiType() {
+            return document.querySelector('.api-option.active')?.dataset.type || currentApiType || 'openai';
+        }
+
+        function isFileOrigin() {
+            return window.location.protocol === 'file:';
+        }
+
+        function isHttpsPage() {
+            return window.location.protocol === 'https:';
+        }
+
+        function getCurrentPageLabel() {
+            if (isFileOrigin()) return window.location.href;
+            return `${window.location.origin}${window.location.pathname}`;
+        }
+
+        function getParsedApiUrl(apiUrl) {
+            if (!apiUrl) return null;
+
+            try {
+                return new URL(apiUrl, window.location.href);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function getApiTargetLabel(apiUrl) {
+            const parsed = getParsedApiUrl(apiUrl);
+            return parsed ? parsed.origin : (apiUrl || 'API');
+        }
+
+        function isCrossOriginRequest(apiUrl) {
+            const parsed = getParsedApiUrl(apiUrl);
+            if (!parsed) return false;
+            if (isFileOrigin()) return true;
+            return parsed.origin !== window.location.origin;
+        }
+
+        function isMixedContentRisk(apiUrl) {
+            const parsed = getParsedApiUrl(apiUrl);
+            if (!parsed) return false;
+            return isHttpsPage() && parsed.protocol === 'http:';
+        }
+
+        function getFriendlyFetchErrorMessage(error, apiUrl) {
+            const rawMessage = error?.message || String(error || 'Unknown error');
+            const normalizedMessage = rawMessage.toLowerCase();
+            const target = getApiTargetLabel(apiUrl);
+            const pageLabel = getCurrentPageLabel();
+
+            if (rawMessage.includes('signal timed out') || error?.name === 'AbortError' || normalizedMessage.includes('aborted')) {
+                return currentLang === 'zh'
+                    ? `连接 ${target} 超时，请确认接口地址可达且服务已经启动。`
+                    : `Connection to ${target} timed out. Please confirm the endpoint is reachable and the service is running.`;
+            }
+
+            if (rawMessage.includes('Failed to fetch')) {
+                if (isMixedContentRisk(apiUrl)) {
+                    return currentLang === 'zh'
+                        ? `当前页面地址是 ${pageLabel}，而接口是 ${target}。HTTPS 页面直连 HTTP 接口会被浏览器当作 mixed content 拦截；像部署在 GitHub Pages 上的页面访问 http://192.168.x.x 这类局域网接口时也会这样。请把接口改成 HTTPS，或改用仓库里的 Python 后端版/你自己的代理。`
+                        : `This page is loaded from ${pageLabel}, but the API is ${target}. Browsers block HTTPS pages from directly calling HTTP APIs as mixed content; this also applies to pages hosted on GitHub Pages calling LAN endpoints like http://192.168.x.x. Use HTTPS for the API, or switch to the project's Python backend / your own proxy.`;
+                }
+
+                if (isFileOrigin()) {
+                    return currentLang === 'zh'
+                        ? `浏览器拦截了对 ${target} 的直接请求：当前页面是通过 file:// 打开的，来源会被视为 null。请改为通过本地 HTTP 服务访问本页面，或使用仓库里的 Python 后端版；如果目标 API 没有返回 Access-Control-Allow-Origin，仍然需要后端代理。`
+                        : `The browser blocked the direct request to ${target}: this page was opened via file://, so the origin is treated as null. Serve this page over local HTTP or use the project's Python backend; if the target API does not return Access-Control-Allow-Origin, you still need a backend proxy.`;
+                }
+
+                if (isCrossOriginRequest(apiUrl)) {
+                    return currentLang === 'zh'
+                        ? `当前页面地址是 ${pageLabel}，请求 ${target} 属于跨域访问。即使页面部署在 https://gengchaogit.github.io/llm_speedtest，只要目标接口没有返回 Access-Control-Allow-Origin，或没有通过 OPTIONS 预检，浏览器也会拦截模型列表和测速请求。建议改用仓库里的 Python 后端版，或通过你自己的服务端代理转发。`
+                        : `This page is loaded from ${pageLabel}, and the request to ${target} is cross-origin. Even when the page is deployed at https://gengchaogit.github.io/llm_speedtest, the browser will still block model-list and benchmark requests unless the target API returns Access-Control-Allow-Origin and passes the OPTIONS preflight. Use the project's Python backend or proxy the request through your own server.`;
+                }
+
+                return currentLang === 'zh'
+                    ? `浏览器无法直接访问 ${target}。这通常是网络、证书或浏览器安全策略导致的请求失败。建议改用仓库里的 Python 后端版，或通过你自己的服务端代理转发请求。`
+                    : `The browser could not access ${target} directly. This is usually caused by network issues, certificate problems, or browser security restrictions. Use the project's Python backend or proxy the request through your own server.`;
+            }
+
+            return rawMessage;
+        }
+
+        function updateBrowserEnvironmentWarning(apiType = getSelectedApiType()) {
+            if (!browserEnvWarning) return;
+
+            const apiUrlValue = document.getElementById('apiUrl')?.value?.trim() || '';
+            const parsedApiUrl = getParsedApiUrl(apiUrlValue);
+            const shouldShowWarning = apiType === 'openai'
+                && parsedApiUrl
+                && /^https?:$/.test(parsedApiUrl.protocol)
+                && (isFileOrigin() || isMixedContentRisk(apiUrlValue) || isCrossOriginRequest(apiUrlValue));
+
+            if (!shouldShowWarning) {
+                browserEnvWarning.style.display = 'none';
+                browserEnvWarning.innerHTML = '';
+                return;
+            }
+
+            const target = escapeHtml(getApiTargetLabel(apiUrlValue));
+            const pageLabel = escapeHtml(getCurrentPageLabel());
+
+            if (isMixedContentRisk(apiUrlValue)) {
+                if (currentLang === 'zh') {
+                    browserEnvWarning.innerHTML = `<strong>HTTPS 页面直连 HTTP 接口提醒</strong>当前页面地址是 <code>${pageLabel}</code>。像 <code>${target}</code> 这样的 HTTP 接口，如果从 GitHub Pages 或其他 HTTPS 页面直接访问，会被浏览器当作 mixed content 拦截；访问 <code>http://192.168.x.x</code> 这类局域网接口时尤其常见。请把接口改成 HTTPS，或改用 <code>python/启动测速工具.bat</code> / <code>python/llm_test_backend.py</code> 这套后端版。`;
+                } else {
+                    browserEnvWarning.innerHTML = `<strong>HTTPS page to HTTP API warning</strong>This page is loaded from <code>${pageLabel}</code>. HTTP endpoints like <code>${target}</code> will be blocked as mixed content when called directly from GitHub Pages or any other HTTPS site, which commonly happens with LAN URLs such as <code>http://192.168.x.x</code>. Use HTTPS for the API, or switch to <code>python/Start_LLM_Speed_Test.bat</code> / <code>python/llm_test_backend.py</code>.`;
+                }
+            } else if (isFileOrigin()) {
+                if (currentLang === 'zh') {
+                    browserEnvWarning.innerHTML = `<strong>浏览器直连提醒</strong>当前页面是通过 <code>file://</code> 打开的，浏览器会把来源视为 <code>null</code>。像 <code>${target}</code> 这类 OpenAI 兼容接口如果没有返回 <code>Access-Control-Allow-Origin</code>，模型列表和测速请求都会被 CORS 拦截。可直接双击 <code>python/启动测速工具.bat</code>，或先运行 <code>python/llm_test_backend.py</code> 再打开 <code>python/LLM_Speed_Test_v3_Python_Backend.html</code>。`;
+                } else {
+                    browserEnvWarning.innerHTML = `<strong>Direct browser access warning</strong>This page is opened via <code>file://</code>, so the browser treats the origin as <code>null</code>. OpenAI-compatible endpoints like <code>${target}</code> will be blocked by CORS unless they return <code>Access-Control-Allow-Origin</code>. You can use <code>python/Start_LLM_Speed_Test.bat</code>, or run <code>python/llm_test_backend.py</code> and then open <code>python/LLM_Speed_Test_v3_Python_Backend.html</code>.`;
+                }
+            } else if (currentLang === 'zh') {
+                browserEnvWarning.innerHTML = `<strong>跨域直连提醒</strong>当前页面地址是 <code>${pageLabel}</code>，请求 <code>${target}</code> 属于浏览器跨域访问。即使页面部署在 <code>https://gengchaogit.github.io/llm_speedtest</code>，只要目标 API 没有返回 <code>Access-Control-Allow-Origin</code>，或没有通过 <code>OPTIONS</code> 预检，模型列表和测速请求也会被拦截。建议改用 <code>python/启动测速工具.bat</code> / <code>python/llm_test_backend.py</code>，或通过你自己的后端代理转发。`;
+            } else {
+                browserEnvWarning.innerHTML = `<strong>Cross-origin direct access warning</strong>This page is loaded from <code>${pageLabel}</code>, and <code>${target}</code> is a cross-origin request. Even if the page is deployed at <code>https://gengchaogit.github.io/llm_speedtest</code>, model-list and benchmark requests will still be blocked unless the target API returns <code>Access-Control-Allow-Origin</code> and passes the <code>OPTIONS</code> preflight. Use <code>python/Start_LLM_Speed_Test.bat</code> / <code>python/llm_test_backend.py</code>, or proxy the request through your own backend.`;
+            }
+
+            browserEnvWarning.style.display = 'block';
+        }
+
+        document.getElementById('apiUrl').addEventListener('input', () => updateBrowserEnvironmentWarning());
+
         updateApiDescription('openai');
 
         // 单词库用于生成提示词（丰富多样的词汇，涵盖不同主题和词性）
@@ -2036,7 +2200,7 @@
                 console.log(`[ModelSuggest] 从接口 ${endpoint} 成功拉取 ${names.length} 个模型`);
                 return names;
             } catch (err) {
-                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, err.message);
+                console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, getFriendlyFetchErrorMessage(err, endpoint));
                 _customModelNameCache[endpoint] = []; // 避免重复请求
                 return [];
             } finally {
@@ -2283,14 +2447,15 @@
 
                 } catch (error) {
                     clearTimeout(timeoutId); // Failed attempt
+                    const friendlyMessage = getFriendlyFetchErrorMessage(error, apiUrl);
 
                     // Log the attempt
-                    console.warn(`[RetryLogic] Attempt ${i + 1}/${retries} for ${fetchOptions.body.length} bytes failed: ${error.message}`);
+                    console.warn(`[RetryLogic] Attempt ${i + 1}/${retries} for ${fetchOptions.body.length} bytes failed: ${friendlyMessage}`);
 
                     if (i === retries - 1) {
                         // This was the last attempt, re-throw the error to be caught by allSettled
                         console.error(`[RetryLogic] All ${retries} attempts failed.`);
-                        throw error;
+                        throw new Error(friendlyMessage);
                     }
 
                     // Wait before the next retry
@@ -2387,7 +2552,7 @@
                         clearTimeout(timeoutId);
                         console.log("[Test] 暖机请求完成。");
                     }
-                    catch (error) { console.warn("暖机请求失败:", error.message); }
+                    catch (error) { console.warn("暖机请求失败:", getFriendlyFetchErrorMessage(error, apiUrl)); }
                     await new Promise(resolve => setTimeout(resolve, 800)); // 暖机后额外等待
                 }
 
@@ -2445,7 +2610,7 @@
 
                     //  检查是否有成功的请求
                     if (concurrencyResults.length === 0) {
-                        throw new Error(`所有 ${concurrency} 个并发请求都失败了`);
+                        throw new Error(`${translations[currentLang].msgAllRequestsFailed}: ${failedMessages.join(', ')}`);
                     }
 
                     //
@@ -3132,7 +3297,7 @@
                         clearTimeout(timeoutId);
                         console.log("[Test] 暖机请求完成。");
                     }
-                    catch (error) { console.warn("暖机请求失败:", error.message); }
+                    catch (error) { console.warn("暖机请求失败:", getFriendlyFetchErrorMessage(error, apiUrl)); }
                     await new Promise(resolve => setTimeout(resolve, 800));
                 }
 
@@ -4634,6 +4799,7 @@
             document.getElementById('topPInput').value = savedTopP || d_top_p;
             document.getElementById('presencePenaltyInput').value = savedPresencePenalty || d_presence_penalty;
             document.getElementById('frequencyPenaltyInput').value = savedFrequencyPenalty || d_frequency_penalty;
+            updateBrowserEnvironmentWarning(savedApiType);
 
             // 提示用户已加载配置
             if (savedApiUrl) {
