@@ -2600,6 +2600,73 @@
         }
 
         // 【修复】测试OpenAI兼容接口
+        function toTokenNumber(value) {
+            if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+            const num = Number(value);
+            if (!Number.isFinite(num)) return null;
+            return Math.trunc(num);
+        }
+
+        function pickBestTokenValue(...values) {
+            const parsed = values.map(toTokenNumber).filter(value => value !== null);
+            if (parsed.length === 0) return null;
+            const positives = parsed.filter(value => value > 0);
+            return positives.length > 0 ? Math.max(...positives) : Math.max(...parsed);
+        }
+
+        function normalizeUsageTokenStats(usage) {
+            const promptTokens = pickBestTokenValue(
+                usage.prompt_tokens,
+                usage.input_tokens,
+                usage.prompt_eval_count
+            );
+            const completionTokens = pickBestTokenValue(
+                usage.completion_tokens,
+                usage.output_tokens,
+                usage.eval_count
+            );
+            const reasoningTokensTop = pickBestTokenValue(usage.reasoning_tokens);
+            const reasoningTokensNested = pickBestTokenValue(
+                usage.completion_tokens_details?.reasoning_tokens,
+                usage.output_tokens_details?.reasoning_tokens
+            );
+            const totalTokens = pickBestTokenValue(usage.total_tokens);
+            const reasoningTokens = reasoningTokensTop ?? reasoningTokensNested;
+            let outputTokens = null;
+
+            if (completionTokens !== null) {
+                outputTokens = completionTokens;
+
+                if (reasoningTokensTop !== null && reasoningTokensTop > 0) {
+                    if (promptTokens !== null && totalTokens !== null) {
+                        if (totalTokens === promptTokens + completionTokens + reasoningTokensTop) {
+                            outputTokens = completionTokens + reasoningTokensTop;
+                        } else if (totalTokens === promptTokens + completionTokens) {
+                            outputTokens = completionTokens;
+                        } else {
+                            outputTokens = Math.max(completionTokens, completionTokens + reasoningTokensTop);
+                        }
+                    } else {
+                        outputTokens = completionTokens + reasoningTokensTop;
+                    }
+                } else if (outputTokens <= 0 && reasoningTokens !== null && reasoningTokens > 0) {
+                    outputTokens = reasoningTokens;
+                }
+            } else if (reasoningTokens !== null) {
+                outputTokens = reasoningTokens;
+            } else if (promptTokens !== null && totalTokens !== null && totalTokens >= promptTokens) {
+                outputTokens = totalTokens - promptTokens;
+            }
+
+            return {
+                promptTokens,
+                completionTokens,
+                reasoningTokens,
+                outputTokens,
+                totalTokens
+            };
+        }
+
         async function testOpenAI(apiUrl, modelName, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
             for (let length of testLengths) {
                 if (!isTestingRunning) break;
@@ -2930,13 +2997,13 @@
 
                             //  解析usage字段（流式响应的最后一个chunk会包含）
                             if (data.usage) {
-                                const completion = data.usage.completion_tokens || 0;
-                                const reasoning = data.usage.reasoning_tokens || 0;
-                                const prompt = data.usage.prompt_tokens || 0;
+                                const usageStats = normalizeUsageTokenStats(data.usage);
+                                const completion = usageStats.completionTokens || 0;
+                                const reasoning = usageStats.reasoningTokens || 0;
+                                const prompt = usageStats.promptTokens || 0;
 
-                                // 总decode吞吐 = 思考tokens + 答案tokens
-                                actualOutputTokensFromUsage = completion + reasoning;
-                                actualPromptTokensFromUsage = prompt;
+                                actualOutputTokensFromUsage = usageStats.outputTokens;
+                                actualPromptTokensFromUsage = usageStats.promptTokens;
 
                                 // 保存完整的usage对象用于详情展示（包含所有可能的字段）
                                 usageInfo = { ...data.usage };
@@ -3140,7 +3207,9 @@
                 }
 
                 //  优先使用usage中的准确token数，如果没有则估算/使用传入值
-                const actualPromptTokens = actualPromptTokensFromUsage ?? promptLength; // Prefill用API返回的实际值
+                const actualPromptTokens = (actualPromptTokensFromUsage && actualPromptTokensFromUsage > 0)
+                    ? actualPromptTokensFromUsage
+                    : promptLength; // Prefill用API返回的实际值
 
                 //  Token统计：优先使用usage中的准确值
                 let receivedTokens;

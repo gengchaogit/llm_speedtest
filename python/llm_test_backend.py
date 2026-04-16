@@ -653,6 +653,84 @@ def estimate_token_count(text: str) -> int:
     return max(1, estimated_tokens)
 
 
+def _coerce_int(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(float(stripped))
+        except ValueError:
+            return None
+    return None
+
+
+def _pick_best_token_value(*values: Any) -> Optional[int]:
+    parsed = [v for v in (_coerce_int(value) for value in values) if v is not None]
+    if not parsed:
+        return None
+    positives = [v for v in parsed if v > 0]
+    return max(positives) if positives else max(parsed)
+
+
+def extract_usage_token_stats(usage: Dict[str, Any]) -> Dict[str, Optional[int]]:
+    completion_details = usage.get("completion_tokens_details") or {}
+    output_details = usage.get("output_tokens_details") or {}
+
+    prompt_tokens = _pick_best_token_value(
+        usage.get("prompt_tokens"),
+        usage.get("input_tokens"),
+        usage.get("prompt_eval_count"),
+    )
+    completion_tokens = _pick_best_token_value(
+        usage.get("completion_tokens"),
+        usage.get("output_tokens"),
+        usage.get("eval_count"),
+    )
+    reasoning_tokens_top = _pick_best_token_value(usage.get("reasoning_tokens"))
+    reasoning_tokens_nested = _pick_best_token_value(
+        completion_details.get("reasoning_tokens"),
+        output_details.get("reasoning_tokens"),
+    )
+    total_tokens = _pick_best_token_value(usage.get("total_tokens"))
+
+    reasoning_tokens = reasoning_tokens_top if reasoning_tokens_top is not None else reasoning_tokens_nested
+    output_tokens = None
+
+    if completion_tokens is not None:
+        output_tokens = completion_tokens
+
+        # Top-level reasoning tokens are usually separate from completion_tokens.
+        if reasoning_tokens_top is not None and reasoning_tokens_top > 0:
+            if prompt_tokens is not None and total_tokens is not None:
+                if total_tokens == prompt_tokens + completion_tokens + reasoning_tokens_top:
+                    output_tokens = completion_tokens + reasoning_tokens_top
+                elif total_tokens == prompt_tokens + completion_tokens:
+                    output_tokens = completion_tokens
+                else:
+                    output_tokens = max(completion_tokens, completion_tokens + reasoning_tokens_top)
+            else:
+                output_tokens = completion_tokens + reasoning_tokens_top
+        elif output_tokens <= 0 and reasoning_tokens is not None and reasoning_tokens > 0:
+            output_tokens = reasoning_tokens
+    elif reasoning_tokens is not None:
+        output_tokens = reasoning_tokens
+    elif prompt_tokens is not None and total_tokens is not None and total_tokens >= prompt_tokens:
+        output_tokens = total_tokens - prompt_tokens
+
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
 def calculate_dynamic_timeout(prompt_length: int, base_timeout: int) -> int:
     """
     根据prompt长度动态计算超时时间
@@ -878,15 +956,16 @@ async def execute_single_request(
                         # 提取usage信息（OpenAI格式）
                         if data.get("usage"):
                             usage = data["usage"]
-                            completion = usage.get("completion_tokens", 0)
-                            reasoning = usage.get("reasoning_tokens", 0)
-                            prompt = usage.get("prompt_tokens", 0)
+                            usage_stats = extract_usage_token_stats(usage)
+                            completion = usage_stats["completion_tokens"] or 0
+                            reasoning = usage_stats["reasoning_tokens"] or 0
+                            prompt = usage_stats["prompt_tokens"] or 0
 
                             print(f"[Usage] 找到usage字段！prompt_tokens: {prompt}, completion_tokens: {completion}, reasoning_tokens: {reasoning}")
                             print(f"[Debug] 完整usage字段: {json.dumps(usage, indent=2)}")
 
-                            actual_output_tokens = completion + reasoning
-                            actual_prompt_tokens = prompt
+                            actual_output_tokens = usage_stats["output_tokens"]
+                            actual_prompt_tokens = usage_stats["prompt_tokens"]
                             usage_info = usage.copy()
 
                             # 提取服务器timing (多种可能的字段名)
@@ -1078,14 +1157,14 @@ async def execute_single_request(
         
         # Token统计
         token_source = ''
-        if actual_prompt_tokens is None:
+        if actual_prompt_tokens is None or actual_prompt_tokens <= 0:
             # Fallback: 使用prompt_length作为估算（因为我们控制了prompt生成）
             actual_prompt_tokens = prompt_length
             print(f"[Token] Prompt估算: {actual_prompt_tokens} (使用设定长度)")
         else:
             print(f"[Token] Prompt来自usage: {actual_prompt_tokens}")
 
-        if actual_output_tokens is None:
+        if actual_output_tokens is None or (actual_output_tokens <= 0 and (reasoning_content or output_content)):
             # 使用精确的token估算函数
             reasoning_tokens = estimate_token_count(reasoning_content)
             completion_tokens = estimate_token_count(output_content)
