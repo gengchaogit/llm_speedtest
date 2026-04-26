@@ -1793,12 +1793,24 @@
             return parsed;
         }
 
+        function getBrowserPreferredPageLanguage() {
+            const preferredLanguages = Array.isArray(navigator.languages) && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language, navigator.userLanguage].filter(Boolean);
+            const primaryLanguage = String(preferredLanguages.find((lang) => typeof lang === 'string' && lang.trim()) || '').trim();
+            return /^zh\b/i.test(primaryLanguage) ? PAGE_LANGUAGE.ZH : PAGE_LANGUAGE.EN;
+        }
+
         function getStoredPageLanguage() {
             try {
-                return localStorage.getItem(PAGE_LANGUAGE_STORAGE_KEY) === PAGE_LANGUAGE.EN ? PAGE_LANGUAGE.EN : PAGE_LANGUAGE.ZH;
+                const storedLanguage = localStorage.getItem(PAGE_LANGUAGE_STORAGE_KEY);
+                if (storedLanguage === PAGE_LANGUAGE.EN || storedLanguage === PAGE_LANGUAGE.ZH) {
+                    return storedLanguage;
+                }
             } catch (_) {
-                return PAGE_LANGUAGE.ZH;
+                return getBrowserPreferredPageLanguage();
             }
+            return getBrowserPreferredPageLanguage();
         }
 
         function persistPageLanguage() {
