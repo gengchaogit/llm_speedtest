@@ -1737,8 +1737,24 @@
             }
         };
 
+        function getBrowserPreferredLang() {
+            const preferredLanguages = Array.isArray(navigator.languages) && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language, navigator.userLanguage].filter(Boolean);
+            const primaryLanguage = String(preferredLanguages.find((lang) => typeof lang === 'string' && lang.trim()) || '').trim();
+            return /^zh\b/i.test(primaryLanguage) ? 'zh' : 'en';
+        }
+
+        function getInitialLang() {
+            const storedLang = localStorage.getItem('llmPerfTestLang');
+            if (storedLang === 'zh' || storedLang === 'en') {
+                return storedLang;
+            }
+            return getBrowserPreferredLang();
+        }
+
         // 当前语言
-        let currentLang = localStorage.getItem('llmPerfTestLang') || 'zh';
+        let currentLang = getInitialLang();
         const modelSuggestStatusState = {
             mode: 'raw',
             message: '',
