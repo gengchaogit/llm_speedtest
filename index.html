@@ -1042,7 +1042,7 @@
         <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8
                 (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
 
-        <div
+        <div id="starSupportBanner"
             style="text-align: center; margin-bottom: 20px; font-size: 15px; background: #fffbf0; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; color: #d35400;">
             ❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank"
                 style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub 仓库</a> 随手点个
@@ -1275,6 +1275,7 @@
             'zh': {
                 pageTitle: '大模型 Prefill & Decode 性能测试工具 v3 (chao魔改版)',
                 langToggle: 'English',
+                starSupportBanner: '❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub 仓库</a> 随手点个 ⭐️ Star 支持一下！非常感谢！🙏',
                 apiOpenAI: 'OpenAI兼容接口',
                 apiOllama: 'Ollama接口',
                 apiDescOpenAITitle: 'OpenAI兼容接口测试说明',
@@ -1495,8 +1496,30 @@
                 cloudRecover: '🔑 找回识别码', cloudShareBtn: '上传测试结果',
                 cloudDisplayNameFromUser: '（来自已设置的用户名）', cloudDisplayNameNone: '（未设置用户名）',
                 cloudDisplayNamePlaceholder: '（未设置用户名则匿名）',
+                cloudShareModalTitle: '☁️ 分享测试结果',
+                cloudModelNameLabel: '模型名称',
+                cloudModelNamePlaceholder: '自动获取或手动修改',
+                cloudHardwareLabel: '硬件',
+                cloudHardwareHint: '（如 RTX 4090、M4 Pro）',
+                cloudHardwarePlaceholder: '必填',
+                cloudFrameworkLabel: '推理框架',
+                cloudQuantizationLabel: '量化方式',
+                cloudDisplayNameLabel: '显示名称',
+                cloudNotesLabel: '备注（可选，200字以内）',
+                cloudNotesPlaceholder: '如版本、特殊配置等',
+                cloudCancelBtn: '取消',
                 cloudUploadBtn: '📤 上传分享', cloudUploading: '上传中...',
                 cloudUploadNote: '上传后数据公开可见，不可删除',
+                cloudUploadMissingHardware: '❌ 请填写硬件信息（必填）',
+                cloudUploadNoData: '❌ 没有可上传的测试数据，请先完成测试',
+                cloudUploadSuccess: '✅ 上传成功！',
+                cloudUploadFailed: '❌ 上传失败：{error}',
+                cloudShareId: '分享ID：',
+                cloudCopyId: '复制ID',
+                cloudCopyLink: '复制链接',
+                cloudReportLink: '报告链接',
+                cloudExampleReportLink: '示例报告链接（第一条）',
+                cloudUnknownModel: '未知模型',
                 batchUploadLimit: '一次只能上传 1 个 CSV 文件。',
                 batchUploadNoData: '未解析到任何有效的测试数据记录。',
                 batchUploadResult: '⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}',
@@ -1506,6 +1529,7 @@
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3 (chao mod)',
                 langToggle: '中文',
+                starSupportBanner: '❤️ Thanks for using this tool! Open source is not easy. If you find it helpful, please visit the <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub repository</a> and drop a ⭐️ Star. Thank you very much! 🙏',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',
                 apiDescOpenAITitle: 'OpenAI Compatible API Test Description',
@@ -1727,8 +1751,30 @@
                 cloudShareBtn: 'Upload Results',
                 cloudDisplayNameFromUser: '(from your username)', cloudDisplayNameNone: '(no username set)',
                 cloudDisplayNamePlaceholder: '(anonymous if no username)',
+                cloudShareModalTitle: '☁️ Share Test Results',
+                cloudModelNameLabel: 'Model Name',
+                cloudModelNamePlaceholder: 'Auto-detected or edit manually',
+                cloudHardwareLabel: 'Hardware',
+                cloudHardwareHint: '(e.g. RTX 4090, M4 Pro)',
+                cloudHardwarePlaceholder: 'Required',
+                cloudFrameworkLabel: 'Framework',
+                cloudQuantizationLabel: 'Quantization',
+                cloudDisplayNameLabel: 'Display Name',
+                cloudNotesLabel: 'Notes (optional, max 200 chars)',
+                cloudNotesPlaceholder: 'For example: version, special config, etc.',
+                cloudCancelBtn: 'Cancel',
                 cloudUploadBtn: '📤 Upload', cloudUploading: 'Uploading...',
                 cloudUploadNote: 'Data is public once uploaded and cannot be deleted',
+                cloudUploadMissingHardware: '❌ Please fill in hardware information (required)',
+                cloudUploadNoData: '❌ No test data available to upload. Please run a test first.',
+                cloudUploadSuccess: '✅ Upload successful!',
+                cloudUploadFailed: '❌ Upload failed: {error}',
+                cloudShareId: 'Share ID:',
+                cloudCopyId: 'Copy ID',
+                cloudCopyLink: 'Copy Link',
+                cloudReportLink: 'Report Link',
+                cloudExampleReportLink: 'Example Report Link (first record)',
+                cloudUnknownModel: 'Unknown Model',
                 batchUploadLimit: 'You can only upload 1 CSV file at a time.',
                 batchUploadNoData: 'No valid test records found in the file.',
                 batchUploadResult: '⚠️ Upload finished. Success: {success}, Fail: {fail}.<br>Last Error: {error}',
@@ -1812,6 +1858,7 @@
             // 更新页面标题
             document.getElementById('pageTitle').textContent = t.pageTitle;
             document.getElementById('langToggle').textContent = t.langToggle;
+            document.getElementById('starSupportBanner').innerHTML = t.starSupportBanner;
 
             // 更新API选择器
             const apiOptions = document.querySelectorAll('.api-option');
@@ -5614,7 +5661,22 @@
             if (_e('cloudNoUsernameText')) _e('cloudNoUsernameText').textContent = t.cloudNoUsername;
             if (_e('cloudSetUsernameBtn')) _e('cloudSetUsernameBtn').textContent = t.cloudSetUsername;
             if (_e('cloudRecoverLink')) _e('cloudRecoverLink').textContent = t.cloudRecover;
-            if (_e('doUploadBtn') && !_e('doUploadBtn').disabled) _e('doUploadBtn').textContent = t.cloudUploadBtn;
+            if (_e('shareModalTitle')) _e('shareModalTitle').textContent = t.cloudShareModalTitle;
+            if (_e('shareModelNameLabel')) _e('shareModelNameLabel').textContent = t.cloudModelNameLabel;
+            if (_e('shareModelName')) _e('shareModelName').placeholder = t.cloudModelNamePlaceholder;
+            if (_e('shareHardwareLabel')) _e('shareHardwareLabel').childNodes[0].textContent = t.cloudHardwareLabel + ' ';
+            if (_e('shareHardwareHint')) _e('shareHardwareHint').textContent = t.cloudHardwareHint;
+            if (_e('shareHardware')) _e('shareHardware').placeholder = t.cloudHardwarePlaceholder;
+            if (_e('shareFrameworkLabel')) _e('shareFrameworkLabel').textContent = t.cloudFrameworkLabel;
+            if (_e('shareQuantizationLabel')) _e('shareQuantizationLabel').textContent = t.cloudQuantizationLabel;
+            if (_e('shareNicknameLabel')) _e('shareNicknameLabel').childNodes[0].textContent = t.cloudDisplayNameLabel;
+            if (_e('shareNickname')) _e('shareNickname').placeholder = t.cloudDisplayNamePlaceholder;
+            if (_e('shareNotesLabel')) _e('shareNotesLabel').textContent = t.cloudNotesLabel;
+            if (_e('shareNotes')) _e('shareNotes').placeholder = t.cloudNotesPlaceholder;
+            if (_e('shareCancelBtn')) _e('shareCancelBtn').textContent = t.cloudCancelBtn;
+            if (_e('shareModalUserCodeLabel')) _e('shareModalUserCodeLabel').textContent = t.cloudUserCode;
+            if (_e('shareModalUploadNote')) _e('shareModalUploadNote').textContent = t.cloudUploadNote;
+            if (_e('doUploadBtn')) _e('doUploadBtn').textContent = _e('doUploadBtn').disabled ? t.cloudUploading : t.cloudUploadBtn;
         };
 
         //
@@ -5712,20 +5774,20 @@
         style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;align-items:center;justify-content:center;">
         <div
             style="background:#282c34;border:1px solid #444;border-radius:12px;padding:28px;width:440px;max-width:95vw;color:#abb2bf;">
-            <h3 style="margin:0 0 16px;color:#61afef;">☁️ 分享测试结果</h3>
-            <div style="margin-bottom:12px;"><label
+            <h3 id="shareModalTitle" style="margin:0 0 16px;color:#61afef;">☁️ 分享测试结果</h3>
+            <div style="margin-bottom:12px;"><label id="shareModelNameLabel"
                     style="display:block;margin-bottom:4px;font-size:13px;">模型名称</label><input id="shareModelName"
                     type="text" maxlength="100" placeholder="自动获取或手动修改" list="modelSuggestModal" autocomplete="off"
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
                 <datalist id="modelSuggestModal"></datalist>
             </div>
-            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">硬件 <span
-                        style="color:#e06c75;">*</span><span style="color:#888;font-size:11px;">（如 RTX 4090、M4
+            <div style="margin-bottom:12px;"><label id="shareHardwareLabel" style="display:block;margin-bottom:4px;font-size:13px;">硬件 <span
+                        style="color:#e06c75;">*</span><span id="shareHardwareHint" style="color:#888;font-size:11px;">（如 RTX 4090、M4
                         Pro）</span></label><input id="shareHardware" type="text" maxlength="100" placeholder="必填"
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
             </div>
             <div style="display:flex;gap:12px;margin-bottom:12px;">
-                <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">推理框架</label><input
+                <div style="flex:1;"><label id="shareFrameworkLabel" style="display:block;margin-bottom:4px;font-size:13px;">推理框架</label><input
                         id="shareFramework" type="text" maxlength="50" placeholder="llama.cpp / vllm"
                         list="frameworkSuggest" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
@@ -5766,7 +5828,7 @@
                         <option value="API (其他云服务)">
                     </datalist>
                 </div>
-                <div style="flex:1;"><label style="display:block;margin-bottom:4px;font-size:13px;">量化方式</label><input
+                <div style="flex:1;"><label id="shareQuantizationLabel" style="display:block;margin-bottom:4px;font-size:13px;">量化方式</label><input
                         id="shareQuantization" type="text" maxlength="20" placeholder="Q4_K_M / FP16"
                         list="quantizationSuggest" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;">
@@ -5826,25 +5888,25 @@
                     </datalist>
                 </div>
             </div>
-            <div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-size:13px;">显示名称<span
+            <div style="margin-bottom:12px;"><label id="shareNicknameLabel" style="display:block;margin-bottom:4px;font-size:13px;">显示名称<span
                         id="nicknameSourceHint" style="color:#888;font-size:11px;"></span></label><input
                     id="shareNickname" type="text" maxlength="50" placeholder="（未设置用户名则匿名）" readonly
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #444;border-radius:4px;background:#161a1f;color:#888;font-size:14px;cursor:default;">
             </div>
-            <div style="margin-bottom:20px;"><label
+            <div style="margin-bottom:20px;"><label id="shareNotesLabel"
                     style="display:block;margin-bottom:4px;font-size:13px;">备注（可选，200字以内）</label><textarea
                     id="shareNotes" maxlength="200" rows="2" placeholder="如版本、特殊配置等"
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;resize:vertical;"></textarea>
             </div>
             <div id="shareResultMsg"
                 style="display:none;margin-bottom:16px;padding:10px;border-radius:6px;font-size:13px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;"><button onclick="closeShareModal()"
+            <div style="display:flex;gap:10px;justify-content:flex-end;"><button id="shareCancelBtn" onclick="closeShareModal()"
                     style="background:#555;border:none;color:#abb2bf;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button><button
                     id="doUploadBtn" onclick="doUpload()"
                     style="background:#16a085;border:none;color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">📤
                     上传分享</button></div>
-            <p style="margin:12px 0 0;font-size:11px;color:#666;">识别码 <strong id="shareModalUserCode"
-                    style="color:#61afef;font-family:monospace;"></strong> · 上传后数据公开可见，不可删除</p>
+            <p style="margin:12px 0 0;font-size:11px;color:#666;"><span id="shareModalUserCodeLabel">识别码</span> <strong id="shareModalUserCode"
+                    style="color:#61afef;font-family:monospace;"></strong> · <span id="shareModalUploadNote">上传后数据公开可见，不可删除</span></p>
         </div>
     </div>
 
@@ -5871,7 +5933,8 @@
             function _buildShareLinkBlock(shareUrl, label) {
                 if (!shareUrl) return '';
                 const shareUrlLiteral = JSON.stringify(shareUrl);
-                return `<br>${label}：<a href="${shareUrl}" target="_blank" rel="noopener" style="color:#61afef;word-break:break-all;">${shareUrl}</a> <button onclick='navigator.clipboard.writeText(${shareUrlLiteral})' style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">复制链接</button>`;
+                const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
+                return `<br>${label}: <a href="${shareUrl}" target="_blank" rel="noopener" style="color:#61afef;word-break:break-all;">${shareUrl}</a> <button onclick='navigator.clipboard.writeText(${shareUrlLiteral})' style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">${t.cloudCopyLink || 'Copy Link'}</button>`;
             }
 
             function generateUserCode() {
@@ -6032,6 +6095,7 @@
                 return await fetch(SUPABASE_URL + '/rest/v1/speed_results', { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
             }
             window.doUpload = async function () {
+                const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
                 const hw = (document.getElementById('shareHardware') || {}).value?.trim() || '';
                 const fw = (document.getElementById('shareFramework') || {}).value?.trim() || '';
                 const qt = (document.getElementById('shareQuantization') || {}).value?.trim() || '';
@@ -6039,23 +6103,23 @@
                 const notes = (document.getElementById('shareNotes') || {}).value?.trim() || '';
                 const msgDiv = document.getElementById('shareResultMsg');
                 const uploadBtn = document.getElementById('doUploadBtn');
-                if (!hw) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 请填写硬件信息（必填）'; } return; }
+                if (!hw) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = t.cloudUploadMissingHardware || '❌ Please fill in hardware information (required)'; } return; }
                 localStorage.setItem('llm_speedtest_share_hw', hw);
                 if (fw) localStorage.setItem('llm_speedtest_share_fw', fw);
                 if (qt) localStorage.setItem('llm_speedtest_share_qt', qt);
                 const mn = document.getElementById('shareModelName')?.value?.trim();
                 if (mn) localStorage.setItem('llm_speedtest_share_model', mn);
-                if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = '上传中...'; } if (msgDiv) msgDiv.style.display = 'none';
+                if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = t.cloudUploading || 'Uploading...'; } if (msgDiv) msgDiv.style.display = 'none';
                 if (_batchMode) { await _doBatchUpload(hw, fw, qt, nick, notes, mn); return; }
                 const vp = (typeof testResultsData !== 'undefined' ? testResultsData : (window.testResultsData || [])).filter(r => r.prefillSpeed !== 'N/A' && r.outputSpeed !== 'N/A');
-                if (!vp.length) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 没有可上传的测试数据，请先完成测试'; } if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '📤 上传分享'; } return; }
+                if (!vp.length) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = t.cloudUploadNoData || '❌ No test data available to upload. Please run a test first.'; } if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 Upload'; } return; }
                 const userCode = getOrCreateUserCode();
                 const maxP = vp.reduce((m, r) => Math.max(m, parseFloat(r.prefillSpeed)), 0);
                 const maxD = vp.reduce((m, r) => Math.max(m, parseFloat(r.outputSpeed)), 0);
                 const avgP = vp.reduce((sum, r) => sum + parseFloat(r.prefillSpeed), 0) / vp.length;
                 const avgD = vp.reduce((sum, r) => sum + parseFloat(r.outputSpeed), 0) / vp.length;
                 const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
-                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(avgP.toFixed(2)), avg_decode_speed: parseFloat(avgD.toFixed(2)), max_prefill_speed: parseFloat(maxP.toFixed(2)), max_decode_speed: parseFloat(maxD.toFixed(2)), source: 'web_pure', record_tags: ['source:web_pure'], results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, avg_ttft_ms: parseFloat(r.avgTtftMs) || 0, avg_itl_mean: parseFloat(r.avgItlMean) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
+                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || t.cloudUnknownModel || 'Unknown Model', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(avgP.toFixed(2)), avg_decode_speed: parseFloat(avgD.toFixed(2)), max_prefill_speed: parseFloat(maxP.toFixed(2)), max_decode_speed: parseFloat(maxD.toFixed(2)), source: 'web_pure', record_tags: ['source:web_pure'], results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, avg_ttft_ms: parseFloat(r.avgTtftMs) || 0, avg_itl_mean: parseFloat(r.avgItlMean) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
                 try {
                     const r = await _sbInsert(payload);
                     if (!r.ok) { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message || 'HTTP ' + r.status); }
@@ -6064,10 +6128,10 @@
                     if (msgDiv) {
                         const shareIdLiteral = JSON.stringify(String(shareId || ''));
                         msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;';
-                        msgDiv.innerHTML = `✅ 上传成功！<br>分享ID：<strong style="font-family:monospace;color:#61afef;">${shareId || '-'}</strong> <button onclick='navigator.clipboard.writeText(${shareIdLiteral})' style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">复制ID</button>${_buildShareLinkBlock(shareUrl, '报告链接')}`;
+                        msgDiv.innerHTML = `${t.cloudUploadSuccess || '✅ Upload successful!'}<br>${t.cloudShareId || 'Share ID:'}<strong style="font-family:monospace;color:#61afef;">${shareId || '-'}</strong> <button onclick='navigator.clipboard.writeText(${shareIdLiteral})' style="background:#16a085;border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">${t.cloudCopyId || 'Copy ID'}</button>${_buildShareLinkBlock(shareUrl, t.cloudReportLink || 'Report Link')}`;
                     }
-                } catch (e) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = '❌ 上传失败：' + e.message; } }
-                finally { if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = '📤 上传分享'; } }
+                } catch (e) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = (typeof formatI18nText === 'function' ? formatI18nText((t.cloudUploadFailed || '❌ Upload failed: {error}'), { error: e.message }) : `${t.cloudUploadFailed || '❌ Upload failed:'} ${e.message}`); } }
+                finally { if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 Upload'; } }
             };
             async function _doBatchUpload(hw, fw, qt, nickname, notes, modelName) {
                 const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
@@ -6076,7 +6140,7 @@
                 let ok = 0, fail = 0, lastErr = '';
                 let firstShareUrl = '';
                 for (const bd of _batchPayloads) {
-                    const payload = { user_code: userCode, nickname: nickname || null, model_name: modelName || bd.model || '未知模型', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || bd.notes || null, concurrency: bd.concurrency, avg_prefill_speed: bd.avgPrefill ?? bd.maxPrefill, avg_decode_speed: bd.avgDecode ?? bd.maxDecode, max_prefill_speed: bd.maxPrefill, max_decode_speed: bd.maxDecode, source: 'web_pure', record_tags: bd.recordTags || ['source:web_pure'], results_json: JSON.stringify(bd.points) };
+                    const payload = { user_code: userCode, nickname: nickname || null, model_name: modelName || bd.model || t.cloudUnknownModel || 'Unknown Model', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || bd.notes || null, concurrency: bd.concurrency, avg_prefill_speed: bd.avgPrefill ?? bd.maxPrefill, avg_decode_speed: bd.avgDecode ?? bd.maxDecode, max_prefill_speed: bd.maxPrefill, max_decode_speed: bd.maxDecode, source: 'web_pure', record_tags: bd.recordTags || ['source:web_pure'], results_json: JSON.stringify(bd.points) };
                     try {
                         const r = await _sbInsert(payload);
                         if (r.ok || r.status === 201) {
@@ -6088,8 +6152,8 @@
                     }
                     catch (e) { fail++; lastErr = e.message; }
                 }
-                if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 上传分享'; }
-                const batchLinkBlock = _buildShareLinkBlock(firstShareUrl, ok > 1 ? '示例报告链接（第一条）' : '报告链接');
+                if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 Upload'; }
+                const batchLinkBlock = _buildShareLinkBlock(firstShareUrl, ok > 1 ? (t.cloudExampleReportLink || 'Example Report Link (first record)') : (t.cloudReportLink || 'Report Link'));
                 if (!fail) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#0d2b1e;color:#98c379;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.innerHTML = (t.batchUploadSuccess || '✅ 批量上传成功！共上传 {count} 个测试记录。').replace('{count}', ok) + batchLinkBlock; } }
                 else { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.innerHTML = (t.batchUploadResult || '⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}').replace('{success}', ok).replace('{fail}', fail).replace('{error}', lastErr) + (ok > 0 ? batchLinkBlock : ''); } }
                 _batchPayloads = [];
