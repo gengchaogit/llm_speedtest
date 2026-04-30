@@ -794,6 +794,78 @@ def generate_prompt(length: int, seed: int = 0) -> str:
     return prompt
 
 
+def generate_warmup_prompt() -> str:
+    """Generate a short randomized warmup prompt to avoid prefix cache hits."""
+    nonce = f"{int(time.time() * 1000)}-{random.randint(1000, 9999)}"
+    return f"Warmup request {nonce}. Reply with one short word only."
+
+
+async def send_warmup_request(
+    api_url: str,
+    api_key: str,
+    api_type: str,
+    model_name: str,
+    timeout: int,
+    temperature: float,
+    top_p: float,
+) -> None:
+    """Send a short warmup request and wait for it to finish before benchmarking."""
+    warmup_prompt = generate_warmup_prompt()
+    warmup_timeout = max(timeout, 15000)
+    timeout_seconds = warmup_timeout / 1000.0
+
+    if api_type == "openai":
+        headers = {"Content-Type": "application/json"}
+        if api_key and api_key.strip():
+            headers["Authorization"] = f"Bearer {api_key}"
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": warmup_prompt},
+            ],
+            "max_tokens": 8,
+            "temperature": temperature,
+            "top_p": top_p,
+            "stream": False,
+        }
+    else:
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": warmup_prompt},
+            ],
+            "options": {
+                "num_predict": 8,
+                "temperature": temperature,
+                "top_p": top_p,
+            },
+            "stream": False,
+        }
+
+    print(
+        f"[Warmup] Sending {api_type} warmup request before benchmark "
+        f"(timeout={warmup_timeout}ms)...",
+        flush=True,
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            response = await client.post(api_url, headers=headers, json=payload)
+            response_bytes = response.content
+            if response.status_code >= 400:
+                raise RuntimeError(
+                    build_http_error_message(api_url, model_name, response.status_code, response_bytes)
+                )
+        print("[Warmup] Warmup request completed.", flush=True)
+    except Exception as exc:
+        print(f"[Warmup] Warmup request failed: {exc}", flush=True)
+
+    await asyncio.sleep(0.8)
+
+
 def build_http_error_message(api_url: str, model_name: str, status_code: int, error_bytes: bytes) -> str:
     """Build a more actionable HTTP error message for common provider quirks."""
     error_text = error_bytes.decode(errors="replace")
@@ -1323,6 +1395,17 @@ async def websocket_test_endpoint(websocket: WebSocket):
         completed = 0
         
         all_results = []
+
+        if total_tests > 0:
+            await send_warmup_request(
+                api_url=config.api_url,
+                api_key=config.api_key,
+                api_type=config.api_type,
+                model_name=config.model_name,
+                timeout=config.timeout,
+                temperature=config.temperature,
+                top_p=config.top_p,
+            )
         
         for length in test_lengths:
             print(f"\n[Test] ===== 测试提示词长度: {length} ({completed+1}/{total_tests}) =====")
@@ -1333,7 +1416,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 "total": total_tests,
                 "testing_length": length
             })
-            
+
             # 创建并发任务（每个任务使用不同的seed避免cache）
             # 根据prompt长度动态计算超时时间
             dynamic_timeout = calculate_dynamic_timeout(length, config.timeout)
