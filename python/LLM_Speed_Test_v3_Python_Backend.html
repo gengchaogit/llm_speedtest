@@ -6987,6 +6987,41 @@ async function processOllamaResponse(response, promptLength) {
             pendingBatchPayloads = [];
         }
 
+        function parseConcurrentStatusText(statusText, fallbackConcurrency = 1) {
+            const fallback = Math.max(1, parseInt(fallbackConcurrency, 10) || 1);
+            const match = String(statusText || '').match(/(\d+)\s*\/\s*(\d+)/);
+            if (!match) return { successful: null, concurrency: fallback };
+            const successful = parseInt(match[1], 10);
+            const concurrency = parseInt(match[2], 10);
+            return {
+                successful: Number.isFinite(successful) ? successful : null,
+                concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : fallback
+            };
+        }
+
+        function resolveUploadPointStats(point, fallbackConcurrency = 1) {
+            const statusStats = parseConcurrentStatusText(point?.status, fallbackConcurrency);
+            const explicitConcurrency = parseInt(point?.concurrency, 10);
+            const concurrentDetails = Array.isArray(point?.concurrentDetails) ? point.concurrentDetails : (Array.isArray(point?.concurrent_details) ? point.concurrent_details : []);
+            const detailCount = concurrentDetails.length;
+            const concurrency = Math.max(
+                1,
+                explicitConcurrency > 0 ? explicitConcurrency : 0,
+                statusStats.concurrency,
+                detailCount
+            );
+            const explicitSuccessful = parseInt(point?.successful, 10);
+            const measured = point?.prefillSpeed !== 'N/A' && point?.outputSpeed !== 'N/A';
+            const successfulCandidates = [
+                explicitSuccessful,
+                statusStats.successful,
+                detailCount,
+                measured ? 1 : 0
+            ].filter(value => Number.isFinite(value) && value >= 0);
+            const successful = successfulCandidates.length > 0 ? Math.min(concurrency, Math.max(...successfulCandidates)) : 0;
+            return { concurrency, successful, concurrentDetails };
+        }
+
         function buildUploadPayload(hardware, framework, quantization, nickname, notes) {
             const userCode = getOrCreateUserCode();
             const validPoints = (window.testResultsData || []).filter(r =>
@@ -7016,22 +7051,25 @@ async function processOllamaResponse(response, promptLength) {
                 max_decode_speed: parseFloat(maxDecode.toFixed(2)),
                 source: 'python_backend',
                 record_tags: ['source:python_backend'],
-                results: validPoints.map(r => ({
-                    prompt_length: parseFloat(r.promptLength),
-                    prefill_speed: parseFloat(r.prefillSpeed),
-                    output_speed: parseFloat(r.outputSpeed),
-                    prefill_time_ms: parseFloat(r.prefillTimeMs) || 0,
-                    output_time_ms: parseFloat(r.outputTimeMs) || 0,
-                    avg_ttft_ms: r.avgTtftMs && r.avgTtftMs !== 'N/A' ? parseFloat(r.avgTtftMs) : null,
-                    avg_itl_mean: r.avgItlMean && r.avgItlMean !== 'N/A' ? parseFloat(r.avgItlMean) : null,
-                    avg_itl_std: r.avgItlStd && r.avgItlStd !== 'N/A' ? parseFloat(r.avgItlStd) : null,
-                    concurrency: parseInt(r.concurrency) || concurrency,
-                    successful: parseInt(r.successful) || 1,
-                    concurrent_details: (r.concurrentDetails || []).map(d => ({
-                        prefill_speed: parseFloat(d.prefill_speed || d.prefillSpeed) || null,
-                        output_speed: parseFloat(d.output_speed || d.outputSpeed) || null,
-                    }))
-                }))
+                results: validPoints.map(r => {
+                    const pointStats = resolveUploadPointStats(r, concurrency);
+                    return {
+                        prompt_length: parseFloat(r.promptLength),
+                        prefill_speed: parseFloat(r.prefillSpeed),
+                        output_speed: parseFloat(r.outputSpeed),
+                        prefill_time_ms: parseFloat(r.prefillTimeMs) || 0,
+                        output_time_ms: parseFloat(r.outputTimeMs) || 0,
+                        avg_ttft_ms: r.avgTtftMs && r.avgTtftMs !== 'N/A' ? parseFloat(r.avgTtftMs) : null,
+                        avg_itl_mean: r.avgItlMean && r.avgItlMean !== 'N/A' ? parseFloat(r.avgItlMean) : null,
+                        avg_itl_std: r.avgItlStd && r.avgItlStd !== 'N/A' ? parseFloat(r.avgItlStd) : null,
+                        concurrency: pointStats.concurrency,
+                        successful: pointStats.successful,
+                        concurrent_details: pointStats.concurrentDetails.map(d => ({
+                            prefill_speed: parseFloat(d.prefill_speed || d.prefillSpeed) || null,
+                            output_speed: parseFloat(d.output_speed || d.outputSpeed) || null,
+                        }))
+                    };
+                })
             };
         }
 
@@ -7277,6 +7315,7 @@ async function processOllamaResponse(response, promptLength) {
                         // 只需要成功的，或者至少有速度的
                         if (isNaN(prefillSpeed) || isNaN(outputSpeed)) continue;
 
+                        const statusStats = parseConcurrentStatusText(status, concurrencyNum);
                         validPoints.push({
                             prompt_length: promptLen,
                             prefill_speed: prefillSpeed,
@@ -7286,8 +7325,8 @@ async function processOllamaResponse(response, promptLength) {
                             avg_ttft_ms: isNaN(ttft) ? null : ttft,
                             avg_itl_mean: isNaN(itlMean) ? null : itlMean,
                             avg_itl_std: isNaN(itlStd) ? null : itlStd,
-                            concurrency: concurrencyNum,
-                            successful: status.includes('成功') || status.includes('Success') ? 1 : 1, // 老数据如果存进来了认为都算成功，除非没速度
+                            concurrency: statusStats.concurrency,
+                            successful: statusStats.successful ?? 1,
                             concurrent_details: [] // 历史CSV没有存并发详情，留空
                         });
                     }
@@ -7302,10 +7341,11 @@ async function processOllamaResponse(response, promptLength) {
                     const avgPrefill = validPoints.reduce((sum, r) => sum + r.prefill_speed, 0) / validPoints.length;
                     const avgDecode = validPoints.reduce((sum, r) => sum + r.output_speed, 0) / validPoints.length;
 
+                    const batchConcurrency = Math.max(concurrencyNum, ...validPoints.map(p => parseInt(p.concurrency, 10) || concurrencyNum));
                     pendingBatchPayloads.push({
                         temp_model_name: modelName,
                         temp_notes: notesStr,
-                        concurrency: concurrencyNum,
+                        concurrency: batchConcurrency,
                         avg_prefill_speed: parseFloat(avgPrefill.toFixed(2)),
                         avg_decode_speed: parseFloat(avgDecode.toFixed(2)),
                         max_prefill_speed: parseFloat(maxPrefill.toFixed(2)),

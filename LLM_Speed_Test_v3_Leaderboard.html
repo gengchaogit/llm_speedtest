@@ -3493,10 +3493,30 @@
                 const outputSpeed = Number(item?.output_speed ?? item?.outputSpeed ?? item?.decode_speed ?? item?.decodeSpeed);
                 const avgTtftMs = Number(item?.avg_ttft_ms ?? item?.avgTtftMs);
                 const avgItlMean = Number(item?.avg_itl_mean ?? item?.avgItlMean);
-                const successRaw = item?.successful;
-                const successful = successRaw !== undefined && successRaw !== null
-                    ? Number(successRaw)
-                    : ((Number.isFinite(prefillSpeed) || Number.isFinite(outputSpeed)) ? 1 : 0);
+                const concurrentDetails = Array.isArray(item?.concurrent_details)
+                    ? item.concurrent_details
+                    : (Array.isArray(item?.concurrentDetails) ? item.concurrentDetails : []);
+                const detailSuccessCount = concurrentDetails.length;
+                const concurrencyRaw = Number(item?.concurrency ?? row.concurrency);
+                const pointConcurrency = Math.max(
+                    1,
+                    Number.isFinite(concurrencyRaw) && concurrencyRaw > 0 ? concurrencyRaw : 0,
+                    detailSuccessCount
+                );
+                const successRaw = Number(item?.successful);
+                const hasStoredSuccessful = item?.successful !== undefined && item?.successful !== null && item?.successful !== '';
+                let successful = Number.isFinite(successRaw) ? successRaw : null;
+                if (detailSuccessCount > 0) {
+                    successful = Math.max(successful ?? 0, detailSuccessCount);
+                }
+                if (successful === null) {
+                    successful = (Number.isFinite(prefillSpeed) || Number.isFinite(outputSpeed)) ? 1 : 0;
+                }
+                successful = Math.max(0, Math.min(pointConcurrency, Math.round(successful)));
+                const successCountIsExact = detailSuccessCount > 0
+                    || pointConcurrency === 1
+                    || (Number.isFinite(successRaw) && (successRaw === 0 || successRaw > 1 || successRaw === pointConcurrency))
+                    || (!hasStoredSuccessful && pointConcurrency === 1);
 
                 return {
                     ...item,
@@ -3505,7 +3525,9 @@
                     output_speed: Number.isFinite(outputSpeed) ? outputSpeed : null,
                     avg_ttft_ms: Number.isFinite(avgTtftMs) ? avgTtftMs : null,
                     avg_itl_mean: Number.isFinite(avgItlMean) ? avgItlMean : null,
-                    successful: successful ? 1 : 0
+                    concurrency: pointConcurrency,
+                    successful,
+                    success_count_is_exact: successCountIsExact
                 };
             }).sort((a, b) => (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER));
 
@@ -3536,7 +3558,14 @@
                 const itl = (r.avg_itl_mean !== null && r.avg_itl_mean !== undefined) ? r.avg_itl_mean.toFixed(2) : 'N/A';
                 const pSpeed = (r.prefill_speed !== null && r.prefill_speed !== undefined) ? r.prefill_speed.toFixed(2) : 'N/A';
                 const dSpeed = (r.output_speed !== null && r.output_speed !== undefined) ? r.output_speed.toFixed(2) : 'N/A';
-                const statusStr = r.successful ? `<span style="color:#98c379;">1/1 并发成功</span>` : `<span style="color:#e06c75;">失败</span>`;
+                let statusStr = `<span style="color:#e06c75;">失败</span>`;
+                if (r.successful > 0 && !r.success_count_is_exact) {
+                    statusStr = `<span style="color:#98c379;">成功</span>`;
+                } else if (r.successful > 0 && r.successful < r.concurrency) {
+                    statusStr = `<span style="color:#e5c07b;">${r.successful}/${r.concurrency} 部分并发成功</span>`;
+                } else if (r.successful > 0) {
+                    statusStr = `<span style="color:#98c379;">${r.successful}/${r.concurrency} 并发成功</span>`;
+                }
 
                 tableHtml += `
                     <tr style="border-bottom:1px solid var(--border-color);">

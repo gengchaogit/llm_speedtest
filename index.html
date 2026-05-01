@@ -6111,6 +6111,39 @@
             async function _sbInsert(payload) {
                 return await fetch(SUPABASE_URL + '/rest/v1/speed_results', { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(payload) });
             }
+            function _parseConcurrentStatusText(statusText, fallbackConcurrency = 1) {
+                const fallback = Math.max(1, parseInt(fallbackConcurrency, 10) || 1);
+                const match = String(statusText || '').match(/(\d+)\s*\/\s*(\d+)/);
+                if (!match) return { successful: null, concurrency: fallback };
+                const successful = parseInt(match[1], 10);
+                const concurrency = parseInt(match[2], 10);
+                return {
+                    successful: Number.isFinite(successful) ? successful : null,
+                    concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : fallback
+                };
+            }
+            function _resolveUploadPointStats(point, fallbackConcurrency = 1) {
+                const statusStats = _parseConcurrentStatusText(point?.status, fallbackConcurrency);
+                const explicitConcurrency = parseInt(point?.concurrency, 10);
+                const concurrentDetails = Array.isArray(point?.concurrentDetails) ? point.concurrentDetails : (Array.isArray(point?.concurrent_details) ? point.concurrent_details : []);
+                const detailCount = concurrentDetails.length;
+                const concurrency = Math.max(
+                    1,
+                    explicitConcurrency > 0 ? explicitConcurrency : 0,
+                    statusStats.concurrency,
+                    detailCount
+                );
+                const explicitSuccessful = parseInt(point?.successful, 10);
+                const measured = point?.prefillSpeed !== 'N/A' && point?.outputSpeed !== 'N/A';
+                const successfulCandidates = [
+                    explicitSuccessful,
+                    statusStats.successful,
+                    detailCount,
+                    measured ? 1 : 0
+                ].filter(value => Number.isFinite(value) && value >= 0);
+                const successful = successfulCandidates.length > 0 ? Math.min(concurrency, Math.max(...successfulCandidates)) : 0;
+                return { concurrency, successful, concurrentDetails };
+            }
             window.doUpload = async function () {
                 const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
                 const hw = (document.getElementById('shareHardware') || {}).value?.trim() || '';
@@ -6136,7 +6169,41 @@
                 const avgP = vp.reduce((sum, r) => sum + parseFloat(r.prefillSpeed), 0) / vp.length;
                 const avgD = vp.reduce((sum, r) => sum + parseFloat(r.outputSpeed), 0) / vp.length;
                 const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
-                const payload = { user_code: userCode, nickname: nick || null, model_name: mn || t.cloudUnknownModel || 'Unknown Model', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || null, concurrency, avg_prefill_speed: parseFloat(avgP.toFixed(2)), avg_decode_speed: parseFloat(avgD.toFixed(2)), max_prefill_speed: parseFloat(maxP.toFixed(2)), max_decode_speed: parseFloat(maxD.toFixed(2)), source: 'web_pure', record_tags: ['source:web_pure'], results_json: JSON.stringify(vp.map(r => ({ prompt_length: parseFloat(r.promptLength), prefill_speed: parseFloat(r.prefillSpeed), output_speed: parseFloat(r.outputSpeed), prefill_time_ms: parseFloat(r.prefillTimeMs) || 0, output_time_ms: parseFloat(r.outputTimeMs) || 0, avg_ttft_ms: parseFloat(r.avgTtftMs) || 0, avg_itl_mean: parseFloat(r.avgItlMean) || 0, concurrency: parseInt(r.concurrency) || concurrency, successful: parseInt(r.successful) || 1 }))) };
+                const payload = {
+                    user_code: userCode,
+                    nickname: nick || null,
+                    model_name: mn || t.cloudUnknownModel || 'Unknown Model',
+                    hardware: hw,
+                    framework: fw || null,
+                    quantization: qt || null,
+                    notes: notes || null,
+                    concurrency,
+                    avg_prefill_speed: parseFloat(avgP.toFixed(2)),
+                    avg_decode_speed: parseFloat(avgD.toFixed(2)),
+                    max_prefill_speed: parseFloat(maxP.toFixed(2)),
+                    max_decode_speed: parseFloat(maxD.toFixed(2)),
+                    source: 'web_pure',
+                    record_tags: ['source:web_pure'],
+                    results_json: JSON.stringify(vp.map(r => {
+                        const pointStats = _resolveUploadPointStats(r, concurrency);
+                        return {
+                            prompt_length: parseFloat(r.promptLength),
+                            prefill_speed: parseFloat(r.prefillSpeed),
+                            output_speed: parseFloat(r.outputSpeed),
+                            prefill_time_ms: parseFloat(r.prefillTimeMs) || 0,
+                            output_time_ms: parseFloat(r.outputTimeMs) || 0,
+                            avg_ttft_ms: parseFloat(r.avgTtftMs) || 0,
+                            avg_itl_mean: parseFloat(r.avgItlMean) || 0,
+                            avg_itl_std: parseFloat(r.avgItlStd) || 0,
+                            concurrency: pointStats.concurrency,
+                            successful: pointStats.successful,
+                            concurrent_details: pointStats.concurrentDetails.map(d => ({
+                                prefill_speed: parseFloat(d.prefill_speed || d.prefillSpeed) || null,
+                                output_speed: parseFloat(d.output_speed || d.outputSpeed) || null
+                            }))
+                        };
+                    }))
+                };
                 try {
                     const r = await _sbInsert(payload);
                     if (!r.ok) { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message || 'HTTP ' + r.status); }
@@ -6200,13 +6267,26 @@
                             else if (c.length >= 7) { pl = parseFloat(c[0]); pt = parseFloat(c[1]); ps = parseFloat(c[2]); ot = parseFloat(c[4]); os = parseFloat(c[5]); ttft = 0; itl = 0; }
                             else continue;
                             if (isNaN(ps) || isNaN(os)) continue;
-                            pts.push({ prompt_length: pl, prefill_speed: ps, output_speed: os, prefill_time_ms: pt || 0, output_time_ms: ot || 0, avg_ttft_ms: ttft || 0, avg_itl_mean: itl || 0, concurrency: conc, successful: 1 });
+                            const status = c[9] || '';
+                            const statusStats = _parseConcurrentStatusText(status, conc);
+                            pts.push({
+                                prompt_length: pl,
+                                prefill_speed: ps,
+                                output_speed: os,
+                                prefill_time_ms: pt || 0,
+                                output_time_ms: ot || 0,
+                                avg_ttft_ms: ttft || 0,
+                                avg_itl_mean: itl || 0,
+                                concurrency: statusStats.concurrency,
+                                successful: statusStats.successful ?? 1
+                            });
                         }
                         if (!pts.length) continue;
+                        const batchConcurrency = Math.max(conc, ...pts.map(p => parseInt(p.concurrency, 10) || conc));
                         _batchPayloads.push({
                             model,
                             notes,
-                            concurrency: conc,
+                            concurrency: batchConcurrency,
                             avgPrefill: parseFloat((pts.reduce((sum, r) => sum + r.prefill_speed, 0) / pts.length).toFixed(2)),
                             avgDecode: parseFloat((pts.reduce((sum, r) => sum + r.output_speed, 0) / pts.length).toFixed(2)),
                             maxPrefill: parseFloat(pts.reduce((m, r) => Math.max(m, r.prefill_speed), 0).toFixed(2)),
