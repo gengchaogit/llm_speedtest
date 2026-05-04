@@ -2827,12 +2827,13 @@
                     const data = JSON.parse(responseText);
                     let actualPromptTokens = null;
                     if (data?.usage) {
-                        actualPromptTokens = extractUsageTokenStats(data.usage).promptTokens;
+                        actualPromptTokens = normalizeUsageTokenStats(data.usage).promptTokens;
                     } else if (data?.prompt_eval_count !== undefined) {
                         actualPromptTokens = toTokenNumber(data.prompt_eval_count);
                     }
                     calibration = buildPromptCalibration(warmupPrompt, actualPromptTokens);
                 } catch (parseError) {
+                    console.warn('[Warmup] Failed to parse warmup usage for prompt calibration:', parseError);
                     calibration = null;
                 }
                 console.log('[Warmup] Warmup request completed.');
@@ -2850,11 +2851,7 @@
         }
 
         // 网络延迟采样工具：测速开始后多次采样，取平均值用于客户端TTFT扣除。
-        function createLatencyProbePrompt() {
-            const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-            return `Latency probe ${nonce}. Reply ok.`;
-        }
-
+        // Network latency samples use model-list endpoints so they do not trigger inference.
         function getAverageNetworkLatencyMs(latencySamples) {
             let validSamples = latencySamples.filter(value => Number.isFinite(value) && value > 0);
             if (validSamples.length === 0) return 0;
@@ -2866,44 +2863,15 @@
 
         async function measureNetworkLatencySample(apiUrl, apiType, modelName, timeout) {
             const probeTimeout = Math.min(Math.max(Number(timeout) || 0, 3000), 8000);
-
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), probeTimeout);
-                const start = performance.now();
-                const response = await fetch(apiUrl, { method: 'OPTIONS', signal: controller.signal });
-                await response.text().catch(() => '');
-                clearTimeout(timeoutId);
-                return { latencyMs: performance.now() - start, probeType: `OPTIONS ${response.status}` };
-            } catch (error) {
-                console.warn('[Latency] OPTIONS latency probe failed, falling back to a tiny completion:', getFriendlyFetchErrorMessage(error, apiUrl));
+            const { endpoint } = resolveModelCatalogEndpoint(apiUrl);
+            if (!endpoint) {
+                console.warn('[Latency] No non-inference latency endpoint could be derived; skipping latency sample.');
+                return null;
             }
 
-            const headers = { 'Content-Type': 'application/json' };
-            let requestBody;
-            if (apiType === 'openai') {
-                if (api_key) {
-                    headers['Authorization'] = `Bearer ${api_key}`;
-                }
-                requestBody = {
-                    model: modelName,
-                    messages: [
-                        { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
-                        { role: 'user', content: createLatencyProbePrompt() }
-                    ],
-                    max_tokens: 1,
-                    stream: false
-                };
-            } else {
-                requestBody = {
-                    model: modelName,
-                    messages: [
-                        { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
-                        { role: 'user', content: createLatencyProbePrompt() }
-                    ],
-                    options: { num_predict: 1 },
-                    stream: false
-                };
+            const headers = {};
+            if (apiType === 'openai' && api_key) {
+                headers['Authorization'] = `Bearer ${api_key}`;
             }
 
             const controller = new AbortController();
@@ -2911,14 +2879,14 @@
             const start = performance.now();
 
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
+                const response = await fetch(endpoint, {
+                    method: 'GET',
                     headers,
-                    body: JSON.stringify(requestBody),
-                    signal: controller.signal
+                    signal: controller.signal,
+                    cache: 'no-store'
                 });
                 await response.text().catch(() => '');
-                return { latencyMs: performance.now() - start, probeType: `tiny_completion ${response.status}` };
+                return { latencyMs: performance.now() - start, probeType: `model_catalog ${response.status}` };
             } finally {
                 clearTimeout(timeoutId);
             }

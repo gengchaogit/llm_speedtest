@@ -1161,42 +1161,6 @@ def get_average_network_latency_ms(latency_samples: list[float]) -> float:
     return sum(valid_samples) / len(valid_samples)
 
 
-def build_latency_probe_payload(
-    api_type: str,
-    model_name: str,
-    temperature: float,
-    top_p: float,
-) -> Dict[str, Any]:
-    nonce = f"{int(time.time() * 1000)}-{random.randint(1000, 9999)}"
-    prompt = f"Latency probe {nonce}. Reply ok."
-    if api_type == "openai":
-        return {
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": 1,
-            "temperature": temperature,
-            "top_p": top_p,
-            "stream": False,
-        }
-
-    return {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        "options": {
-            "num_predict": 1,
-            "temperature": temperature,
-            "top_p": top_p,
-        },
-        "stream": False,
-    }
-
-
 async def measure_network_latency_sample(
     api_url: str,
     api_key: str,
@@ -1207,6 +1171,11 @@ async def measure_network_latency_sample(
     top_p: float,
 ) -> Optional[Dict[str, Any]]:
     probe_timeout = min(max((timeout or 0) / 1000.0, 3.0), 8.0)
+    endpoint, _ = resolve_model_catalog_endpoint(api_url)
+    if not endpoint:
+        print("[Latency] No non-inference latency endpoint could be derived; skipping latency sample.", flush=True)
+        return None
+
     headers: Dict[str, str] = {}
     if api_type == "openai" and api_key and api_key.strip():
         headers["Authorization"] = f"Bearer {api_key}"
@@ -1214,24 +1183,12 @@ async def measure_network_latency_sample(
     try:
         async with httpx.AsyncClient(timeout=probe_timeout, verify=False) as client:
             start = time.perf_counter()
-            response = await client.options(api_url, headers=headers)
+            response = await client.get(endpoint, headers=headers)
             _ = response.content
             latency_ms = (time.perf_counter() - start) * 1000
-            return {"latency_ms": latency_ms, "probe_type": f"OPTIONS {response.status_code}"}
+            return {"latency_ms": latency_ms, "probe_type": f"model_catalog {response.status_code}"}
     except Exception as exc:
-        print(f"[Latency] OPTIONS latency probe failed, fallback to tiny completion: {exc}", flush=True)
-
-    headers = {"Content-Type": "application/json", **headers}
-    payload = build_latency_probe_payload(api_type, model_name, temperature, top_p)
-    try:
-        async with httpx.AsyncClient(timeout=probe_timeout, verify=False) as client:
-            start = time.perf_counter()
-            response = await client.post(api_url, headers=headers, json=payload)
-            _ = response.content
-            latency_ms = (time.perf_counter() - start) * 1000
-            return {"latency_ms": latency_ms, "probe_type": f"tiny_completion {response.status_code}"}
-    except Exception as exc:
-        print(f"[Latency] latency probe failed: {exc}", flush=True)
+        print(f"[Latency] model catalog latency probe failed: {exc}", flush=True)
         return None
 
 
