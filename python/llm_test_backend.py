@@ -230,6 +230,7 @@ class UploadPayload(BaseModel):
     framework: Optional[str] = None
     quantization: Optional[str] = None
     notes: Optional[str] = None
+    run_command: Optional[str] = None
     concurrency: int
     avg_prefill_speed: float
     avg_decode_speed: float
@@ -289,6 +290,18 @@ class UploadPayload(BaseModel):
     def validate_notes(cls, v):
         if v and len(v) > 200:
             raise ValueError('notes 不超过200字符')
+        return v
+
+    @field_validator('run_command')
+    @classmethod
+    def validate_run_command(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return None
+        if len(v) > 2000:
+            raise ValueError('run_command 不超过2000字符')
         return v
 
     @field_validator('nickname')
@@ -391,6 +404,8 @@ async def upload_result(request: Request, payload: UploadPayload):
         "ip_hash": ip_hash_val,
         "status": "public",
     }
+    if payload.run_command:
+        record["run_command"] = payload.run_command
 
     resp = await _supabase_request(
         "POST", SUPABASE_TABLE,
@@ -444,9 +459,16 @@ async def get_results(
             safe_s = s.replace(",", "").replace(".", "").replace('"', '')
             params += f"&or=(nickname.ilike.*{safe_s}*,model_name.ilike.*{safe_s}*,user_code.eq.{safe_s.upper()})"
 
+    select_fields = "id,user_code,nickname,model_name,hardware,framework,quantization,notes,run_command,concurrency,avg_prefill_speed,avg_decode_speed,max_prefill_speed,max_decode_speed,source,record_tags,created_at,results_json"
     resp = await _supabase_request(
-        "GET", f"{SUPABASE_TABLE}?{params}&select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,max_prefill_speed,max_decode_speed,source,record_tags,created_at,results_json",
+        "GET", f"{SUPABASE_TABLE}?{params}&select={select_fields}",
     )
+
+    if resp.status_code != 200 and "run_command" in resp.text:
+        legacy_select_fields = select_fields.replace(",run_command", "")
+        resp = await _supabase_request(
+            "GET", f"{SUPABASE_TABLE}?{params}&select={legacy_select_fields}",
+        )
 
     if resp.status_code != 200:
         raise HTTPException(status_code=502, detail=f"查询失败: {resp.text}")

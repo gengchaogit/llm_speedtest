@@ -324,6 +324,7 @@ Here are detailed explanations for each configuration item:
     *   **Ollama**: The model name you pulled in Ollama, e.g., `llama2`, `qwen`.
 *   **API-Key (`apiKey`)**: If your LLM service requires API Key authentication, enter it here. Otherwise, it can be left blank.
 *   **Notes (`notes`)**: Used to record environment information for each test, e.g., `GeForce RTX 4090, vLLM 0.3.0, Qwen-7B-Chat-AWQ`.
+*   **Run Command (`run_command`)**: Optional. Used to record the command that starts the inference serving framework, e.g., `vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0`. Run the database change in `supabase_add_run_command.sql` before storing this field in the cloud.
 *   **Minimum/Maximum Prompt Length (`minLength`, `maxLength`)**: Defines the token length range for the test prompts.
 *   **Step (`step`)**: The amount by which the prompt length increases in each test. For example, `minLength=128, maxLength=1024, step=128` will test prompts of 128, 256, 384...1024 tokens.
 *   **Expected Output Length (`outputLength`)**: The number of tokens the model is expected to generate for each request.

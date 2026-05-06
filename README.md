@@ -367,6 +367,7 @@
     *   **Ollama**：你在 Ollama 中拉取的模型名称，例如 `llama2`，`qwen`。
 *   **API-Key (`apiKey`)**：如果你的大模型服务设置了 API Key 认证，请在此处填写。否则可以留空。
 *   **备注 (`notes`)：** 用于记录每次测试的环境信息，例如 `GeForce RTX 4090, vLLM 0.3.0, Qwen-7B-Chat-AWQ`。
+*   **启动命令 (`run_command`)：** 可选，用于记录启动推理框架的命令，例如 `vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0`。云端存储前请先执行 `supabase_add_run_command.sql` 中的数据库变更语句。
 *   **最小/最大提示词长度 (`minLength`, `maxLength`)**：定义测试的提示词 token 长度区间。
 *   **步长 (`step`)**：每次测试时提示词长度递增的数量。例如，`minLength=128, maxLength=1024, step=128` 会测试 128, 256, 384...1024 token 的提示词。
 *   **期望输出长度 (`outputLength`)**：模型每次请求预计生成的 token 数量。

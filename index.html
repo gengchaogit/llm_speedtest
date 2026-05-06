@@ -1096,6 +1096,14 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
+                    <label for="runCommand">启动命令</label>
+                    <textarea id="runCommand" rows="2" maxlength="2000"
+                        placeholder="例如：vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0"
+                        style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="checkbox" id="saveDetailContent" style="margin-right: 8px; width: auto;">
                         <span id="labelSaveDetail">保存测试详情（提示词和输出内容）</span>
@@ -1297,6 +1305,8 @@
                 placeholderApiKey: '未设置 API-Key 则留空',
                 labelNotes: '备注',
                 placeholderNotes: '请填写设备信息、模型信息、模型推理框架，以便在结果中显示',
+                labelRunCommand: '启动命令',
+                placeholderRunCommand: '例如：vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 labelSaveDetail: '保存测试详情（提示词和输出内容）',
                 noteSaveDetail: '💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。',
                 modelSuggestLoading: '正在加载模型列表...',
@@ -1507,6 +1517,8 @@
                 cloudDisplayNameLabel: '显示名称',
                 cloudNotesLabel: '备注（可选，200字以内）',
                 cloudNotesPlaceholder: '如版本、特殊配置等',
+                cloudRunCommandLabel: '启动命令（可选）',
+                cloudRunCommandPlaceholder: '例如：vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 cloudCancelBtn: '取消',
                 cloudUploadBtn: '📤 上传分享', cloudUploading: '上传中...',
                 cloudUploadNote: '上传后数据公开可见，不可删除',
@@ -1551,6 +1563,8 @@
                 placeholderApiKey: 'Leave empty if no API key is required',
                 labelNotes: 'Notes',
                 placeholderNotes: 'Fill in device info, model info, inference framework for display in results',
+                labelRunCommand: 'Run Command',
+                placeholderRunCommand: 'Example: vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 labelSaveDetail: 'Save Test Details (Prompts and Outputs)',
                 noteSaveDetail: '💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.',
                 modelSuggestLoading: 'Loading model list...',
@@ -1762,6 +1776,8 @@
                 cloudDisplayNameLabel: 'Display Name',
                 cloudNotesLabel: 'Notes (optional, max 200 chars)',
                 cloudNotesPlaceholder: 'For example: version, special config, etc.',
+                cloudRunCommandLabel: 'Run Command (optional)',
+                cloudRunCommandPlaceholder: 'Example: vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 cloudCancelBtn: 'Cancel',
                 cloudUploadBtn: '📤 Upload', cloudUploading: 'Uploading...',
                 cloudUploadNote: 'Data is public once uploaded and cannot be deleted',
@@ -1883,6 +1899,8 @@
             document.getElementById('apiKey').placeholder = t.placeholderApiKey;
             document.querySelector('label[for="notes"]').textContent = t.labelNotes;
             document.getElementById('notes').placeholder = t.placeholderNotes;
+            document.querySelector('label[for="runCommand"]').textContent = t.labelRunCommand;
+            document.getElementById('runCommand').placeholder = t.placeholderRunCommand;
             document.getElementById('labelSaveDetail').textContent = t.labelSaveDetail;
             document.getElementById('noteSaveDetail').textContent = t.noteSaveDetail;
             document.querySelector('label[for="minLength"]').textContent = t.labelMinLength;
@@ -4503,6 +4521,7 @@
             currentModelName = document.getElementById('modelName').value.trim();
             api_key = document.getElementById('apiKey').value.trim();
             notes = document.getElementById('notes').value.trim() || `无用户备注，接口: ${currentApiType === 'openai' ? 'OpenAI兼容接口' : 'Ollama接口'} ，模型: ${currentModelName}`;
+            const runCommand = document.getElementById('runCommand').value.trim();
             const minLength = parseInt(document.getElementById('minLength').value, 10);
             const maxLength = parseInt(document.getElementById('maxLength').value, 10);
             const step = parseInt(document.getElementById('step').value, 10);
@@ -4522,6 +4541,7 @@
                 localStorage.setItem('llmPerfTestApiType', currentApiType);
                 localStorage.setItem('llmPerfTestApiKey', api_key);
                 localStorage.setItem('llmPerfTestNotes', notes);
+                localStorage.setItem('llmPerfTestRunCommand', runCommand);
                 localStorage.setItem('llmPerfTestMinLength', minLength);
                 localStorage.setItem('llmPerfTestMaxLength', maxLength);
                 localStorage.setItem('llmPerfTestStep', step);
@@ -4693,7 +4713,8 @@
                         presencePenalty: presence_penalty,
                         frequencyPenalty: frequency_penalty,
                         timeout: timeout,
-                        notes: notes
+                        notes: notes,
+                        runCommand: runCommand
                     };
                     const saved = saveTestToHistory(currentConfig, testResultsData, statsData);
                     if (saved) {
@@ -5330,6 +5351,7 @@
             const savedModelName = localStorage.getItem('llmPerfTestModelName');
             const savedApiKey = localStorage.getItem('llmPerfTestApiKey');
             const savedNotes = localStorage.getItem('llmPerfTestNotes');
+            const savedRunCommand = localStorage.getItem('llmPerfTestRunCommand');
             const savedMinLength = localStorage.getItem('llmPerfTestMinLength');
             const savedMaxLength = localStorage.getItem('llmPerfTestMaxLength');
             const savedStep = localStorage.getItem('llmPerfTestStep');
@@ -5355,6 +5377,7 @@
             document.getElementById('modelName').value = savedModelName || ((savedApiType === 'openai') ? d_openai_modelName : d_ollama_modelName);
             document.getElementById('apiKey').value = savedApiKey || d_api_key;
             document.getElementById('notes').value = savedNotes || '';
+            document.getElementById('runCommand').value = savedRunCommand || '';
             document.getElementById('minLength').value = savedMinLength || d_minLength;
             document.getElementById('maxLength').value = savedMaxLength || d_maxLength;
             document.getElementById('step').value = savedStep || d_step;
@@ -5634,6 +5657,7 @@
             }
             // 填充备注字段
             document.getElementById('notes').value = record.notes || '';
+            document.getElementById('runCommand').value = record.config?.runCommand || '';
 
             // 加载历史记录的结果数据
             testResultsData = [...record.results];
@@ -5991,6 +6015,8 @@
             if (_e('shareNickname')) _e('shareNickname').placeholder = t.cloudDisplayNamePlaceholder;
             if (_e('shareNotesLabel')) _e('shareNotesLabel').textContent = t.cloudNotesLabel;
             if (_e('shareNotes')) _e('shareNotes').placeholder = t.cloudNotesPlaceholder;
+            if (_e('shareRunCommandLabel')) _e('shareRunCommandLabel').textContent = t.cloudRunCommandLabel;
+            if (_e('shareRunCommand')) _e('shareRunCommand').placeholder = t.cloudRunCommandPlaceholder;
             if (_e('shareCancelBtn')) _e('shareCancelBtn').textContent = t.cloudCancelBtn;
             if (_e('shareModalUserCodeLabel')) _e('shareModalUserCodeLabel').textContent = t.cloudUserCode;
             if (_e('shareModalUploadNote')) _e('shareModalUploadNote').textContent = t.cloudUploadNote;
@@ -6216,6 +6242,12 @@
                     id="shareNotes" maxlength="200" rows="2" placeholder="如版本、特殊配置等"
                     style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:14px;resize:vertical;"></textarea>
             </div>
+            <div style="margin-bottom:20px;"><label id="shareRunCommandLabel"
+                    style="display:block;margin-bottom:4px;font-size:13px;">启动命令（可选）</label><textarea
+                    id="shareRunCommand" maxlength="2000" rows="3"
+                    placeholder="例如：vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #555;border-radius:4px;background:#1e2227;color:#abb2bf;font-size:13px;font-family:monospace;resize:vertical;"></textarea>
+            </div>
             <div id="shareResultMsg"
                 style="display:none;margin-bottom:16px;padding:10px;border-radius:6px;font-size:13px;"></div>
             <div style="display:flex;gap:10px;justify-content:flex-end;"><button id="shareCancelBtn" onclick="closeShareModal()"
@@ -6397,14 +6429,16 @@
                 if (hw) hw.value = localStorage.getItem('llm_speedtest_share_hw') || '';
                 if (fw) fw.value = localStorage.getItem('llm_speedtest_share_fw') || '';
                 if (qt) qt.value = localStorage.getItem('llm_speedtest_share_qt') || '';
-                const mn = document.getElementById('shareModelName'), sn = document.getElementById('shareNotes');
+                const mn = document.getElementById('shareModelName'), sn = document.getElementById('shareNotes'), rc = document.getElementById('shareRunCommand');
                 if (_batchMode) {
                     // 批量CSV模式：从第一个解析好的记录里预填充模型名，方便用户确认/修改，且让联想立即可用
                     if (mn) { mn.value = (_batchPayloads[0] && _batchPayloads[0].model) ? _batchPayloads[0].model : ''; mn.dispatchEvent(new Event('input')); }
                     if (sn) sn.value = '';
+                    if (rc) rc.value = '';
                 } else {
                     if (mn) mn.value = localStorage.getItem('llm_speedtest_share_model') || document.getElementById('modelName')?.value?.trim() || '';
                     if (sn) sn.value = document.getElementById('notes')?.value?.trim() || '';
+                    if (rc) rc.value = document.getElementById('runCommand')?.value?.trim() || '';
                 }
                 document.getElementById('shareModal').style.display = 'flex';
             };
@@ -6451,6 +6485,7 @@
                 const qt = (document.getElementById('shareQuantization') || {}).value?.trim() || '';
                 const nick = (document.getElementById('shareNickname') || {}).value?.trim() || '';
                 const notes = (document.getElementById('shareNotes') || {}).value?.trim() || '';
+                const runCommand = (document.getElementById('shareRunCommand') || {}).value?.trim() || '';
                 const msgDiv = document.getElementById('shareResultMsg');
                 const uploadBtn = document.getElementById('doUploadBtn');
                 if (!hw) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = t.cloudUploadMissingHardware || '❌ Please fill in hardware information (required)'; } return; }
@@ -6460,7 +6495,7 @@
                 const mn = document.getElementById('shareModelName')?.value?.trim();
                 if (mn) localStorage.setItem('llm_speedtest_share_model', mn);
                 if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = t.cloudUploading || 'Uploading...'; } if (msgDiv) msgDiv.style.display = 'none';
-                if (_batchMode) { await _doBatchUpload(hw, fw, qt, nick, notes, mn); return; }
+                if (_batchMode) { await _doBatchUpload(hw, fw, qt, nick, notes, mn, runCommand); return; }
                 const vp = (typeof testResultsData !== 'undefined' ? testResultsData : (window.testResultsData || [])).filter(r => r.prefillSpeed !== 'N/A' && r.outputSpeed !== 'N/A');
                 if (!vp.length) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = t.cloudUploadNoData || '❌ No test data available to upload. Please run a test first.'; } if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 Upload'; } return; }
                 const userCode = getOrCreateUserCode();
@@ -6504,6 +6539,7 @@
                         };
                     }))
                 };
+                if (runCommand) payload.run_command = runCommand;
                 try {
                     const r = await _sbInsert(payload);
                     if (!r.ok) { const err = await r.json().catch(() => ({ message: r.statusText })); throw new Error(err.message || 'HTTP ' + r.status); }
@@ -6517,7 +6553,7 @@
                 } catch (e) { if (msgDiv) { msgDiv.style.cssText = 'display:block;background:#3a1515;color:#e06c75;padding:10px;border-radius:6px;font-size:13px;'; msgDiv.textContent = (typeof formatI18nText === 'function' ? formatI18nText((t.cloudUploadFailed || '❌ Upload failed: {error}'), { error: e.message }) : `${t.cloudUploadFailed || '❌ Upload failed:'} ${e.message}`); } }
                 finally { if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = t.cloudUploadBtn || '📤 Upload'; } }
             };
-            async function _doBatchUpload(hw, fw, qt, nickname, notes, modelName) {
+            async function _doBatchUpload(hw, fw, qt, nickname, notes, modelName, runCommand = '') {
                 const t = (typeof translations !== 'undefined' && currentLang) ? translations[currentLang] : {};
                 const userCode = getOrCreateUserCode();
                 const msgDiv = document.getElementById('shareResultMsg'), uploadBtn = document.getElementById('doUploadBtn');
@@ -6525,6 +6561,7 @@
                 let firstShareUrl = '';
                 for (const bd of _batchPayloads) {
                     const payload = { user_code: userCode, nickname: nickname || null, model_name: modelName || bd.model || t.cloudUnknownModel || 'Unknown Model', hardware: hw, framework: fw || null, quantization: qt || null, notes: notes || bd.notes || null, concurrency: bd.concurrency, avg_prefill_speed: bd.avgPrefill ?? bd.maxPrefill, avg_decode_speed: bd.avgDecode ?? bd.maxDecode, max_prefill_speed: bd.maxPrefill, max_decode_speed: bd.maxDecode, source: 'web_pure', record_tags: bd.recordTags || ['source:web_pure'], results_json: JSON.stringify(bd.points) };
+                    if (runCommand) payload.run_command = runCommand;
                     try {
                         const r = await _sbInsert(payload);
                         if (r.ok || r.status === 201) {

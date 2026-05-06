@@ -295,6 +295,24 @@
             position: relative;
         }
 
+        .command-modal-content {
+            max-width: 760px;
+        }
+
+        .run-command-block {
+            margin: 12px 0 18px;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-panel);
+            color: var(--text-main);
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         .close-btn {
             color: var(--text-muted);
             float: right;
@@ -671,10 +689,34 @@
             white-space: nowrap;
         }
 
+        .btn-run-command {
+            background: transparent;
+            color: var(--accent-yellow);
+            border: 1px solid var(--accent-yellow);
+            padding: 3px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 9px;
+            min-height: 22px;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        .btn-run-command:hover {
+            background: rgba(229, 192, 123, 0.12);
+        }
+
         .col-notes {
             width: 9%;
             min-width: 120px;
             max-width: 160px;
+        }
+
+        .col-command {
+            width: 92px;
+            min-width: 92px;
+            max-width: 110px;
+            text-align: center;
         }
 
         .col-source-tags {
@@ -937,6 +979,7 @@
             .col-share-id,
             .col-user,
             .col-notes,
+            .col-command,
             .col-source-tags,
             .col-concurrency {
                 display: none;
@@ -1285,6 +1328,7 @@
         body.force-mobile-view .col-share-id,
         body.force-mobile-view .col-user,
         body.force-mobile-view .col-notes,
+        body.force-mobile-view .col-command,
         body.force-mobile-view .col-source-tags,
         body.force-mobile-view .col-concurrency {
             display: none;
@@ -1494,6 +1538,7 @@
         body.force-desktop-view .col-model,
         body.force-desktop-view .col-config,
         body.force-desktop-view .col-notes,
+        body.force-desktop-view .col-command,
         body.force-desktop-view .col-source-tags,
         body.force-desktop-view .col-concurrency,
         body.force-desktop-view .col-prefill,
@@ -1647,6 +1692,7 @@
                         <th class="col-model">模型</th>
                         <th class="col-config">硬件 / 框架 / 量化</th>
                         <th class="col-notes">备注</th>
+                        <th class="col-command" data-translate-skip="true" data-run-command-label="true">启动命令</th>
                         <th class="col-source-tags">Source / Tags</th>
                         <th class="col-concurrency">并发</th>
                         <th id="sortHeader-max_prefill_speed" class="sortable-header col-prefill" aria-sort="none">
@@ -1694,6 +1740,18 @@
                 <div class="chart-box"><canvas id="ttftChart"></canvas></div>
                 <div class="chart-box"><canvas id="itlChart"></canvas></div>
             </div>
+        </div>
+    </div>
+
+    <!-- 启动命令模态框 -->
+    <div id="runCommandModal" class="modal">
+        <div class="modal-content command-modal-content">
+            <span class="close-btn" onclick="closeRunCommandModal()">&times;</span>
+            <h2 id="runCommandModalTitle" data-translate-skip="true" style="color:var(--accent-yellow); margin-top:0;">启动命令</h2>
+            <div id="runCommandModalSubtitle" style="color:var(--text-muted); font-size:13px;"></div>
+            <pre id="runCommandText" class="run-command-block" data-translate-skip="true"></pre>
+            <button id="copyRunCommandBtn" class="btn-run-command" onclick="copyRunCommand()"
+                data-translate-skip="true" style="font-size:12px; padding:7px 12px;">复制命令</button>
         </div>
     </div>
 
@@ -1779,6 +1837,7 @@
             ttft: null,
             itl: null
         };
+        let activeRunCommand = '';
 
         function getShareIdFromUrl() {
             const params = new URLSearchParams(window.location.search || '');
@@ -1980,6 +2039,20 @@
             enBtn.title = title;
         }
 
+        function getRunCommandLabel() {
+            return currentPageLanguage === PAGE_LANGUAGE.EN ? 'Run Command' : '启动命令';
+        }
+
+        function updateRunCommandLabels() {
+            document.querySelectorAll('[data-run-command-label="true"]').forEach((element) => {
+                element.textContent = getRunCommandLabel();
+            });
+            const modalTitle = document.getElementById('runCommandModalTitle');
+            if (modalTitle) modalTitle.textContent = getRunCommandLabel();
+            const copyBtn = document.getElementById('copyRunCommandBtn');
+            if (copyBtn) copyBtn.textContent = currentPageLanguage === PAGE_LANGUAGE.EN ? 'Copy Command' : '复制命令';
+        }
+
         function initializePageTranslation() {
             if (translationObserver) return;
 
@@ -2041,10 +2114,12 @@
                 translationNeedsRerun = false;
                 restoreOriginalPageText(document.body);
                 document.title = ORIGINAL_DOCUMENT_TITLE;
+                updateRunCommandLabels();
                 updateLanguageToggleState(false);
                 return;
             }
 
+            updateRunCommandLabels();
             updateLanguageToggleState(true);
             translateCurrentPage(generation).catch((error) => {
                 console.error('Page translation failed:', error);
@@ -2676,7 +2751,7 @@
             if (isLegacySchemaMode()) {
                 return 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,results_json,created_at';
             }
-            return 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,concurrency,avg_prefill_speed,avg_decode_speed,max_prefill_speed,max_decode_speed,source,record_tags,results_json,created_at';
+            return 'select=id,user_code,nickname,model_name,hardware,framework,quantization,notes,run_command,concurrency,avg_prefill_speed,avg_decode_speed,max_prefill_speed,max_decode_speed,source,record_tags,results_json,created_at';
         }
 
         function buildModelTagSelectFields() {
@@ -2693,7 +2768,8 @@
                 text.includes('max_prefill_speed') ||
                 text.includes('max_decode_speed') ||
                 text.includes('record_tags') ||
-                text.includes('source')
+                text.includes('source') ||
+                text.includes('run_command')
             );
         }
 
@@ -3188,6 +3264,7 @@
             loadPersistedTranslationCache();
             initializePageTranslation();
             updateLanguageToggleState(false);
+            updateRunCommandLabels();
 
             const pageEl = document.getElementById('pageSizeSelect');
             if (pageEl) pageEl.value = String(currentPageSize);
@@ -3355,6 +3432,11 @@
                     // Config text
                     const configText = [row.hardware, row.framework, row.quantization].filter(Boolean).map(escapeHtml).join(' / ');
                     const notesText = row.notes ? escapeHtml(row.notes) : '-';
+                    const hasRunCommand = typeof row.run_command === 'string' && row.run_command.trim();
+                    const rowIdLiteral = JSON.stringify(String(row.id || ''));
+                    const runCommandCell = hasRunCommand
+                        ? `<button type="button" class="btn-run-command" data-translate-skip="true" data-run-command-label="true" onclick='openRunCommandModal(${rowIdLiteral})'>${getRunCommandLabel()}</button>`
+                        : '-';
                     const prefillValue = pickDisplaySpeed(row.max_prefill_speed, row.avg_prefill_speed);
                     const decodeValue = pickDisplaySpeed(row.max_decode_speed, row.avg_decode_speed);
                     const prefillText = Number.isFinite(prefillValue) ? prefillValue.toFixed(1) : '-';
@@ -3383,6 +3465,7 @@
                         <span class="notes-text">${notesText}</span>
                         ${row.notes ? `<div class="notes-tooltip">${notesText}</div>` : ''}
                     </td>
+                    <td class="col-command">${runCommandCell}</td>
                     <td class="col-source-tags" style="font-size:11px; color:var(--text-muted); line-height:1.35;">${sourceTagsText}</td>
                     <td class="col-concurrency">${row.concurrency}</td>
                     <td class="col-prefill" style="color:#98c379; font-weight:bold;">${prefillText}</td>
@@ -3400,6 +3483,7 @@
 
                 loading.style.display = 'none';
                 table.style.display = 'table';
+                updateRunCommandLabels();
 
                 // Pagination display logic
                 pagination.style.display = 'block';
@@ -3467,11 +3551,40 @@
             document.getElementById('chartModal').style.display = 'none';
         }
 
+        function openRunCommandModal(id) {
+            const row = resultsDataMap[id];
+            const command = typeof row?.run_command === 'string' ? row.run_command.trim() : '';
+            if (!command) return;
+
+            activeRunCommand = command;
+            updateRunCommandLabels();
+            document.getElementById('runCommandModalSubtitle').textContent =
+                `${row.model_name || '-'} | ${new Date(row.created_at).toLocaleString()}`;
+            document.getElementById('runCommandText').textContent = command;
+            document.getElementById('runCommandModal').style.display = 'block';
+        }
+
+        function closeRunCommandModal() {
+            document.getElementById('runCommandModal').style.display = 'none';
+        }
+
+        async function copyRunCommand() {
+            if (!activeRunCommand) return;
+            await navigator.clipboard.writeText(activeRunCommand);
+            const btn = document.getElementById('copyRunCommandBtn');
+            if (!btn) return;
+            btn.textContent = currentPageLanguage === PAGE_LANGUAGE.EN ? 'Copied' : '已复制';
+            setTimeout(updateRunCommandLabels, 1200);
+        }
+
         // Click outside to close
         window.onclick = function (event) {
-            const modal = document.getElementById('chartModal');
-            if (event.target === modal) {
+            const chartModal = document.getElementById('chartModal');
+            const runCommandModal = document.getElementById('runCommandModal');
+            if (event.target === chartModal) {
                 closeCharts();
+            } else if (event.target === runCommandModal) {
+                closeRunCommandModal();
             }
         }
 
@@ -3539,7 +3652,14 @@
 
             // ================== Build Detail Data Table ==================
             const dataContainer = document.getElementById('modalDataContainer');
-            let tableHtml = `
+            const runCommandText = row.run_command ? escapeHtml(row.run_command) : '';
+            const runCommandHtml = runCommandText ? `
+                <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:6px; padding:14px; margin-bottom:16px; font-size:13px;">
+                    <div style="color:var(--text-muted); margin-bottom:8px;">启动命令 / Run Command</div>
+                    <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-family:monospace; color:var(--text-main);">${runCommandText}</pre>
+                </div>
+            ` : '';
+            let tableHtml = `${runCommandHtml}
             <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:13px;">
                 <thead>
                     <tr style="background:var(--bg-panel);">
