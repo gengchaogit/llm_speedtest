@@ -3139,6 +3139,32 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
         }
 */
 
+        function hasUsableSpeedValue(value) {
+            const numeric = parseFloat(value);
+            return value !== 'N/A' && Number.isFinite(numeric);
+        }
+
+        function hasSuccessfulResult(result) {
+            if (!result) return false;
+
+            const hasExplicitSuccessful = result.successful !== undefined
+                && result.successful !== null
+                && result.successful !== '';
+            if (hasExplicitSuccessful) {
+                const successful = Number(result.successful);
+                if (Number.isFinite(successful)) return successful > 0;
+            }
+
+            const statusText = String(result.status || '');
+            const concurrentMatch = statusText.match(/(\d+)\s*\/\s*(\d+)/);
+            if (concurrentMatch) return parseInt(concurrentMatch[1], 10) > 0;
+            if (statusText.includes('失败') || statusText.includes('Failed')) return false;
+            if (statusText.includes('成功') || statusText.includes('Success')) return true;
+
+            return hasUsableSpeedValue(result.prefillSpeed ?? result.prefill_speed)
+                && hasUsableSpeedValue(result.outputSpeed ?? result.output_speed);
+        }
+
         function updateConcurrencyStats(prefillSpeed, outputSpeed) {
 
             concurrencyStats.minPrefillSpeed = Math.min(concurrencyStats.minPrefillSpeed, prefillSpeed);
@@ -3148,12 +3174,12 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
 
             // 重新从 testResultsData 计算平均值，确保准确性
             const allPrefillSpeeds = testResultsData
-                .filter(r => (r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess) && r.prefillSpeed !== 'N/A')
+                .filter(r => hasSuccessfulResult(r) && r.prefillSpeed !== 'N/A')
                 .map(r => parseFloat(r.prefillSpeed));
             if (prefillSpeed) allPrefillSpeeds.push(prefillSpeed); // 包括当前批次的
 
             const allOutputSpeeds = testResultsData
-                .filter(r => (r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess) && r.outputSpeed !== 'N/A')
+                .filter(r => hasSuccessfulResult(r) && r.outputSpeed !== 'N/A')
                 .map(r => parseFloat(r.outputSpeed));
             if (outputSpeed) allOutputSpeeds.push(outputSpeed); // 包括当前批次的
 
@@ -4411,7 +4437,7 @@ async function processOllamaResponse(response, promptLength) {
 
             // 无论测试是完成还是被手动停止，只要有数据就显示统计
             let statsData = null;
-            if (testResultsData.some(r => r.status === translations.zh.statusSuccess || r.status === translations.en.statusSuccess)) {
+            if (testResultsData.some(hasSuccessfulResult)) {
                 statsData = showConcurrencyStats();
                 // generateCharts(); //
 
@@ -4448,7 +4474,7 @@ async function processOllamaResponse(response, promptLength) {
                 const stopRow = document.createElement('tr');
                 stopRow.innerHTML = `<td colspan="8" class="info">${t.msgTestStopped}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(stopRow);
-            } else if (!testResultsData.some(r => r.status === t.statusSuccess)) {
+            } else if (!testResultsData.some(hasSuccessfulResult)) {
                 const noDataRow = document.createElement('tr');
                 noDataRow.innerHTML = `<td colspan="8" class="info">${t.msgTestCompleteNoData}</td>`;
                 resultsDiv.querySelector('tbody').appendChild(noDataRow);
@@ -6214,7 +6240,7 @@ async function processOllamaResponse(response, promptLength) {
                 }
 
                 // 根据状态设置行样式
-                if (resultEntry.status === t.statusSuccess || resultEntry.status.includes('成功') || resultEntry.status.includes('Success')) {
+                if (hasSuccessfulResult(resultEntry)) {
                     row.classList.add('success');
                 } else {
                     row.classList.add('error');
