@@ -906,6 +906,8 @@ PROMPT_TOKEN_WORDS = [
 ]
 SHORT_PROMPT_MAX_LENGTH = 46
 BENCHMARK_SUFFIX_TOKEN_LENGTH = SHORT_PROMPT_MAX_LENGTH + 1
+TOKEN_SANITY_MIN_TOKENS = 128
+TOKEN_SANITY_MAX_RELATIVE_DIFF = 0.8
 
 
 def get_resolved_prompt_length(length: int) -> int:
@@ -1025,6 +1027,39 @@ def estimate_generated_prompt_tokens(
 
 def _has_positive_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and value > 0
+
+
+def resolve_token_count_with_sanity_check(
+    kind: str,
+    api_tokens: Any,
+    estimated_tokens: Any,
+) -> Dict[str, Any]:
+    """Prefer API token stats unless they look like cumulative/concurrent totals."""
+    api_value = _coerce_int(api_tokens)
+    estimated_value = _coerce_int(estimated_tokens)
+
+    if not _has_positive_number(api_value):
+        if _has_positive_number(estimated_value):
+            return {"tokens": estimated_value, "source": "Local Estimation", "warning": None}
+        return {"tokens": 0, "source": "Unknown", "warning": None}
+
+    if _has_positive_number(estimated_value):
+        relative_diff = abs(api_value - estimated_value) / max(estimated_value, 1)
+        max_tokens = max(api_value, estimated_value)
+        if max_tokens >= TOKEN_SANITY_MIN_TOKENS and relative_diff >= TOKEN_SANITY_MAX_RELATIVE_DIFF:
+            return {
+                "tokens": estimated_value,
+                "source": "API Stats Anomaly",
+                "warning": {
+                    "type": "api_token_mismatch",
+                    "kind": kind,
+                    "api_tokens": api_value,
+                    "estimated_tokens": estimated_value,
+                    "relative_diff": relative_diff,
+                },
+            }
+
+    return {"tokens": api_value, "source": "API", "warning": None}
 
 
 def calculate_aggregate_throughput_metrics(results: list[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1629,28 +1664,66 @@ async def execute_single_request(
 
         print(f"[Timing] Server Prefill: {server_prefill_time_ms}ms, Server Decode: {server_decode_time_ms}ms")
         
-        # Token统计
-        token_source = ''
-        if actual_prompt_tokens is None or actual_prompt_tokens <= 0:
-            # Fallback: 使用prompt_length作为估算（因为我们控制了prompt生成）
-            actual_prompt_tokens = estimated_prompt_tokens
-            print(f"[Token] Prompt估算: {actual_prompt_tokens} (使用设定长度)")
-        else:
-            print(f"[Token] Prompt来自usage: {actual_prompt_tokens}")
+        # Token sanity check: llama.cpp-like servers may return cumulative totals per concurrent response.
+        token_warnings: List[Dict[str, Any]] = []
+        api_prompt_tokens = actual_prompt_tokens
+        api_output_tokens = actual_output_tokens
+        local_output_tokens = (
+            estimate_token_count(reasoning_content) + estimate_token_count(output_content)
+            if (reasoning_content or output_content)
+            else None
+        )
 
-        if actual_output_tokens is None or (actual_output_tokens <= 0 and (reasoning_content or output_content)):
-            # 使用精确的token估算函数
-            reasoning_tokens = estimate_token_count(reasoning_content)
-            completion_tokens = estimate_token_count(output_content)
-            actual_output_tokens = reasoning_tokens + completion_tokens
-            token_source = 'Local Estimation'
-            print(f"[Token] Output估算: {actual_output_tokens} (reasoning: {reasoning_tokens}, completion: {completion_tokens})")
+        prompt_resolution = resolve_token_count_with_sanity_check(
+            "prompt",
+            api_prompt_tokens,
+            estimated_prompt_tokens,
+        )
+        actual_prompt_tokens = prompt_resolution["tokens"] or estimated_prompt_tokens
+        if prompt_resolution["warning"]:
+            token_warnings.append(prompt_resolution["warning"])
+            print(
+                "[TokenWarning] Prompt API stats look abnormal; "
+                f"api={prompt_resolution['warning']['api_tokens']}, "
+                f"local={prompt_resolution['warning']['estimated_tokens']}, "
+                f"diff={prompt_resolution['warning']['relative_diff'] * 100:.1f}%. "
+                "Using local estimate.",
+                flush=True,
+            )
+        elif prompt_resolution["source"] == "API":
+            print(f"[Token] Prompt from API usage: {actual_prompt_tokens}")
         else:
-            token_source = 'API'
-            print(f"[Token] Output来自usage: {actual_output_tokens}")
+            print(f"[Token] Prompt local estimate: {actual_prompt_tokens}")
 
-        if not token_source:
-            token_source = 'Unknown'
+        output_resolution = resolve_token_count_with_sanity_check(
+            "decode",
+            api_output_tokens,
+            local_output_tokens,
+        )
+        actual_output_tokens = output_resolution["tokens"]
+        if output_resolution["warning"]:
+            token_warnings.append(output_resolution["warning"])
+            print(
+                "[TokenWarning] Decode API stats look abnormal; "
+                f"api={output_resolution['warning']['api_tokens']}, "
+                f"local={output_resolution['warning']['estimated_tokens']}, "
+                f"diff={output_resolution['warning']['relative_diff'] * 100:.1f}%. "
+                "Using local estimate.",
+                flush=True,
+            )
+        elif output_resolution["source"] == "API":
+            print(f"[Token] Output from API usage: {actual_output_tokens}")
+        else:
+            print(f"[Token] Output local estimate: {actual_output_tokens}")
+
+        if token_warnings:
+            token_source = "API Stats Anomaly"
+        elif output_resolution["source"] == "API" or prompt_resolution["source"] == "API":
+            token_source = "API"
+        elif output_resolution["source"] == "Local Estimation" or prompt_resolution["source"] == "Local Estimation":
+            token_source = "Local Estimation"
+        else:
+            token_source = "Unknown"
 
         # 计算时间和速度：优先使用服务器返回的timing，否则使用客户端测量
 
@@ -1758,6 +1831,7 @@ async def execute_single_request(
             "boundary_source": boundary_source,
             "end_timestamp": end_time,
             "token_source": token_source,  # 添加token来源
+            "token_warnings": token_warnings,
             # 新增ITL相关数据
             "token_timestamps": token_timestamps,  # 所有token的时间戳数据
             "itl_stats": itl_stats  # ITL统计信息
@@ -1952,9 +2026,12 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 avg_prompt_tokens = sum(r["prompt_tokens"] for r in successful_results) / len(successful_results)
                 aggregate_metrics = calculate_aggregate_throughput_metrics(successful_results)
                 boundary_fallback_count = sum(1 for r in successful_results if r.get("boundary_source") == "first_chunk_fallback")
+                token_warning_count = sum(len(r.get("token_warnings") or []) for r in successful_results)
                 record_tags = ["source:python_backend"]
                 if boundary_fallback_count > 0:
                     record_tags.append("boundary_source:first_chunk_fallback")
+                if token_warning_count > 0:
+                    record_tags.append("token_source:api_stats_anomaly")
                 if aggregate_metrics["prefill_source"] == "server":
                     record_tags.append("prefill_source:server")
                 elif aggregate_metrics["prefill_source"] == "client_latency_adjusted":
@@ -2002,6 +2079,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "source": "python_backend",
                     "record_tags": record_tags,
                     "boundary_fallback_count": boundary_fallback_count,
+                    "token_warning_count": token_warning_count,
                     "concurrent_details": successful_results,
                     "status": "成功"
                 }

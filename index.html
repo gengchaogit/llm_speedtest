@@ -324,6 +324,11 @@
             color: var(--error-color);
         }
 
+        .token-warning-row {
+            background-color: rgba(229, 192, 123, 0.16) !important;
+            box-shadow: inset 4px 0 #e5c07b;
+        }
+
         .info {
             color: var(--info-color);
             padding: 5px 0;
@@ -1413,6 +1418,9 @@
                 tokenSourceUnknown: '未知',
                 tokenSourceAPINote: '✓ 使用API返回的准确统计',
                 tokenSourceEstimationNote: '⚠ 本地估算值，可能不准确',
+                tokenSourceApiAnomaly: '本地估算（API统计异常）',
+                tokenSourceApiAnomalyNote: '⚠ API返回的token统计与本地估算差异过大，可能是并发总量/累计值；本条已改用本地估算。',
+                tokenAnomalyStatusSuffix: '⚠ API统计异常，已用本地估算',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1671,6 +1679,9 @@
                 tokenSourceUnknown: 'Unknown',
                 tokenSourceAPINote: '✓ Using accurate API statistics',
                 tokenSourceEstimationNote: '⚠ Local estimation, may be inaccurate',
+                tokenSourceApiAnomaly: 'Local estimation (API stats anomaly)',
+                tokenSourceApiAnomalyNote: '⚠ API token stats differ too much from local estimation and may be concurrent totals/counters. This row uses local estimation.',
+                tokenAnomalyStatusSuffix: '⚠ API stats anomaly, using local estimate',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -2205,6 +2216,8 @@
         ].filter(word => estimateTokenCount(word) === 1);
         const SHORT_PROMPT_MAX_LENGTH = 46;
         const BENCHMARK_SUFFIX_TOKEN_LENGTH = SHORT_PROMPT_MAX_LENGTH + 1;
+        const TOKEN_SANITY_MIN_TOKENS = 128;
+        const TOKEN_SANITY_MAX_RELATIVE_DIFF = 0.8;
 
         function estimateTokenWeight(text) {
             return estimateTokenCount(text);
@@ -2981,6 +2994,93 @@
             return positives.length > 0 ? Math.max(...positives) : Math.max(...parsed);
         }
 
+        function resolveTokenCountWithSanityCheck(kind, apiTokens, estimatedTokens) {
+            const apiValue = toTokenNumber(apiTokens);
+            const estimatedValue = toTokenNumber(estimatedTokens);
+            if (!hasPositiveNumber(apiValue)) {
+                return {
+                    tokens: hasPositiveNumber(estimatedValue) ? estimatedValue : 0,
+                    source: hasPositiveNumber(estimatedValue) ? 'Local Estimation' : 'Unknown',
+                    warning: null
+                };
+            }
+
+            if (hasPositiveNumber(estimatedValue)) {
+                const relativeDiff = Math.abs(apiValue - estimatedValue) / Math.max(estimatedValue, 1);
+                const maxTokens = Math.max(apiValue, estimatedValue);
+                if (maxTokens >= TOKEN_SANITY_MIN_TOKENS && relativeDiff >= TOKEN_SANITY_MAX_RELATIVE_DIFF) {
+                    return {
+                        tokens: estimatedValue,
+                        source: 'API Stats Anomaly',
+                        warning: {
+                            type: 'api_token_mismatch',
+                            kind,
+                            apiTokens: apiValue,
+                            estimatedTokens: estimatedValue,
+                            relativeDiff
+                        }
+                    };
+                }
+            }
+
+            return { tokens: apiValue, source: 'API', warning: null };
+        }
+
+        function collectTokenWarnings(results) {
+            return (results || []).flatMap(result => Array.isArray(result?.tokenWarnings) ? result.tokenWarnings : []);
+        }
+
+        function formatStatusWithTokenWarnings(statusText, tokenWarnings) {
+            const warnings = Array.isArray(tokenWarnings) ? tokenWarnings : [];
+            if (warnings.length === 0) return statusText;
+            const suffix = translations[currentLang]?.tokenAnomalyStatusSuffix || '⚠ API stats anomaly, using local estimate';
+            return `${statusText} ${suffix}`;
+        }
+
+        function getTokenSourcePresentation(sourceRaw, t) {
+            if (sourceRaw === 'API') {
+                return {
+                    label: t.tokenSourceAPI,
+                    note: t.tokenSourceAPINote,
+                    color: '#27ae60'
+                };
+            }
+            if (sourceRaw === 'API Stats Anomaly') {
+                return {
+                    label: t.tokenSourceApiAnomaly,
+                    note: t.tokenSourceApiAnomalyNote,
+                    color: '#e5c07b'
+                };
+            }
+            if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
+                return {
+                    label: t.tokenSourceLocalEstimation,
+                    note: t.tokenSourceEstimationNote,
+                    color: '#e67e22'
+                };
+            }
+            return {
+                label: t.tokenSourceUnknown,
+                note: t.tokenSourceEstimationNote,
+                color: '#e67e22'
+            };
+        }
+
+        function buildTokenWarningsHTML(tokenWarnings) {
+            const warnings = Array.isArray(tokenWarnings) ? tokenWarnings : [];
+            if (warnings.length === 0) return '';
+            const t = translations[currentLang];
+            return warnings.map(warning => {
+                const kindLabel = warning.kind === 'prompt' ? 'Prompt' : (warning.kind === 'decode' ? 'Decode' : 'Token');
+                const diffPercent = Number.isFinite(warning.relativeDiff) ? (warning.relativeDiff * 100).toFixed(1) : 'N/A';
+                return `<div class="detail-info-item" style="grid-column: 1 / -1; color: #e5c07b;">
+                    <span class="detail-label">${kindLabel} Token Warning:</span>
+                    <span class="detail-value">${t.tokenSourceApiAnomalyNote}</span>
+                    <span style="margin-left: 8px;">API=${warning.apiTokens}, Local=${warning.estimatedTokens}, Diff=${diffPercent}%</span>
+                </div>`;
+            }).join('');
+        }
+
         function normalizeUsageTokenStats(usage) {
             const promptTokens = pickBestTokenValue(
                 usage.prompt_tokens,
@@ -3200,7 +3300,11 @@
                     }
 
                     const successfulCount = concurrencyResults.length;
-                    const statusText = `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
+                    const tokenWarnings = collectTokenWarnings(concurrencyResults);
+                    const statusText = formatStatusWithTokenWarnings(
+                        `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`,
+                        tokenWarnings
+                    );
                     resultEntry = {
                         promptLength: actualPromptLength, //  修复：使用实际token数
                         requestedPromptLength: length,
@@ -3218,6 +3322,7 @@
                         aggregateOutputSource: aggregateMetrics.decodeSource,
                         networkLatencyMs: networkLatencyMs > 0 ? networkLatencyMs.toFixed(2) : 'N/A',
                         networkLatencySampleCount: latencySamples.length,
+                        tokenWarnings,
                         // 保存并发详情（用于P50/P90/P95统计）
                         concurrentDetails: concurrencyResults.map(res => ({
                             prefillTimeMs: res.prefillTimeMs,
@@ -3233,7 +3338,9 @@
                             prefillTimeSource: res.prefillTimeSource,
                             outputTimeSource: res.outputTimeSource,
                             networkLatencyMs: res.networkLatencyMs,
-                            networkLatencySampleCount: res.networkLatencySampleCount
+                            networkLatencySampleCount: res.networkLatencySampleCount,
+                            tokenSource: res.tokenSource,
+                            tokenWarnings: res.tokenWarnings || []
                         })),
                         // 详情数据：保存第一个请求的prompt和output
                         promptText: firstPrompt,
@@ -3241,7 +3348,7 @@
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
                         usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
-                        tokenSource: concurrencyResults[0]?.tokenSource || 'Unknown',  // 保存token来源
+                        tokenSource: tokenWarnings.length > 0 ? 'API Stats Anomaly' : (concurrencyResults[0]?.tokenSource || 'Unknown'),  // 保存token来源
                         requestConfig: {
                             apiType: 'OpenAI Compatible',
                             model: modelName,
@@ -3278,6 +3385,7 @@
 
                     row.classList.remove('info');
                     row.classList.add('success');
+                    row.classList.toggle('token-warning-row', tokenWarnings.length > 0);
 
                 } catch (error) {
                     // F12控制台错误日志
@@ -3584,30 +3692,44 @@
                 }
 
                 //  优先使用usage中的准确token数，如果没有则估算/使用传入值
-                const actualPromptTokens = (actualPromptTokensFromUsage && actualPromptTokensFromUsage > 0)
-                    ? actualPromptTokensFromUsage
-                    : promptLength; // Prefill用API返回的实际值
+                const localPromptEstimate = hasPositiveNumber(promptTokenEstimate) ? promptTokenEstimate : promptLength;
+                const tokenWarnings = [];
+                const promptResolution = resolveTokenCountWithSanityCheck('prompt', actualPromptTokensFromUsage, localPromptEstimate);
+                const actualPromptTokens = hasPositiveNumber(promptResolution.tokens) ? promptResolution.tokens : localPromptEstimate;
+                if (promptResolution.warning) {
+                    tokenWarnings.push(promptResolution.warning);
+                    console.warn(`[Token异常] Prompt API统计疑似异常: api=${promptResolution.warning.apiTokens}, local=${promptResolution.warning.estimatedTokens}, diff=${(promptResolution.warning.relativeDiff * 100).toFixed(1)}%. 已改用本地估算。`);
+                }
 
                 //  Token统计：优先使用usage中的准确值
                 let receivedTokens;
                 let tokenSource = ''; // 记录token统计来源
 
+                const localOutputEstimate = (reasoningContent.length > 0 || outputContent.length > 0)
+                    ? estimateTokenCount(reasoningContent) + estimateTokenCount(outputContent)
+                    : null;
+
                 if (actualOutputTokensFromUsage && actualOutputTokensFromUsage > 0) {
                     // 优先使用API返回的usage
-                    receivedTokens = actualOutputTokensFromUsage;
-                    tokenSource = 'API';
-                    console.log(`[Token统计] 来源: API usage (${receivedTokens} tokens)`);
+                    const outputResolution = resolveTokenCountWithSanityCheck('decode', actualOutputTokensFromUsage, localOutputEstimate);
+                    receivedTokens = outputResolution.tokens;
+                    tokenSource = outputResolution.source === 'API Stats Anomaly' ? 'API Stats Anomaly' : 'API';
+                    if (outputResolution.warning) {
+                        tokenWarnings.push(outputResolution.warning);
+                        console.warn(`[Token异常] Decode API统计疑似异常: api=${outputResolution.warning.apiTokens}, local=${outputResolution.warning.estimatedTokens}, diff=${(outputResolution.warning.relativeDiff * 100).toFixed(1)}%. 已改用本地估算。`);
+                    } else {
+                        console.log(`[Token统计] 来源: API usage (${receivedTokens} tokens)`);
+                    }
                 } else if (reasoningContent.length > 0 || outputContent.length > 0) {
                     // Fallback: 估算
-                    const reasoningTokens = estimateTokenCount(reasoningContent);
-                    const completionTokens = estimateTokenCount(outputContent);
-                    receivedTokens = reasoningTokens + completionTokens;
-                    tokenSource = '本地估算';
-                    console.log(`[Token估算] 来源: 本地估算 - reasoning: ${reasoningTokens}, completion: ${completionTokens}, 总计: ${receivedTokens}`);
+                    receivedTokens = localOutputEstimate;
+                    tokenSource = 'Local Estimation';
+                    console.log(`[Token估算] 来源: 本地估算 - 总计: ${receivedTokens}`);
                 } else {
                     receivedTokens = 0;
-                    tokenSource = '无数据';
+                    tokenSource = 'Unknown';
                 }
+                if (promptResolution.warning && tokenSource === 'API') tokenSource = 'API Stats Anomaly';
 
                 //  计算时间：优先使用服务器真实处理时间，否则使用端到端测量
                 let prefillTimeMs, outputTimeMs;
@@ -3660,6 +3782,7 @@
                     completionContent: outputContent,  // 单独的答案内容
                     usageInfo: usageInfo,  // API返回的完整usage信息
                     tokenSource: tokenSource,  // Token统计来源（API/本地估算/无数据）
+                    tokenWarnings,
                     // 添加时间戳用于计算并发总吞吐
                     startTimestamp: startTime,
                     firstTokenTimestamp: firstTokenTime,
@@ -4009,7 +4132,11 @@
                     }
 
                     const successfulCount = concurrencyResults.length;
-                    const statusText = `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`;
+                    const tokenWarnings = collectTokenWarnings(concurrencyResults);
+                    const statusText = formatStatusWithTokenWarnings(
+                        `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`,
+                        tokenWarnings
+                    );
                     resultEntry = {
                         promptLength: actualPromptLength, //  修复：使用实际token数
                         requestedPromptLength: length,
@@ -4027,6 +4154,7 @@
                         aggregateOutputSource: aggregateMetrics.decodeSource,
                         networkLatencyMs: networkLatencyMs > 0 ? networkLatencyMs.toFixed(2) : 'N/A',
                         networkLatencySampleCount: latencySamples.length,
+                        tokenWarnings,
                         // 保存并发详情（用于P50/P90/P95统计）
                         concurrentDetails: concurrencyResults.map(res => ({
                             prefillTimeMs: res.prefillTimeMs,
@@ -4042,7 +4170,9 @@
                             prefillTimeSource: res.prefillTimeSource,
                             outputTimeSource: res.outputTimeSource,
                             networkLatencyMs: res.networkLatencyMs,
-                            networkLatencySampleCount: res.networkLatencySampleCount
+                            networkLatencySampleCount: res.networkLatencySampleCount,
+                            tokenSource: res.tokenSource,
+                            tokenWarnings: res.tokenWarnings || []
                         })),
                         // 详情数据：保存第一个请求的prompt和output
                         promptText: firstPrompt,
@@ -4050,7 +4180,7 @@
                         reasoningText: concurrencyResults[0]?.reasoningContent || '',
                         completionText: concurrencyResults[0]?.completionContent || '',
                         usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
-                        tokenSource: concurrencyResults[0]?.tokenSource || 'Unknown',  // 保存token来源
+                        tokenSource: tokenWarnings.length > 0 ? 'API Stats Anomaly' : (concurrencyResults[0]?.tokenSource || 'Unknown'),  // 保存token来源
                         requestConfig: {
                             apiType: 'Ollama',
                             model: modelName,
@@ -4085,6 +4215,7 @@
 
                     row.classList.remove('info');
                     row.classList.add('success');
+                    row.classList.toggle('token-warning-row', tokenWarnings.length > 0);
 
                 } catch (error) {
                     // F12控制台错误日志
@@ -4132,22 +4263,32 @@
             // prompt_eval_duration 和 eval_duration 是纳秒 (ns)
             const prefillDurationMs = data.prompt_eval_duration / 1_000_000;
 
-            //  Ollama的eval_count已经包含所有输出token（如果是思考模型，包括思考+答案）
-            // 注意：Ollama目前没有单独的reasoning_tokens字段，但eval_count是准确的总数
-            const actualOutputTokens = data.eval_count;
+            // 提取输出内容
+            const outputText = data.message?.content || data.response || '';
+            const tokenWarnings = [];
+            const localOutputEstimate = outputText ? estimateTokenCount(outputText) : null;
+            const outputResolution = resolveTokenCountWithSanityCheck('decode', data.eval_count, localOutputEstimate);
+            if (outputResolution.warning) {
+                tokenWarnings.push(outputResolution.warning);
+                console.warn(`[Token异常] Ollama Decode API统计疑似异常: api=${outputResolution.warning.apiTokens}, local=${outputResolution.warning.estimatedTokens}, diff=${(outputResolution.warning.relativeDiff * 100).toFixed(1)}%. 已改用本地估算。`);
+            }
+            const actualOutputTokens = hasPositiveNumber(outputResolution.tokens) ? outputResolution.tokens : 0;
             const outputDurationMs = Math.max(data.eval_duration / 1_000_000, 1); // ns to ms, 最小 1ms
 
-            //  Ollama返回的实际prompt token数
-            const actualPromptTokens = data.prompt_eval_count || (hasPositiveNumber(promptTokenEstimate) ? promptTokenEstimate : promptLength);
+            //  Ollama返回的实际prompt token数；若疑似并发总量/累计值，则改用本地估算。
+            const localPromptEstimate = hasPositiveNumber(promptTokenEstimate) ? promptTokenEstimate : promptLength;
+            const promptResolution = resolveTokenCountWithSanityCheck('prompt', data.prompt_eval_count, localPromptEstimate);
+            if (promptResolution.warning) {
+                tokenWarnings.push(promptResolution.warning);
+                console.warn(`[Token异常] Ollama Prompt API统计疑似异常: api=${promptResolution.warning.apiTokens}, local=${promptResolution.warning.estimatedTokens}, diff=${(promptResolution.warning.relativeDiff * 100).toFixed(1)}%. 已改用本地估算。`);
+            }
+            const actualPromptTokens = hasPositiveNumber(promptResolution.tokens) ? promptResolution.tokens : localPromptEstimate;
 
             console.log(`[Ollama Token统计] prompt_eval_count: ${actualPromptTokens}, eval_count: ${actualOutputTokens}, prompt_eval_duration: ${data.prompt_eval_duration}ns`);
 
             //  修复：使用实际的prompt token数
             const prefillSpeed = (actualPromptTokens / (prefillDurationMs / 1000));
             const outputSpeed = actualOutputTokens > 0 ? (actualOutputTokens / (outputDurationMs / 1000)) : 0;
-
-            // 提取输出内容
-            const outputText = data.message?.content || '';
 
             // 构建usageInfo对象（Ollama格式）
             const usageInfo = {
@@ -4171,7 +4312,8 @@
                 reasoningContent: '',  // Ollama目前不单独区分思考内容
                 completionContent: outputText,  // 答案内容
                 usageInfo: usageInfo,  // API返回的完整usage信息
-                tokenSource: 'API',  // Ollama总是返回准确的token统计
+                tokenSource: tokenWarnings.length > 0 ? 'API Stats Anomaly' : (outputResolution.source === 'Local Estimation' || promptResolution.source === 'Local Estimation' ? 'Local Estimation' : 'API'),
+                tokenWarnings,
                 // 添加虚拟时间戳（Ollama不是流式，但需要兼容并发吞吐计算）
                 serverPrefillDurationMs: prefillDurationMs,  // 服务器返回的真实prefill时间
                 serverOutputDurationMs: outputDurationMs,     // 服务器返回的真实output时间
@@ -4223,28 +4365,19 @@
 
             // 预先构建 Usage 部分的 HTML
             let usageHTML = '';
+            const tokenWarningsHTML = buildTokenWarningsHTML(testData.tokenWarnings);
             if (testData.usageInfo) {
                 // 添加统计来源标识
                 const sourceRaw = testData.tokenSource || 'Unknown';
-                let sourceLabel, sourceNote;
-                if (sourceRaw === 'API') {
-                    sourceLabel = t.tokenSourceAPI;
-                    sourceNote = t.tokenSourceAPINote;
-                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
-                    sourceLabel = t.tokenSourceLocalEstimation;
-                    sourceNote = t.tokenSourceEstimationNote;
-                } else {
-                    sourceLabel = t.tokenSourceUnknown;
-                    sourceNote = t.tokenSourceEstimationNote;
-                }
-                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                const sourcePresentation = getTokenSourcePresentation(sourceRaw, t);
+                const sourceColor = sourcePresentation.color;
                 let sourceHTML = `<div class="detail-info-item" style="grid-column: 1 / -1;">
                     <span class="detail-label">${t.detailTokenSource}</span>
-                    <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
-                    <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                    <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourcePresentation.label}</span>
+                    <span style="color: ${sourceColor}; margin-left: 8px;">${sourcePresentation.note}</span>
                 </div>`;
 
-                let usageItems = sourceHTML;
+                let usageItems = sourceHTML + tokenWarningsHTML;
 
                 if (testData.usageInfo.prompt_tokens !== undefined) {
                     usageItems += `<div class="detail-info-item">
@@ -4339,29 +4472,20 @@
                         ${usageItems}
                     </div>
                 </div>`;
-            } else if (testData.tokenSource) {
+            } else if (testData.tokenSource || tokenWarningsHTML) {
                 // 即使没有usageInfo，也显示tokenSource
-                const sourceRaw = testData.tokenSource;
-                let sourceLabel, sourceNote;
-                if (sourceRaw === 'API') {
-                    sourceLabel = t.tokenSourceAPI;
-                    sourceNote = t.tokenSourceAPINote;
-                } else if (sourceRaw === 'Local Estimation' || sourceRaw === '本地估算') {
-                    sourceLabel = t.tokenSourceLocalEstimation;
-                    sourceNote = t.tokenSourceEstimationNote;
-                } else {
-                    sourceLabel = t.tokenSourceUnknown;
-                    sourceNote = t.tokenSourceEstimationNote;
-                }
-                let sourceColor = sourceRaw === 'API' ? '#27ae60' : '#e67e22';
+                const sourceRaw = testData.tokenSource || 'API Stats Anomaly';
+                const sourcePresentation = getTokenSourcePresentation(sourceRaw, t);
+                const sourceColor = sourcePresentation.color;
                 usageHTML = `<div class="detail-section">
                     <div class="detail-section-title">${t.detailSectionUsage}</div>
                     <div class="detail-info-grid">
                         <div class="detail-info-item" style="grid-column: 1 / -1;">
                             <span class="detail-label">${t.detailTokenSource}</span>
-                            <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourceLabel}</span>
-                            <span style="color: ${sourceColor}; margin-left: 8px;">${sourceNote}</span>
+                            <span class="detail-value" style="color: ${sourceColor}; font-weight: bold;">${sourcePresentation.label}</span>
+                            <span style="color: ${sourceColor}; margin-left: 8px;">${sourcePresentation.note}</span>
                         </div>
+                        ${tokenWarningsHTML}
                     </div>
                 </div>`;
             }
@@ -5787,6 +5911,9 @@
                 } else {
                     row.classList.add('error');
                 }
+                if (Array.isArray(resultEntry.tokenWarnings) && resultEntry.tokenWarnings.length > 0) {
+                    row.classList.add('token-warning-row');
+                }
 
                 tbody.appendChild(row);
             });
@@ -6585,6 +6712,10 @@
                 const avgP = vp.reduce((sum, r) => sum + parseFloat(r.prefillSpeed), 0) / vp.length;
                 const avgD = vp.reduce((sum, r) => sum + parseFloat(r.outputSpeed), 0) / vp.length;
                 const concurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
+                const recordTags = ['source:web_pure'];
+                if (vp.some(r => Array.isArray(r.tokenWarnings) && r.tokenWarnings.length > 0)) {
+                    recordTags.push('token_source:api_stats_anomaly');
+                }
                 const payload = {
                     user_code: userCode,
                     nickname: nick || null,
@@ -6599,7 +6730,7 @@
                     max_prefill_speed: parseFloat(maxP.toFixed(2)),
                     max_decode_speed: parseFloat(maxD.toFixed(2)),
                     source: 'web_pure',
-                    record_tags: ['source:web_pure'],
+                    record_tags: recordTags,
                     results_json: JSON.stringify(vp.map(r => {
                         const pointStats = _resolveUploadPointStats(r, concurrency);
                         return {
