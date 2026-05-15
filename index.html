@@ -1419,8 +1419,8 @@
                 tokenSourceAPINote: '✓ 使用API返回的准确统计',
                 tokenSourceEstimationNote: '⚠ 本地估算值，可能不准确',
                 tokenSourceApiAnomaly: '本地估算（API统计异常）',
-                tokenSourceApiAnomalyNote: '⚠ API返回的token统计与本地估算差异过大，可能是并发总量/累计值；本条已改用本地估算。',
-                tokenAnomalyStatusSuffix: '⚠ API统计异常，已用本地估算',
+                tokenSourceApiAnomalyNote: '⚠ API返回的统计可能异常，已改用本地估算或客户端实测时间计算。',
+                tokenAnomalyStatusSuffix: '⚠ API统计异常，已用本地测量',
                 // 统计标题
                 statTotalPrefillRange: '总预填充吞吐范围:',
                 statTotalDecodeRange: '总输出吞吐范围:',
@@ -1680,8 +1680,8 @@
                 tokenSourceAPINote: '✓ Using accurate API statistics',
                 tokenSourceEstimationNote: '⚠ Local estimation, may be inaccurate',
                 tokenSourceApiAnomaly: 'Local estimation (API stats anomaly)',
-                tokenSourceApiAnomalyNote: '⚠ API token stats differ too much from local estimation and may be concurrent totals/counters. This row uses local estimation.',
-                tokenAnomalyStatusSuffix: '⚠ API stats anomaly, using local estimate',
+                tokenSourceApiAnomalyNote: '⚠ API statistics may be abnormal. This row uses local estimation or client-measured timing.',
+                tokenAnomalyStatusSuffix: '⚠ API stats anomaly, using local measurement',
                 // Statistics
                 statTotalPrefillRange: 'Total Prefill Throughput Range:',
                 statTotalDecodeRange: 'Total Decode Throughput Range:',
@@ -2296,30 +2296,115 @@
         }
 
         function calculateAggregateThroughputMetrics(results) {
+            if (!Array.isArray(results) || results.length === 0) {
+                return {
+                    totalPromptTokens: 0,
+                    totalOutputTokens: 0,
+                    prefillDurationMs: 1,
+                    decodeDurationMs: 1,
+                    clientPrefillDurationMs: 1,
+                    clientDecodeDurationMs: 1,
+                    clientTotalDurationMs: 1,
+                    clientHasPhaseBoundary: false,
+                    prefillSource: 'client',
+                    decodeSource: 'client',
+                    warnings: []
+                };
+            }
+
             const totalPromptTokens = results.reduce((sum, result) => sum + (result.actualPromptTokens || 0), 0);
             const totalOutputTokens = results.reduce((sum, result) => sum + (result.outputTokens || 0), 0);
-
-            const useServerPrefill = results.length > 0 && results.every(result => hasPositiveNumber(result.serverPrefillTimeMs ?? result.serverPrefillDurationMs));
+            const warnings = [];
             const averageNetworkLatencyMs = getAverageNetworkLatencyMs(results.map(result => result.networkLatencyMs));
-            const rawPrefillDurationMs = useServerPrefill
-                ? Math.max(...results.map(result => result.serverPrefillTimeMs ?? result.serverPrefillDurationMs))
-                : Math.max(...results.map(result => result.firstTokenTimestamp ?? result.endTimestamp)) - Math.min(...results.map(result => result.startTimestamp));
-            const prefillDurationMs = useServerPrefill
-                ? rawPrefillDurationMs
-                : Math.max(rawPrefillDurationMs - averageNetworkLatencyMs, 1);
+            const startTimes = results.map(result => Number(result.startTimestamp)).filter(Number.isFinite);
+            const endTimes = results.map(result => Number(result.endTimestamp)).filter(Number.isFinite);
+            const boundaryTimes = results
+                .map(result => Number(result.firstTokenTimestamp ?? result.boundaryTimestamp))
+                .filter(Number.isFinite);
+            const hasClientTimingWindow = startTimes.length === results.length && endTimes.length === results.length;
+            const hasClientPhaseBoundary = hasClientTimingWindow && boundaryTimes.length === results.length;
+            const minStartTime = startTimes.length > 0 ? Math.min(...startTimes) : 0;
+            const maxEndTime = endTimes.length > 0 ? Math.max(...endTimes) : minStartTime + 1;
+            const maxBoundaryTime = hasClientPhaseBoundary ? Math.max(...boundaryTimes) : maxEndTime;
+            const minDecodeStartTime = hasClientPhaseBoundary ? Math.min(...boundaryTimes) : null;
+            const clientTotalDurationMs = hasClientTimingWindow ? Math.max((maxEndTime - minStartTime) - averageNetworkLatencyMs, 1) : null;
+            const clientPrefillDurationMs = hasClientTimingWindow
+                ? Math.max((maxBoundaryTime - minStartTime) - averageNetworkLatencyMs, 1)
+                : null;
+            const clientDecodeDurationMs = hasClientPhaseBoundary ? Math.max(maxEndTime - minDecodeStartTime, 1) : null;
+            const clientPrefillDurationForUse = clientPrefillDurationMs ?? 1;
+            const clientDecodeDurationForUse = clientDecodeDurationMs ?? clientTotalDurationMs ?? 1;
+            const clientTotalDurationForUse = clientTotalDurationMs ?? Math.max(clientPrefillDurationForUse + clientDecodeDurationForUse, 1);
 
-            const useServerDecode = results.length > 0 && results.every(result => hasPositiveNumber(result.serverDecodeTimeMs ?? result.serverOutputDurationMs));
-            const decodeDurationMs = useServerDecode
-                ? Math.max(...results.map(result => result.serverDecodeTimeMs ?? result.serverOutputDurationMs))
-                : Math.max(...results.map(result => result.endTimestamp)) - Math.min(...results.map(result => result.firstTokenTimestamp ?? result.endTimestamp));
+            const useServerPrefill = results.length > 0 && results.every(result =>
+                hasPositiveNumber(result.serverPrefillTimeMs ?? result.serverPrefillDurationMs)
+                && (result.prefillTimeSource === undefined || result.prefillTimeSource === 'server')
+            );
+            const serverPrefillDurations = results
+                .map(result => result.serverPrefillTimeMs ?? result.serverPrefillDurationMs)
+                .filter(hasPositiveNumber);
+            let prefillDurationMs = useServerPrefill
+                ? Math.max(...serverPrefillDurations)
+                : clientPrefillDurationForUse;
+            let prefillSource = useServerPrefill ? 'server' : (averageNetworkLatencyMs > 0 ? 'client_latency_adjusted' : 'client');
+
+            const useServerDecode = results.length > 0 && results.every(result =>
+                hasPositiveNumber(result.serverDecodeTimeMs ?? result.serverOutputDurationMs)
+                && (result.outputTimeSource === undefined || result.outputTimeSource === 'server')
+            );
+            const serverDecodeDurations = results
+                .map(result => result.serverDecodeTimeMs ?? result.serverOutputDurationMs)
+                .filter(hasPositiveNumber);
+            let decodeDurationMs = useServerDecode
+                ? Math.max(...serverDecodeDurations)
+                : clientDecodeDurationForUse;
+            let decodeSource = useServerDecode ? 'server' : 'client';
+
+            const hasConcurrentLlamaCppTimings = results.length > 1 && results.some(result => hasLlamaCppStyleTimings(result.usageInfo));
+            const serverTotalDurationMs = [...serverPrefillDurations, ...serverDecodeDurations].reduce((sum, value) => sum + value, 0);
+            const inferredParallelism = hasConcurrentLlamaCppTimings && hasClientPhaseBoundary && serverTotalDurationMs > 0 && clientTotalDurationForUse > 0
+                ? Math.min(results.length, Math.max(1, serverTotalDurationMs / clientTotalDurationForUse))
+                : 0;
+            const hasLimitedServerParallelism = inferredParallelism > 0 && inferredParallelism < results.length * 0.8;
+            if (hasLimitedServerParallelism && useServerPrefill && serverPrefillDurations.length > 0) {
+                prefillDurationMs = clientPrefillDurationForUse;
+                prefillSource = 'client_llamacpp_timing_anomaly';
+                warnings.push({
+                    type: 'api_timing_mismatch',
+                    kind: 'prefill_timing',
+                    reason: 'llamacpp_limited_parallel_slots',
+                    apiTimeMs: Number(Math.max(...serverPrefillDurations).toFixed(2)),
+                    clientTimeMs: Number(clientPrefillDurationForUse.toFixed(2)),
+                    inferredParallelism: Number(inferredParallelism.toFixed(2)),
+                    configuredConcurrency: results.length
+                });
+            }
+            if (hasLimitedServerParallelism && useServerDecode && serverDecodeDurations.length > 0) {
+                decodeDurationMs = clientDecodeDurationForUse;
+                decodeSource = 'client_llamacpp_timing_anomaly';
+                warnings.push({
+                    type: 'api_timing_mismatch',
+                    kind: 'decode_timing',
+                    reason: 'llamacpp_limited_parallel_slots',
+                    apiTimeMs: Number(Math.max(...serverDecodeDurations).toFixed(2)),
+                    clientTimeMs: Number(clientDecodeDurationForUse.toFixed(2)),
+                    inferredParallelism: Number(inferredParallelism.toFixed(2)),
+                    configuredConcurrency: results.length
+                });
+            }
 
             return {
                 totalPromptTokens,
                 totalOutputTokens,
                 prefillDurationMs: Math.max(prefillDurationMs, 1),
                 decodeDurationMs: Math.max(decodeDurationMs, 1),
-                prefillSource: useServerPrefill ? 'server' : (averageNetworkLatencyMs > 0 ? 'client_latency_adjusted' : 'client'),
-                decodeSource: useServerDecode ? 'server' : 'client'
+                clientPrefillDurationMs,
+                clientDecodeDurationMs,
+                clientTotalDurationMs,
+                clientHasPhaseBoundary: hasClientPhaseBoundary,
+                prefillSource,
+                decodeSource,
+                warnings
             };
         }
 
@@ -3066,19 +3151,284 @@
             };
         }
 
+        function hasLlamaCppStyleTimings(usageInfo) {
+            const timings = usageInfo?.timings;
+            if (!timings || typeof timings !== 'object') return false;
+            return ['prompt_ms', 'predicted_ms', 'prompt_n', 'predicted_n']
+                .some(key => hasPositiveNumber(Number(timings[key])));
+        }
+
         function buildTokenWarningsHTML(tokenWarnings) {
             const warnings = Array.isArray(tokenWarnings) ? tokenWarnings : [];
             if (warnings.length === 0) return '';
             const t = translations[currentLang];
             return warnings.map(warning => {
-                const kindLabel = warning.kind === 'prompt' ? 'Prompt' : (warning.kind === 'decode' ? 'Decode' : 'Token');
-                const diffPercent = Number.isFinite(warning.relativeDiff) ? (warning.relativeDiff * 100).toFixed(1) : 'N/A';
+                const isTimingWarning = warning.type === 'api_timing_mismatch';
+                const kindLabel = warning.kind === 'prompt'
+                    ? 'Prompt'
+                    : (warning.kind === 'decode'
+                        ? 'Decode'
+                        : (warning.kind === 'prefill_timing'
+                            ? 'Prefill Timing'
+                            : (warning.kind === 'decode_timing' ? 'Decode Timing' : 'API Stats')));
+                const inferredParallelism = warning.inferredParallelism ?? warning.inferred_parallelism;
+                const configuredConcurrency = warning.configuredConcurrency ?? warning.configured_concurrency;
+                const parallelismText = Number.isFinite(Number(inferredParallelism))
+                    ? `, Parallelism=${inferredParallelism}/${configuredConcurrency ?? '?'}`
+                    : '';
+                const detailText = isTimingWarning
+                    ? `API=${warning.apiTimeMs ?? warning.api_time_ms ?? 'N/A'}ms, Client=${warning.clientTimeMs ?? warning.client_time_ms ?? 'N/A'}ms${parallelismText}`
+                    : `API=${warning.apiTokens}, Local=${warning.estimatedTokens}, Diff=${Number.isFinite(warning.relativeDiff) ? (warning.relativeDiff * 100).toFixed(1) : 'N/A'}%`;
                 return `<div class="detail-info-item" style="grid-column: 1 / -1; color: #e5c07b;">
-                    <span class="detail-label">${kindLabel} Token Warning:</span>
+                    <span class="detail-label">${kindLabel} Warning:</span>
                     <span class="detail-value">${t.tokenSourceApiAnomalyNote}</span>
-                    <span style="margin-left: 8px;">API=${warning.apiTokens}, Local=${warning.estimatedTokens}, Diff=${diffPercent}%</span>
+                    <span style="margin-left: 8px;">${detailText}</span>
                 </div>`;
             }).join('');
+        }
+
+        function firstFiniteNumber(...values) {
+            for (const value of values) {
+                const numberValue = Number(value);
+                if (Number.isFinite(numberValue)) return numberValue;
+            }
+            return null;
+        }
+
+        function sumDetailNumbers(details, ...keys) {
+            return (details || []).reduce((sum, detail) => {
+                for (const key of keys) {
+                    const value = firstFiniteNumber(detail?.[key]);
+                    if (value !== null) return sum + value;
+                }
+                return sum;
+            }, 0);
+        }
+
+        function maxDetailNumber(details, ...keys) {
+            const values = (details || []).flatMap(detail => keys
+                .map(key => firstFiniteNumber(detail?.[key]))
+                .filter(value => value !== null));
+            return values.length > 0 ? Math.max(...values) : null;
+        }
+
+        function formatLocalMetric(value, digits = 2) {
+            const numberValue = Number(value);
+            if (!Number.isFinite(numberValue)) return 'N/A';
+            return numberValue.toFixed(digits);
+        }
+
+        function getTimingWarningWithParallelism(testData) {
+            const warnings = Array.isArray(testData?.tokenWarnings) ? testData.tokenWarnings : [];
+            return warnings.find(warning =>
+                warning?.type === 'api_timing_mismatch'
+                && firstFiniteNumber(warning.inferredParallelism, warning.inferred_parallelism) !== null
+            ) || null;
+        }
+
+        function buildLocalCalculationHTML(testData) {
+            const isZh = currentLang === 'zh';
+            const details = Array.isArray(testData?.concurrentDetails)
+                ? testData.concurrentDetails
+                : (Array.isArray(testData?.concurrent_details) ? testData.concurrent_details : []);
+            const local = testData?.localCalculation || testData?.local_calculation || {};
+            const successful = firstFiniteNumber(local.successful, testData?.successful, details.length > 0 ? details.length : null);
+            const concurrency = firstFiniteNumber(local.concurrency, testData?.concurrency, successful);
+            const totalPromptTokens = firstFiniteNumber(
+                local.totalPromptTokens,
+                local.total_prompt_tokens,
+                sumDetailNumbers(details, 'actualPromptTokens', 'prompt_tokens') || null,
+                firstFiniteNumber(testData?.promptLength) !== null && successful !== null ? firstFiniteNumber(testData.promptLength) * successful : null
+            );
+            const totalOutputTokens = firstFiniteNumber(
+                local.totalOutputTokens,
+                local.total_output_tokens,
+                sumDetailNumbers(details, 'outputTokens', 'output_tokens') || null,
+                firstFiniteNumber(testData?.outputTokens) !== null && successful !== null ? firstFiniteNumber(testData.outputTokens) * successful : null
+            );
+            const localEstimatedPromptTokens = firstFiniteNumber(
+                local.localEstimatedPromptTokens,
+                local.local_estimated_prompt_tokens,
+                sumDetailNumbers(details, 'localEstimatedPromptTokens', 'local_estimated_prompt_tokens', 'estimatedPromptTokens', 'estimated_prompt_tokens') || null
+            );
+            const localEstimatedOutputTokens = firstFiniteNumber(
+                local.localEstimatedOutputTokens,
+                local.local_estimated_output_tokens,
+                sumDetailNumbers(details, 'localEstimatedOutputTokens', 'local_estimated_output_tokens') || null
+            );
+            const prefillDurationMs = firstFiniteNumber(local.prefillDurationMs, local.prefill_duration_ms, testData?.prefillTimeMs);
+            const decodeDurationMs = firstFiniteNumber(local.decodeDurationMs, local.decode_duration_ms, testData?.outputTimeMs);
+            const prefillSpeed = firstFiniteNumber(local.prefillSpeed, local.prefill_speed, testData?.prefillSpeed);
+            const decodeSpeed = firstFiniteNumber(local.decodeSpeed, local.decode_speed, testData?.outputSpeed);
+            const clientPrefillDurationMs = firstFiniteNumber(local.clientPrefillDurationMs, local.client_prefill_time_ms);
+            const clientDecodeDurationMs = firstFiniteNumber(local.clientDecodeDurationMs, local.client_decode_time_ms, local.client_output_time_ms);
+            const clientTotalDurationMs = firstFiniteNumber(local.clientTotalDurationMs, local.client_total_time_ms);
+            const clientHasPhaseBoundary = Boolean(local.clientHasPhaseBoundary ?? local.client_has_phase_boundary ?? (clientPrefillDurationMs !== null && clientDecodeDurationMs !== null));
+            const calculatedLocalPrefillSpeed = localEstimatedPromptTokens !== null && clientPrefillDurationMs !== null
+                ? localEstimatedPromptTokens / (clientPrefillDurationMs / 1000)
+                : null;
+            const calculatedLocalDecodeSpeed = localEstimatedOutputTokens !== null && clientDecodeDurationMs !== null
+                ? localEstimatedOutputTokens / (clientDecodeDurationMs / 1000)
+                : null;
+            const calculatedLocalTotalSpeed = localEstimatedPromptTokens !== null && localEstimatedOutputTokens !== null && clientTotalDurationMs !== null
+                ? (localEstimatedPromptTokens + localEstimatedOutputTokens) / (clientTotalDurationMs / 1000)
+                : null;
+            const localPrefillSpeed = firstFiniteNumber(local.localPrefillSpeed, local.local_prefill_speed, calculatedLocalPrefillSpeed);
+            const localDecodeSpeed = firstFiniteNumber(local.localDecodeSpeed, local.local_decode_speed, calculatedLocalDecodeSpeed);
+            const localTotalSpeed = firstFiniteNumber(local.localTotalSpeed, local.local_total_speed, calculatedLocalTotalSpeed);
+            const serverPrefillTimeMs = firstFiniteNumber(
+                local.serverPrefillTimeMs,
+                local.server_prefill_time_ms,
+                maxDetailNumber(details, 'serverPrefillTimeMs', 'server_prefill_time_ms', 'serverPrefillDurationMs')
+            );
+            const serverDecodeTimeMs = firstFiniteNumber(
+                local.serverDecodeTimeMs,
+                local.server_decode_time_ms,
+                maxDetailNumber(details, 'serverDecodeTimeMs', 'server_decode_time_ms', 'serverOutputDurationMs')
+            );
+            const networkLatencyMs = firstFiniteNumber(local.networkLatencyMs, local.network_latency_ms, testData?.networkLatencyMs);
+            const latencySamples = firstFiniteNumber(local.networkLatencySampleCount, local.network_latency_sample_count, testData?.networkLatencySampleCount);
+            const timingWarning = getTimingWarningWithParallelism(testData);
+            const inferredParallelism = firstFiniteNumber(
+                local.inferredParallelism,
+                local.inferred_parallelism,
+                timingWarning?.inferredParallelism,
+                timingWarning?.inferred_parallelism
+            );
+            const configuredConcurrency = firstFiniteNumber(
+                local.configuredConcurrency,
+                local.configured_concurrency,
+                timingWarning?.configuredConcurrency,
+                timingWarning?.configured_concurrency,
+                concurrency
+            );
+            const prefillSource = local.prefillSource || local.prefill_source || testData?.aggregatePrefillSource || testData?.aggregate_prefill_source || 'N/A';
+            const decodeSource = local.decodeSource || local.decode_source || testData?.aggregateOutputSource || testData?.aggregate_output_source || 'N/A';
+            const prefillSourceLower = String(prefillSource).toLowerCase();
+            const decodeSourceLower = String(decodeSource).toLowerCase();
+            const usesServerTiming = prefillSourceLower === 'server' || decodeSourceLower === 'server';
+            const usesOnlyServerTiming = prefillSourceLower === 'server' && decodeSourceLower === 'server';
+            const hasLocalValues = [
+                totalPromptTokens, totalOutputTokens, prefillDurationMs, decodeDurationMs,
+                prefillSpeed, decodeSpeed, serverPrefillTimeMs, serverDecodeTimeMs,
+                networkLatencyMs, inferredParallelism, clientPrefillDurationMs, clientDecodeDurationMs,
+                clientTotalDurationMs, localPrefillSpeed, localDecodeSpeed, localTotalSpeed
+            ].some(value => value !== null) || prefillSource !== 'N/A' || decodeSource !== 'N/A';
+            if (!hasLocalValues) return '';
+
+            const labels = isZh ? {
+                section: '测速计算数据',
+                source: '耗时采用来源',
+                success: '成功/并发',
+                totalPrompt: 'Prompt Tokens 合计',
+                totalOutput: 'Completion Tokens 合计',
+                promptEstimate: '纯本地 Prompt 估算合计',
+                outputEstimate: '纯本地 Completion 估算合计',
+                pureLocalSource: '纯本地计算来源',
+                pureLocalSourceValue: '客户端时间戳 + 通讯延迟均值 + 本地 token 估算，不使用 API usage/timing',
+                localPrefillWindow: '纯本地 Prefill 时间窗',
+                localDecodeWindow: '纯本地 Decode 时间窗',
+                localTotalWindow: '纯本地总时间窗',
+                localPrefillSpeed: '纯本地 Prefill 吞吐估算',
+                localDecodeSpeed: '纯本地 Decode 吞吐估算',
+                localTotalSpeed: '纯本地总吞吐估算',
+                noPhaseNote: '当前记录没有本地首 token 边界，只能展示纯本地总时间窗，不能可靠拆分 Prefill/Decode。',
+                prefillWindow: '采用 Prefill 耗时',
+                decodeWindow: '采用 Decode 耗时',
+                prefillSpeed: '采用 Prefill 吞吐',
+                decodeSpeed: '采用 Decode 吞吐',
+                latency: '通讯延迟扣除',
+                serverPrefill: 'API Prefill Timing 最大值',
+                serverDecode: 'API Decode Timing 最大值',
+                inferred: '推断有效并行度',
+                note: '说明',
+                serverNote: usesOnlyServerTiming
+                    ? '当前 Prefill/Decode 耗时采用 API server timing，所以统计耗时会和 API Timing 基本一致；吞吐为 token 合计 / 采用耗时。'
+                    : '部分耗时采用 API server timing，所以对应统计耗时会和 API Timing 基本一致；吞吐为 token 合计 / 采用耗时。'
+            } : {
+                section: 'Benchmark Calculation',
+                source: 'Timing source used',
+                success: 'Success/Concurrency',
+                totalPrompt: 'Prompt tokens total',
+                totalOutput: 'Completion tokens total',
+                promptEstimate: 'Pure local prompt estimate total',
+                outputEstimate: 'Pure local completion estimate total',
+                pureLocalSource: 'Pure local source',
+                pureLocalSourceValue: 'Client timestamps + average network latency + local token estimates; API usage/timing is not used.',
+                localPrefillWindow: 'Pure local prefill window',
+                localDecodeWindow: 'Pure local decode window',
+                localTotalWindow: 'Pure local total window',
+                localPrefillSpeed: 'Pure local prefill throughput estimate',
+                localDecodeSpeed: 'Pure local decode throughput estimate',
+                localTotalSpeed: 'Pure local total throughput estimate',
+                noPhaseNote: 'This record has no local first-token boundary, so only the pure local total window can be shown reliably.',
+                prefillWindow: 'Selected prefill timing',
+                decodeWindow: 'Selected decode timing',
+                prefillSpeed: 'Selected prefill throughput',
+                decodeSpeed: 'Selected decode throughput',
+                latency: 'Network latency subtracted',
+                serverPrefill: 'API prefill timing max',
+                serverDecode: 'API decode timing max',
+                inferred: 'Inferred effective parallelism',
+                note: 'Note',
+                serverNote: usesOnlyServerTiming
+                    ? 'Prefill/Decode timing uses API server timing here, so the timing used should match API Timing. Throughput is token total divided by the selected timing.'
+                    : 'Some timing uses API server timing here, so the corresponding timing used should match API Timing. Throughput is token total divided by the selected timing.'
+            };
+            const rows = [];
+            const addRow = (label, value, unit = '', digits = 2) => {
+                if (value === null || value === undefined || value === 'N/A') return;
+                const displayValue = typeof value === 'number' ? formatLocalMetric(value, digits) : value;
+                rows.push(`<div class="detail-info-item">
+                    <span class="detail-label">${label}:</span>
+                    <span class="detail-value">${displayValue}${unit}</span>
+                </div>`);
+            };
+
+            addRow(labels.source, `Prefill=${prefillSource}, Decode=${decodeSource}`, '', 0);
+            if (usesServerTiming) {
+                addRow(labels.note, labels.serverNote, '', 0);
+            }
+            if (successful !== null || concurrency !== null) addRow(labels.success, `${successful ?? 'N/A'}/${concurrency ?? 'N/A'}`, '', 0);
+            addRow(labels.totalPrompt, totalPromptTokens, ' tokens', 0);
+            addRow(labels.totalOutput, totalOutputTokens, ' tokens', 0);
+            addRow(labels.pureLocalSource, labels.pureLocalSourceValue, '', 0);
+            addRow(labels.promptEstimate, localEstimatedPromptTokens, ' tokens', 0);
+            addRow(labels.outputEstimate, localEstimatedOutputTokens, ' tokens', 0);
+            if (clientHasPhaseBoundary) {
+                addRow(labels.localPrefillWindow, clientPrefillDurationMs, ' ms');
+                addRow(labels.localDecodeWindow, clientDecodeDurationMs, ' ms');
+                addRow(labels.localPrefillSpeed, localPrefillSpeed, ' tokens/s');
+                addRow(labels.localDecodeSpeed, localDecodeSpeed, ' tokens/s');
+            } else {
+                addRow(labels.localTotalWindow, clientTotalDurationMs, ' ms');
+                addRow(labels.localTotalSpeed, localTotalSpeed, ' tokens/s');
+                if (clientTotalDurationMs !== null) addRow(labels.note, labels.noPhaseNote, '', 0);
+            }
+            addRow(labels.prefillWindow, prefillDurationMs, ' ms');
+            addRow(labels.decodeWindow, decodeDurationMs, ' ms');
+            addRow(labels.prefillSpeed, prefillSpeed, ' tokens/s');
+            addRow(labels.decodeSpeed, decodeSpeed, ' tokens/s');
+            if (networkLatencyMs !== null) {
+                addRow(labels.latency, `${formatLocalMetric(networkLatencyMs)} ms${latencySamples !== null ? ` (${latencySamples} samples)` : ''}`, '', 0);
+            }
+            addRow(labels.serverPrefill, serverPrefillTimeMs, ' ms');
+            addRow(labels.serverDecode, serverDecodeTimeMs, ' ms');
+            if (inferredParallelism !== null && inferredParallelism > 0 && (configuredConcurrency === null || configuredConcurrency > 1)) {
+                addRow(labels.inferred, `${formatLocalMetric(inferredParallelism)}/${configuredConcurrency ?? 'N/A'}`, '', 0);
+            }
+            if (prefillSource === 'client_llamacpp_timing_anomaly' || decodeSource === 'client_llamacpp_timing_anomaly') {
+                addRow(labels.note, isZh
+                    ? '检测到 llama.cpp 并发 timing 统计疑似异常，本行已使用客户端本地时间戳重算。'
+                    : 'llama.cpp concurrent timing looked abnormal, so this row uses client-side timestamps.', '', 0);
+            }
+
+            return `<div class="detail-section">
+                <div class="detail-section-title">${labels.section}</div>
+                <div class="detail-info-grid">
+                    ${rows.join('')}
+                </div>
+            </div>`;
         }
 
         function normalizeUsageTokenStats(usage) {
@@ -3300,11 +3650,32 @@
                     }
 
                     const successfulCount = concurrencyResults.length;
-                    const tokenWarnings = collectTokenWarnings(concurrencyResults);
+                    const tokenWarnings = [
+                        ...collectTokenWarnings(concurrencyResults),
+                        ...(Array.isArray(aggregateMetrics.warnings) ? aggregateMetrics.warnings : [])
+                    ];
                     const statusText = formatStatusWithTokenWarnings(
                         `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`,
                         tokenWarnings
                     );
+                    const serverPrefillDurations = concurrencyResults
+                        .map(res => res.serverPrefillTimeMs ?? res.serverPrefillDurationMs)
+                        .filter(hasPositiveNumber);
+                    const serverDecodeDurations = concurrencyResults
+                        .map(res => res.serverDecodeTimeMs ?? res.serverOutputDurationMs)
+                        .filter(hasPositiveNumber);
+                    const timingWarning = (aggregateMetrics.warnings || []).find(warning => warning.type === 'api_timing_mismatch');
+                    const localEstimatedPromptTotal = concurrencyResults.reduce((sum, res) => sum + (res.localEstimatedPromptTokens || res.estimatedPromptTokens || 0), 0);
+                    const localEstimatedOutputTotal = concurrencyResults.reduce((sum, res) => sum + (res.localEstimatedOutputTokens || 0), 0);
+                    const localPrefillSpeed = hasPositiveNumber(localEstimatedPromptTotal) && hasPositiveNumber(aggregateMetrics.clientPrefillDurationMs)
+                        ? localEstimatedPromptTotal / (aggregateMetrics.clientPrefillDurationMs / 1000)
+                        : null;
+                    const localDecodeSpeed = hasPositiveNumber(localEstimatedOutputTotal) && hasPositiveNumber(aggregateMetrics.clientDecodeDurationMs)
+                        ? localEstimatedOutputTotal / (aggregateMetrics.clientDecodeDurationMs / 1000)
+                        : null;
+                    const localTotalSpeed = hasPositiveNumber(localEstimatedPromptTotal + localEstimatedOutputTotal) && hasPositiveNumber(aggregateMetrics.clientTotalDurationMs)
+                        ? (localEstimatedPromptTotal + localEstimatedOutputTotal) / (aggregateMetrics.clientTotalDurationMs / 1000)
+                        : null;
                     resultEntry = {
                         promptLength: actualPromptLength, //  修复：使用实际token数
                         requestedPromptLength: length,
@@ -3323,6 +3694,33 @@
                         networkLatencyMs: networkLatencyMs > 0 ? networkLatencyMs.toFixed(2) : 'N/A',
                         networkLatencySampleCount: latencySamples.length,
                         tokenWarnings,
+                        localCalculation: {
+                            totalPromptTokens,
+                            totalOutputTokens,
+                            localEstimatedPromptTokens: localEstimatedPromptTotal,
+                            localEstimatedOutputTokens: localEstimatedOutputTotal,
+                            prefillDurationMs,
+                            decodeDurationMs,
+                            prefillSpeed: totalPrefillSpeed,
+                            decodeSpeed: totalOutputSpeed,
+                            clientPrefillDurationMs: aggregateMetrics.clientPrefillDurationMs,
+                            clientDecodeDurationMs: aggregateMetrics.clientDecodeDurationMs,
+                            clientTotalDurationMs: aggregateMetrics.clientTotalDurationMs,
+                            clientHasPhaseBoundary: aggregateMetrics.clientHasPhaseBoundary,
+                            localPrefillSpeed,
+                            localDecodeSpeed,
+                            localTotalSpeed,
+                            prefillSource: aggregateMetrics.prefillSource,
+                            decodeSource: aggregateMetrics.decodeSource,
+                            networkLatencyMs,
+                            networkLatencySampleCount: latencySamples.length,
+                            serverPrefillTimeMs: serverPrefillDurations.length > 0 ? Math.max(...serverPrefillDurations) : null,
+                            serverDecodeTimeMs: serverDecodeDurations.length > 0 ? Math.max(...serverDecodeDurations) : null,
+                            inferredParallelism: timingWarning?.inferredParallelism ?? null,
+                            configuredConcurrency: timingWarning?.configuredConcurrency ?? concurrency,
+                            successful: successfulCount,
+                            concurrency
+                        },
                         // 保存并发详情（用于P50/P90/P95统计）
                         concurrentDetails: concurrencyResults.map(res => ({
                             prefillTimeMs: res.prefillTimeMs,
@@ -3339,6 +3737,8 @@
                             outputTimeSource: res.outputTimeSource,
                             networkLatencyMs: res.networkLatencyMs,
                             networkLatencySampleCount: res.networkLatencySampleCount,
+                            localEstimatedPromptTokens: res.localEstimatedPromptTokens,
+                            localEstimatedOutputTokens: res.localEstimatedOutputTokens,
                             tokenSource: res.tokenSource,
                             tokenWarnings: res.tokenWarnings || []
                         })),
@@ -3750,10 +4150,12 @@
                 const latencyAdjustmentMs = hasPositiveNumber(networkLatencyMs) ? networkLatencyMs : 0;
                 const clientPrefillTimeMs = Math.max((firstTokenTime - startTime) - latencyAdjustmentMs, 1);
                 const clientOutputTimeMs = Math.max(endTime - firstTokenTime, 1);
-                prefillTimeMs = hasPositiveNumber(serverPrefillTimeMs) ? serverPrefillTimeMs : clientPrefillTimeMs;
-                outputTimeMs = hasPositiveNumber(serverDecodeTimeMs) ? serverDecodeTimeMs : clientOutputTimeMs;
-                const prefillTimeSource = hasPositiveNumber(serverPrefillTimeMs) ? 'server' : (latencyAdjustmentMs > 0 ? 'client_latency_adjusted' : 'client');
-                const outputTimeSource = hasPositiveNumber(serverDecodeTimeMs) ? 'server' : 'client';
+                let useServerPrefillTiming = hasPositiveNumber(serverPrefillTimeMs);
+                let useServerDecodeTiming = hasPositiveNumber(serverDecodeTimeMs);
+                prefillTimeMs = useServerPrefillTiming ? serverPrefillTimeMs : clientPrefillTimeMs;
+                outputTimeMs = useServerDecodeTiming ? serverDecodeTimeMs : clientOutputTimeMs;
+                const prefillTimeSource = useServerPrefillTiming ? 'server' : (latencyAdjustmentMs > 0 ? 'client_latency_adjusted' : 'client');
+                const outputTimeSource = useServerDecodeTiming ? 'server' : 'client';
                 const prefillSpeed = (actualPromptTokens / (prefillTimeMs / 1000));
                 const outputSpeed = receivedTokens > 0 ? (receivedTokens / (outputTimeMs / 1000)) : 0;
 
@@ -3776,6 +4178,12 @@
                     outputTimeSource,
                     networkLatencyMs: latencyAdjustmentMs,
                     networkLatencySampleCount,
+                    clientPrefillTimeMs,
+                    clientDecodeTimeMs: clientOutputTimeMs,
+                    clientTotalTimeMs: Math.max((endTime - startTime) - latencyAdjustmentMs, 1),
+                    clientHasPhaseBoundary: true,
+                    localEstimatedPromptTokens: localPromptEstimate,
+                    localEstimatedOutputTokens: localOutputEstimate,
                     actualPromptTokens,  //  返回实际的prompt token数
                     outputContent: outputContent + reasoningContent,  // 完整输出内容（思考+答案）
                     reasoningContent: reasoningContent,  // 单独的思考内容
@@ -4049,8 +4457,9 @@
                         body: JSON.stringify(requestBody)
                     };
 
+                    const requestStartTime = performance.now();
                     const fetchPromise = createFetchPromiseWithRetry(apiUrl, fetchOptions, timeout, 3, 1500);
-                    requests.push(fetchPromise.then(response => ({ response, promptTokenEstimate })));
+                    requests.push(fetchPromise.then(response => ({ response, promptTokenEstimate, requestStartTime })));
                 }
 
                 try {
@@ -4060,7 +4469,7 @@
 
                     for (const result of responses) {
                         if (result.status === 'fulfilled' && result.value.response?.ok) {
-                            processPromises.push(processOllamaResponse(result.value.response, length, result.value.promptTokenEstimate, networkLatencyMs, latencySamples.length));
+                            processPromises.push(processOllamaResponse(result.value.response, length, result.value.promptTokenEstimate, networkLatencyMs, latencySamples.length, result.value.requestStartTime));
                         } else {
                             if (result.status === 'rejected') {
                                 failedMessages.push(result.reason.message);
@@ -4132,11 +4541,32 @@
                     }
 
                     const successfulCount = concurrencyResults.length;
-                    const tokenWarnings = collectTokenWarnings(concurrencyResults);
+                    const tokenWarnings = [
+                        ...collectTokenWarnings(concurrencyResults),
+                        ...(Array.isArray(aggregateMetrics.warnings) ? aggregateMetrics.warnings : [])
+                    ];
                     const statusText = formatStatusWithTokenWarnings(
                         `${successfulCount}/${concurrency} ${translations[currentLang].msgConcurrentSuccess}`,
                         tokenWarnings
                     );
+                    const serverPrefillDurations = concurrencyResults
+                        .map(res => res.serverPrefillTimeMs ?? res.serverPrefillDurationMs)
+                        .filter(hasPositiveNumber);
+                    const serverDecodeDurations = concurrencyResults
+                        .map(res => res.serverDecodeTimeMs ?? res.serverOutputDurationMs)
+                        .filter(hasPositiveNumber);
+                    const timingWarning = (aggregateMetrics.warnings || []).find(warning => warning.type === 'api_timing_mismatch');
+                    const localEstimatedPromptTotal = concurrencyResults.reduce((sum, res) => sum + (res.localEstimatedPromptTokens || res.estimatedPromptTokens || 0), 0);
+                    const localEstimatedOutputTotal = concurrencyResults.reduce((sum, res) => sum + (res.localEstimatedOutputTokens || 0), 0);
+                    const localPrefillSpeed = hasPositiveNumber(localEstimatedPromptTotal) && hasPositiveNumber(aggregateMetrics.clientPrefillDurationMs)
+                        ? localEstimatedPromptTotal / (aggregateMetrics.clientPrefillDurationMs / 1000)
+                        : null;
+                    const localDecodeSpeed = hasPositiveNumber(localEstimatedOutputTotal) && hasPositiveNumber(aggregateMetrics.clientDecodeDurationMs)
+                        ? localEstimatedOutputTotal / (aggregateMetrics.clientDecodeDurationMs / 1000)
+                        : null;
+                    const localTotalSpeed = hasPositiveNumber(localEstimatedPromptTotal + localEstimatedOutputTotal) && hasPositiveNumber(aggregateMetrics.clientTotalDurationMs)
+                        ? (localEstimatedPromptTotal + localEstimatedOutputTotal) / (aggregateMetrics.clientTotalDurationMs / 1000)
+                        : null;
                     resultEntry = {
                         promptLength: actualPromptLength, //  修复：使用实际token数
                         requestedPromptLength: length,
@@ -4167,10 +4597,16 @@
                             actualPromptTokens: res.actualPromptTokens,
                             serverPrefillTimeMs: res.serverPrefillTimeMs ?? res.serverPrefillDurationMs,
                             serverDecodeTimeMs: res.serverDecodeTimeMs ?? res.serverOutputDurationMs,
+                            clientPrefillTimeMs: res.clientPrefillTimeMs,
+                            clientDecodeTimeMs: res.clientDecodeTimeMs,
+                            clientTotalTimeMs: res.clientTotalTimeMs,
+                            clientHasPhaseBoundary: res.clientHasPhaseBoundary,
                             prefillTimeSource: res.prefillTimeSource,
                             outputTimeSource: res.outputTimeSource,
                             networkLatencyMs: res.networkLatencyMs,
                             networkLatencySampleCount: res.networkLatencySampleCount,
+                            localEstimatedPromptTokens: res.localEstimatedPromptTokens,
+                            localEstimatedOutputTokens: res.localEstimatedOutputTokens,
                             tokenSource: res.tokenSource,
                             tokenWarnings: res.tokenWarnings || []
                         })),
@@ -4181,6 +4617,33 @@
                         completionText: concurrencyResults[0]?.completionContent || '',
                         usageInfo: concurrencyResults[0]?.usageInfo || null,  // 保存usage信息
                         tokenSource: tokenWarnings.length > 0 ? 'API Stats Anomaly' : (concurrencyResults[0]?.tokenSource || 'Unknown'),  // 保存token来源
+                        localCalculation: {
+                            totalPromptTokens,
+                            totalOutputTokens,
+                            localEstimatedPromptTokens: localEstimatedPromptTotal,
+                            localEstimatedOutputTokens: localEstimatedOutputTotal,
+                            prefillDurationMs: maxPrefillDurationMs,
+                            decodeDurationMs: maxOutputDurationMs,
+                            prefillSpeed: totalPrefillSpeed,
+                            decodeSpeed: totalOutputSpeed,
+                            clientPrefillDurationMs: aggregateMetrics.clientPrefillDurationMs,
+                            clientDecodeDurationMs: aggregateMetrics.clientDecodeDurationMs,
+                            clientTotalDurationMs: aggregateMetrics.clientTotalDurationMs,
+                            clientHasPhaseBoundary: aggregateMetrics.clientHasPhaseBoundary,
+                            localPrefillSpeed,
+                            localDecodeSpeed,
+                            localTotalSpeed,
+                            prefillSource: aggregateMetrics.prefillSource,
+                            decodeSource: aggregateMetrics.decodeSource,
+                            networkLatencyMs,
+                            networkLatencySampleCount: latencySamples.length,
+                            serverPrefillTimeMs: serverPrefillDurations.length > 0 ? Math.max(...serverPrefillDurations) : null,
+                            serverDecodeTimeMs: serverDecodeDurations.length > 0 ? Math.max(...serverDecodeDurations) : null,
+                            inferredParallelism: timingWarning?.inferredParallelism ?? null,
+                            configuredConcurrency: timingWarning?.configuredConcurrency ?? concurrency,
+                            successful: successfulCount,
+                            concurrency
+                        },
                         requestConfig: {
                             apiType: 'Ollama',
                             model: modelName,
@@ -4243,7 +4706,7 @@
             }
         }
 
-        async function processOllamaResponse(response, promptLength, promptTokenEstimate = null, networkLatencyMs = 0, networkLatencySampleCount = 0) {
+        async function processOllamaResponse(response, promptLength, promptTokenEstimate = null, networkLatencyMs = 0, networkLatencySampleCount = 0, requestStartTime = performance.now()) {
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -4251,6 +4714,9 @@
             }
 
             const data = await response.json();
+            const responseEndTime = performance.now();
+            const latencyAdjustmentMs = hasPositiveNumber(networkLatencyMs) ? networkLatencyMs : 0;
+            const clientTotalTimeMs = Math.max((responseEndTime - requestStartTime) - latencyAdjustmentMs, 1);
 
             if (data.error) {
                 throw new Error(`Ollama 错误: ${data.error}`);
@@ -4307,6 +4773,8 @@
                 outputTokens: actualOutputTokens,
                 outputTimeMs: outputDurationMs,
                 outputSpeed: outputSpeed,
+                localEstimatedPromptTokens: localPromptEstimate,
+                localEstimatedOutputTokens: localOutputEstimate,
                 actualPromptTokens: actualPromptTokens,  //  返回实际的prompt token数
                 outputContent: outputText,  // 完整输出内容
                 reasoningContent: '',  // Ollama目前不单独区分思考内容
@@ -4319,10 +4787,16 @@
                 serverOutputDurationMs: outputDurationMs,     // 服务器返回的真实output时间
                 prefillTimeSource: 'server',
                 outputTimeSource: 'server',
-                networkLatencyMs: hasPositiveNumber(networkLatencyMs) ? networkLatencyMs : 0,
+                networkLatencyMs: latencyAdjustmentMs,
                 networkLatencySampleCount,
+                clientPrefillTimeMs: null,
+                clientDecodeTimeMs: null,
+                clientTotalTimeMs,
+                clientHasPhaseBoundary: false,
                 ttftMs: prefillDurationMs,
-                itlMean: actualOutputTokens > 1 ? outputDurationMs / (actualOutputTokens - 1) : 0
+                itlMean: actualOutputTokens > 1 ? outputDurationMs / (actualOutputTokens - 1) : 0,
+                startTimestamp: requestStartTime,
+                endTimestamp: responseEndTime
             };
         }
 
@@ -4491,6 +4965,8 @@
             }
 
             // 构建详情内容
+            const localCalculationHTML = buildLocalCalculationHTML(testData);
+
             let detailHTML = `
                 <div class="detail-header">
                     <div class="detail-title">${t.detailModalTitle}</div>
@@ -4556,6 +5032,8 @@
                     </div>
 
                     <!-- API使用统计 -->
+                    ${localCalculationHTML}
+
                     ${usageHTML}
 
                     <!-- 请求配置 -->

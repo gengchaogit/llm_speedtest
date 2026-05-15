@@ -252,6 +252,50 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
+        .anomaly-row {
+            background: rgba(229, 192, 123, 0.10);
+            box-shadow: inset 4px 0 0 rgba(229, 192, 123, 0.95);
+        }
+
+        .anomaly-badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid rgba(229, 192, 123, 0.75);
+            background: rgba(229, 192, 123, 0.14);
+            color: var(--accent-yellow);
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .anomaly-badge.strong {
+            border-color: rgba(224, 108, 117, 0.82);
+            background: rgba(224, 108, 117, 0.16);
+            color: var(--accent-red);
+        }
+
+        .anomaly-note {
+            display: block;
+            margin-top: 5px;
+            color: var(--accent-yellow);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .anomaly-summary {
+            margin: 0 0 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(229, 192, 123, 0.45);
+            border-left: 4px solid var(--accent-yellow);
+            border-radius: 6px;
+            background: rgba(229, 192, 123, 0.10);
+            color: var(--text-main);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
         .btn-detail {
             background: var(--accent-purple);
             color: #fff;
@@ -3153,6 +3197,124 @@
             }
         }
 
+        function toFiniteNumber(value) {
+            const numberValue = Number(value);
+            return Number.isFinite(numberValue) ? numberValue : null;
+        }
+
+        function normalizeTags(value) {
+            if (Array.isArray(value)) {
+                return value.filter(item => typeof item === 'string').map(item => item.toLowerCase());
+            }
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed.startsWith('[')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        if (Array.isArray(parsed)) return normalizeTags(parsed);
+                    } catch { /* Fall back to loose splitting for legacy strings. */ }
+                }
+                return trimmed.split(/[,\s]+/).filter(Boolean).map(item => item.toLowerCase());
+            }
+            return [];
+        }
+
+        function hasTimingAnomalyTag(tags) {
+            return tags.some(tag =>
+                tag.includes('api_stats_anomaly')
+                || tag.includes('client_llamacpp_timing_anomaly')
+                || tag.includes('llamacpp_timing_anomaly')
+            );
+        }
+
+        function hasTimingWarning(warnings) {
+            return Array.isArray(warnings) && warnings.some(warning =>
+                warning?.type === 'api_timing_mismatch'
+                || warning?.reason === 'llamacpp_limited_parallel_slots'
+            );
+        }
+
+        function getDetailSpeedValues(details, ...keys) {
+            return (Array.isArray(details) ? details : [])
+                .map(detail => {
+                    for (const key of keys) {
+                        const value = toFiniteNumber(detail?.[key]);
+                        if (value !== null && value > 0) return value;
+                    }
+                    return null;
+                })
+                .filter(value => value !== null);
+        }
+
+        function hasLlamaCppTimingHint(point, parentRow, details, tags) {
+            const haystack = [
+                parentRow?.framework,
+                parentRow?.notes,
+                parentRow?.model_name,
+                parentRow?.run_command,
+                parentRow?.source,
+                point?.framework,
+                point?.source,
+                ...tags
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return haystack.includes('llama.cpp')
+                || haystack.includes('llamacpp')
+                || haystack.includes('llama-cpp')
+                || haystack.includes('gguf')
+                || (Array.isArray(details) && details.some(detail => {
+                    const usageInfo = detail?.usage_info || detail?.usageInfo || {};
+                    return usageInfo?.timings && typeof usageInfo.timings === 'object';
+                }));
+        }
+
+        function detectPointAnomaly(point, parentRow) {
+            const tags = [
+                ...normalizeTags(parentRow?.record_tags),
+                ...normalizeTags(point?.record_tags),
+                ...normalizeTags(point?.recordTags),
+            ];
+            const local = point?.local_calculation || point?.localCalculation || {};
+            const prefillSource = String(point?.aggregate_prefill_source ?? point?.aggregatePrefillSource ?? local.prefill_source ?? local.prefillSource ?? '').toLowerCase();
+            const decodeSource = String(point?.aggregate_output_source ?? point?.aggregateOutputSource ?? local.decode_source ?? local.decodeSource ?? '').toLowerCase();
+            const explicit = hasTimingAnomalyTag(tags)
+                || hasTimingWarning(point?.token_warnings)
+                || hasTimingWarning(point?.tokenWarnings)
+                || prefillSource.includes('client_llamacpp_timing_anomaly')
+                || decodeSource.includes('client_llamacpp_timing_anomaly');
+            if (explicit) {
+                return {
+                    level: 'strong',
+                    label: '异常已标记',
+                    reason: 'API/timing 统计异常，本记录已按本地测量或本地估算处理。'
+                };
+            }
+
+            const concurrency = Math.max(1, toFiniteNumber(point?.concurrency ?? parentRow?.concurrency) || 1);
+            const details = Array.isArray(point?.concurrent_details)
+                ? point.concurrent_details
+                : (Array.isArray(point?.concurrentDetails) ? point.concurrentDetails : []);
+            if (concurrency <= 1 || details.length < 2) return null;
+            if (!hasLlamaCppTimingHint(point, parentRow, details, tags)) return null;
+
+            const prefillSpeed = toFiniteNumber(point?.prefill_speed ?? point?.prefillSpeed);
+            const decodeSpeed = toFiniteNumber(point?.output_speed ?? point?.outputSpeed ?? point?.decode_speed ?? point?.decodeSpeed);
+            const detailPrefill = getDetailSpeedValues(details, 'prefill_speed', 'prefillSpeed');
+            const detailDecode = getDetailSpeedValues(details, 'output_speed', 'outputSpeed', 'decode_speed', 'decodeSpeed');
+            const maxDetailPrefill = detailPrefill.length > 0 ? Math.max(...detailPrefill) : null;
+            const maxDetailDecode = detailDecode.length > 0 ? Math.max(...detailDecode) : null;
+            const prefillRatio = prefillSpeed && maxDetailPrefill ? prefillSpeed / maxDetailPrefill : 0;
+            const decodeRatio = decodeSpeed && maxDetailDecode ? decodeSpeed / maxDetailDecode : 0;
+            const nearConcurrency = ratio => ratio >= Math.max(1.8, concurrency * 0.72) && ratio <= concurrency * 1.35;
+
+            if (!nearConcurrency(prefillRatio) && !nearConcurrency(decodeRatio)) return null;
+            return {
+                level: 'suspect',
+                label: '疑似异常',
+                reason: `总吞吐约为单请求吞吐的 ${Math.max(prefillRatio, decodeRatio).toFixed(1)}x，接近并发数 ${concurrency}；旧记录缺少修正标记，建议结合详情/API timing 核查。`
+            };
+        }
+
         function isPhysicalMobileViewport() {
             return window.matchMedia('(max-width: 900px)').matches;
         }
@@ -3647,6 +3809,25 @@
                     success_count_is_exact: successCountIsExact
                 };
             }).sort((a, b) => (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER));
+            sortedData.forEach(point => {
+                point.anomaly_info = detectPointAnomaly(point, row);
+            });
+            const anomalyPoints = sortedData.filter(point => point.anomaly_info);
+            const strongAnomalyCount = anomalyPoints.filter(point => point.anomaly_info.level === 'strong').length;
+            const suspectAnomalyCount = anomalyPoints.length - strongAnomalyCount;
+            const anomalySummaryParts = [];
+            if (strongAnomalyCount > 0) anomalySummaryParts.push(`${strongAnomalyCount} 条已修正/已标记异常`);
+            if (suspectAnomalyCount > 0) anomalySummaryParts.push(`${suspectAnomalyCount} 条疑似异常`);
+            const anomalySummaryHtml = anomalyPoints.length > 0 ? `
+                <div class="anomaly-summary">
+                    <strong>检测到吞吐统计异常风险：</strong>${anomalySummaryParts.join('，')}。黄色行表示旧数据疑似把单请求吞吐按并发放大，红色标记表示记录中已有 API/timing 异常修正信息。请优先参考已修正后的测速计算数据或详情中的单请求统计。
+                </div>
+            ` : '';
+            const anomalyStatsNote = anomalyPoints.length > 0 ? `
+                <div class="anomaly-note" style="margin: -6px 0 14px;">
+                    此记录包含异常/疑似异常点，聚合统计可能受 API timing 异常影响；已在下方逐行高亮。
+                </div>
+            ` : '';
 
             // ================== Build Detail Data Table ==================
             const dataContainer = document.getElementById('modalDataContainer');
@@ -3657,7 +3838,7 @@
                     <pre style="margin:0; white-space:pre-wrap; word-break:break-word; font-family:monospace; color:var(--text-main);">${runCommandText}</pre>
                 </div>
             ` : '';
-            let tableHtml = `${runCommandHtml}
+            let tableHtml = `${runCommandHtml}${anomalySummaryHtml}
             <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:13px;">
                 <thead>
                     <tr style="background:var(--bg-panel);">
@@ -3690,15 +3871,23 @@
                 } else if (r.successful > 0) {
                     statusStr = `<span style="color:#98c379;">${r.successful}/${r.concurrency} 并发成功</span>`;
                 }
+                const anomalyInfo = r.anomaly_info;
+                const anomalyBadge = anomalyInfo
+                    ? `<span class="anomaly-badge ${anomalyInfo.level === 'strong' ? 'strong' : ''}">${escapeHtml(anomalyInfo.label)}</span>`
+                    : '';
+                const anomalyNote = anomalyInfo
+                    ? `<span class="anomaly-note">${escapeHtml(anomalyInfo.reason)}</span>`
+                    : '';
+                const anomalyRowClass = anomalyInfo ? ' class="anomaly-row"' : '';
 
                 tableHtml += `
-                    <tr style="border-bottom:1px solid var(--border-color);">
+                    <tr${anomalyRowClass} style="border-bottom:1px solid var(--border-color);">
                         <td style="padding:10px;">${r.prompt_length ?? 'N/A'}</td>
                         <td style="padding:10px;">${ttft}</td>
                         <td style="padding:10px;">${itl}</td>
                         <td style="padding:10px;">${pSpeed}</td>
                         <td style="padding:10px;">${dSpeed}</td>
-                        <td style="padding:10px;">${statusStr}</td>
+                        <td style="padding:10px;">${statusStr}${anomalyBadge}${anomalyNote}</td>
                     </tr>
                 `;
 
@@ -3744,6 +3933,7 @@
                 tableHtml += `
                 <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:6px; padding:20px; font-size:14px; color:var(--text-main);">
                     <h3 style="color:var(--accent-blue); margin-top:0; margin-bottom:15px; font-size:16px;">总吞吐量性能统计 (${row.concurrency} 并发)</h3>
+                    ${anomalyStatsNote}
                     <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                         <span>总预填充吞吐范围：</span><span style="color:var(--accent-green);">${minPrefill.toFixed(2)} - ${maxPrefill.toFixed(2)} tokens/s</span>
                     </div>

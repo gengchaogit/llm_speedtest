@@ -1062,6 +1062,18 @@ def resolve_token_count_with_sanity_check(
     return {"tokens": api_value, "source": "API", "warning": None}
 
 
+def has_llamacpp_style_timings(usage_info: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(usage_info, dict):
+        return False
+    timings = usage_info.get("timings")
+    if not isinstance(timings, dict):
+        return False
+    return any(
+        _has_positive_number(timings.get(key))
+        for key in ("prompt_ms", "predicted_ms", "prompt_n", "predicted_n")
+    )
+
+
 def calculate_aggregate_throughput_metrics(results: list[Dict[str, Any]]) -> Dict[str, Any]:
     """Aggregate concurrent throughput with server timings when available."""
     if not results:
@@ -1070,58 +1082,139 @@ def calculate_aggregate_throughput_metrics(results: list[Dict[str, Any]]) -> Dic
             "output_time_ms": 0.0,
             "prefill_speed": 0.0,
             "output_speed": 0.0,
+            "client_prefill_time_ms": 0.0,
+            "client_output_time_ms": 0.0,
+            "client_total_time_ms": 0.0,
+            "client_has_phase_boundary": False,
             "prefill_source": "client",
             "output_source": "client",
+            "warnings": [],
         }
 
     total_prompt_tokens = sum(r.get("prompt_tokens") or 0 for r in results)
     total_output_tokens = sum(r.get("output_tokens") or 0 for r in results)
+    average_network_latency_ms = get_average_network_latency_ms([
+        r.get("network_latency_ms") or 0 for r in results
+    ])
+    min_start = min(r.get("start_timestamp") or 0 for r in results)
+    has_client_phase_boundary = all(
+        _has_positive_number(r.get("first_token_timestamp") or r.get("boundary_timestamp"))
+        and r.get("boundary_source") != "no_boundary_fallback"
+        for r in results
+    )
+    max_boundary = max(
+        r.get("first_token_timestamp")
+        or r.get("boundary_timestamp")
+        or r.get("end_timestamp")
+        or min_start
+        for r in results
+    )
+    client_prefill_time_ms = max(((max_boundary - min_start) * 1000) - average_network_latency_ms, 1)
+    min_decode_start = min(
+        r.get("first_token_timestamp")
+        or r.get("boundary_timestamp")
+        or r.get("start_timestamp")
+        or 0
+        for r in results
+    )
+    max_end = max(r.get("end_timestamp") or min_decode_start for r in results)
+    client_output_time_ms = max((max_end - min_decode_start) * 1000, 1)
+    client_total_time_ms = max(((max_end - min_start) * 1000) - average_network_latency_ms, 1)
 
-    use_server_prefill = all(_has_positive_number(r.get("server_prefill_time_ms")) for r in results)
+    use_server_prefill = all(
+        _has_positive_number(r.get("server_prefill_time_ms"))
+        and r.get("prefill_time_source") in (None, "server")
+        for r in results
+    )
     if use_server_prefill:
         prefill_time_ms = max(r["server_prefill_time_ms"] for r in results)
         prefill_source = "server"
     else:
-        min_start = min(r.get("start_timestamp") or 0 for r in results)
-        max_boundary = max(
-            r.get("first_token_timestamp")
-            or r.get("boundary_timestamp")
-            or r.get("end_timestamp")
-            or min_start
-            for r in results
-        )
-        average_network_latency_ms = get_average_network_latency_ms([
-            r.get("network_latency_ms") or 0 for r in results
-        ])
-        prefill_time_ms = max(((max_boundary - min_start) * 1000) - average_network_latency_ms, 1)
+        prefill_time_ms = client_prefill_time_ms
         prefill_source = "client_latency_adjusted" if average_network_latency_ms > 0 else "client"
 
-    use_server_output = all(_has_positive_number(r.get("server_decode_time_ms")) for r in results)
+    use_server_output = all(
+        _has_positive_number(r.get("server_decode_time_ms"))
+        and r.get("output_time_source") in (None, "server")
+        for r in results
+    )
     if use_server_output:
         output_time_ms = max(r["server_decode_time_ms"] for r in results)
         output_source = "server"
     else:
-        min_decode_start = min(
-            r.get("first_token_timestamp")
-            or r.get("boundary_timestamp")
-            or r.get("start_timestamp")
-            or 0
-            for r in results
-        )
-        max_end = max(r.get("end_timestamp") or min_decode_start for r in results)
-        output_time_ms = max((max_end - min_decode_start) * 1000, 1)
+        output_time_ms = client_output_time_ms
         output_source = "client"
 
     prefill_speed = total_prompt_tokens / (prefill_time_ms / 1000) if prefill_time_ms > 0 else 0.0
     output_speed = total_output_tokens / (output_time_ms / 1000) if output_time_ms > 0 else 0.0
+    warnings: List[Dict[str, Any]] = []
+
+    has_concurrent_llamacpp_timings = (
+        len(results) > 1
+        and has_client_phase_boundary
+        and any(has_llamacpp_style_timings(r.get("usage_info")) for r in results)
+    )
+    server_prefill_times = [
+        r.get("server_prefill_time_ms") for r in results
+        if _has_positive_number(r.get("server_prefill_time_ms"))
+    ]
+    server_output_times = [
+        r.get("server_decode_time_ms") for r in results
+        if _has_positive_number(r.get("server_decode_time_ms"))
+    ]
+    server_total_time_ms = sum(server_prefill_times) + sum(server_output_times)
+    inferred_parallelism = 0.0
+    if has_concurrent_llamacpp_timings and server_total_time_ms > 0 and client_total_time_ms > 0:
+        inferred_parallelism = min(
+            float(len(results)),
+            max(1.0, server_total_time_ms / client_total_time_ms),
+        )
+
+    configured_parallelism = max(float(len(results)), 1.0)
+    has_limited_server_parallelism = (
+        inferred_parallelism > 0
+        and inferred_parallelism < configured_parallelism * 0.8
+    )
+    if has_limited_server_parallelism and use_server_prefill and server_prefill_times:
+        prefill_time_ms = client_prefill_time_ms
+        prefill_speed = total_prompt_tokens / (client_prefill_time_ms / 1000)
+        prefill_source = "client_llamacpp_timing_anomaly"
+        warnings.append({
+            "type": "api_timing_mismatch",
+            "kind": "prefill_timing",
+            "reason": "llamacpp_limited_parallel_slots",
+            "api_time_ms": round(max(server_prefill_times), 2),
+            "client_time_ms": round(client_prefill_time_ms, 2),
+            "inferred_parallelism": round(inferred_parallelism, 2),
+            "configured_concurrency": len(results),
+        })
+
+    if has_limited_server_parallelism and use_server_output and server_output_times:
+        output_time_ms = client_output_time_ms
+        output_speed = total_output_tokens / (client_output_time_ms / 1000)
+        output_source = "client_llamacpp_timing_anomaly"
+        warnings.append({
+            "type": "api_timing_mismatch",
+            "kind": "decode_timing",
+            "reason": "llamacpp_limited_parallel_slots",
+            "api_time_ms": round(max(server_output_times), 2),
+            "client_time_ms": round(client_output_time_ms, 2),
+            "inferred_parallelism": round(inferred_parallelism, 2),
+            "configured_concurrency": len(results),
+        })
 
     return {
         "prefill_time_ms": prefill_time_ms,
         "output_time_ms": output_time_ms,
         "prefill_speed": prefill_speed,
         "output_speed": output_speed,
+        "client_prefill_time_ms": client_prefill_time_ms,
+        "client_output_time_ms": client_output_time_ms,
+        "client_total_time_ms": client_total_time_ms,
+        "client_has_phase_boundary": has_client_phase_boundary,
         "prefill_source": prefill_source,
         "output_source": output_source,
+        "warnings": warnings,
     }
 
 
@@ -1746,9 +1839,11 @@ async def execute_single_request(
         has_server_prefill_timing = _has_positive_number(server_prefill_time_ms)
         has_server_decode_timing = _has_positive_number(server_decode_time_ms)
         latency_adjustment_ms = network_latency_ms if _has_positive_number(network_latency_ms) else 0.0
+        client_prefill_time_ms = max(ttft_ms - latency_adjustment_ms, 1)
+        client_decode_time_ms = decode_time_ms
         if has_server_prefill_timing or has_server_decode_timing:
-            prefill_time_ms = server_prefill_time_ms if has_server_prefill_timing else max(ttft_ms - latency_adjustment_ms, 1)
-            output_time_ms = server_decode_time_ms if has_server_decode_timing else decode_time_ms
+            prefill_time_ms = server_prefill_time_ms if has_server_prefill_timing else client_prefill_time_ms
+            output_time_ms = server_decode_time_ms if has_server_decode_timing else client_decode_time_ms
             prefill_time_source = "server" if has_server_prefill_timing else ("client_latency_adjusted" if latency_adjustment_ms > 0 else "client")
             output_time_source = "server" if has_server_decode_timing else "client"
             print(
@@ -1756,7 +1851,8 @@ async def execute_single_request(
                 f"({prefill_time_ms:.2f}ms), Decode={output_time_source} ({output_time_ms:.2f}ms)"
             )
         else:
-            prefill_time_ms = max(ttft_ms - latency_adjustment_ms, 1)
+            prefill_time_ms = client_prefill_time_ms
+            output_time_ms = client_decode_time_ms
             prefill_time_source = "client_latency_adjusted" if latency_adjustment_ms > 0 else "client"
             output_time_source = "client"
 
@@ -1802,6 +1898,7 @@ async def execute_single_request(
             "prompt_tokens": actual_prompt_tokens,
             "estimated_prompt_tokens": estimated_prompt_tokens,
             "local_estimated_prompt_tokens": local_estimated_prompt_tokens,
+            "local_estimated_output_tokens": local_output_tokens,
             "prompt_calibration": prompt_calibration,
             "output_tokens": actual_output_tokens,
             "ttft_ms": round(ttft_ms, 2),
@@ -1821,6 +1918,10 @@ async def execute_single_request(
             "output_time_source": output_time_source,
             "network_latency_ms": round(latency_adjustment_ms, 2),
             "network_latency_sample_count": network_latency_sample_count,
+            "client_prefill_time_ms": round(client_prefill_time_ms, 2),
+            "client_decode_time_ms": round(client_decode_time_ms, 2),
+            "client_total_time_ms": round(max(total_time_ms - latency_adjustment_ms, 1), 2),
+            "client_has_phase_boundary": boundary_source != "no_boundary_fallback",
             "has_streaming_content": first_token_time is not None,  # 是否有实际内容token
             "chunk_count": chunk_count,  # chunk数量
             # 添加绝对时间戳用于并发总吞吐计算
@@ -2026,7 +2127,11 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 avg_prompt_tokens = sum(r["prompt_tokens"] for r in successful_results) / len(successful_results)
                 aggregate_metrics = calculate_aggregate_throughput_metrics(successful_results)
                 boundary_fallback_count = sum(1 for r in successful_results if r.get("boundary_source") == "first_chunk_fallback")
-                token_warning_count = sum(len(r.get("token_warnings") or []) for r in successful_results)
+                aggregate_warnings = aggregate_metrics.get("warnings") or []
+                token_warning_count = (
+                    sum(len(r.get("token_warnings") or []) for r in successful_results)
+                    + len(aggregate_warnings)
+                )
                 record_tags = ["source:python_backend"]
                 if boundary_fallback_count > 0:
                     record_tags.append("boundary_source:first_chunk_fallback")
@@ -2036,8 +2141,12 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     record_tags.append("prefill_source:server")
                 elif aggregate_metrics["prefill_source"] == "client_latency_adjusted":
                     record_tags.append("prefill_source:client_latency_adjusted")
+                elif aggregate_metrics["prefill_source"] == "client_llamacpp_timing_anomaly":
+                    record_tags.append("prefill_source:client_llamacpp_timing_anomaly")
                 if aggregate_metrics["output_source"] == "server":
                     record_tags.append("decode_source:server")
+                elif aggregate_metrics["output_source"] == "client_llamacpp_timing_anomaly":
+                    record_tags.append("decode_source:client_llamacpp_timing_anomaly")
                 
                 print(f"[Stats] 成功: {len(successful_results)}/{config.concurrency}")
                 print(f"[Stats] 平均 Prefill速度: {avg_prefill_speed:.2f} t/s")
@@ -2073,6 +2182,10 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "aggregate_output_time_ms": round(aggregate_metrics["output_time_ms"], 2),
                     "aggregate_prefill_speed": round(aggregate_metrics["prefill_speed"], 2),
                     "aggregate_output_speed": round(aggregate_metrics["output_speed"], 2),
+                    "client_prefill_time_ms": round(aggregate_metrics.get("client_prefill_time_ms") or 0, 2),
+                    "client_output_time_ms": round(aggregate_metrics.get("client_output_time_ms") or 0, 2),
+                    "client_total_time_ms": round(aggregate_metrics.get("client_total_time_ms") or 0, 2),
+                    "client_has_phase_boundary": bool(aggregate_metrics.get("client_has_phase_boundary")),
                     "aggregate_prefill_source": aggregate_metrics["prefill_source"],
                     "aggregate_output_source": aggregate_metrics["output_source"],
                     "avg_ttft_ms": round(avg_ttft, 2),
@@ -2080,6 +2193,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "record_tags": record_tags,
                     "boundary_fallback_count": boundary_fallback_count,
                     "token_warning_count": token_warning_count,
+                    "aggregate_warnings": aggregate_warnings,
                     "concurrent_details": successful_results,
                     "status": "成功"
                 }
