@@ -1142,13 +1142,13 @@
                 <div class="form-group" style="flex: 1.5;">
                     <label for="apiUrl">API 地址</label>
                     <div style="display: flex; gap: 4px; align-items: center;">
-                        <input type="text" id="apiBaseUrl" value="http://10.0.0.50:8000" placeholder="http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box; padding: 0 10px;" oninput="syncApiUrlAndRefreshModels()">
-                        <input type="text" id="apiPathSuffix" value="/v1/chat/completions" placeholder="/v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; padding: 0 8px; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
+                        <input type="text" id="apiBaseUrl" value="" placeholder="http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box; padding: 0 10px;" oninput="syncApiUrlAndRefreshModels()">
+                        <input type="text" id="apiPathSuffix" value="" placeholder="/v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; padding: 0 8px; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
                         <button type="button" id="btnRefreshModels" class="btn-refresh-models" title="刷新模型列表" onclick="refreshModelList()">
                             <span class="refresh-icon">🔄</span>
                         </button>
                     </div>
-                    <input type="hidden" id="apiUrl" value="http://10.0.0.50:8000/v1/chat/completions">
+                    <input type="hidden" id="apiUrl" value="">
                 </div>
                 <div class="form-group" style="flex: 0.8;">
                     <label for="modelName">模型名称</label>
@@ -2057,10 +2057,26 @@
 
             updateBrowserEnvironmentWarning();
 
-            // 自动加载模型下拉
-            const currentApiUrl = document.getElementById('apiUrl')?.value?.trim();
-            if (currentApiUrl && typeof fetchCustomModels === 'function') {
-                fetchCustomModels(currentApiUrl);
+            // 更新模型下拉框和提示语的语言（不触发网络请求）
+            if (typeof updateModelSelectDropdown === 'function') {
+                const currentApiUrl = document.getElementById('apiUrl')?.value?.trim();
+                let models = [];
+                if (currentApiUrl && typeof resolveModelCatalogEndpoint === 'function' && typeof _customModelNameCache !== 'undefined') {
+                    const endpoint = resolveModelCatalogEndpoint(currentApiUrl).endpoint;
+                    if (endpoint && _customModelNameCache[endpoint]) {
+                        models = _customModelNameCache[endpoint];
+                        // 更新状态提示语
+                        if (typeof _customModelFetchState !== 'undefined') {
+                            const cachedState = _customModelFetchState[endpoint];
+                            if (cachedState?.kind === 'error') {
+                                setModelSuggestStatusKey('modelSuggestLoadFailed', { message: cachedState.message || '' }, true);
+                            } else {
+                                setModelSuggestStatusKey(models.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: models.length });
+                            }
+                        }
+                    }
+                }
+                updateModelSelectDropdown(models);
             }
 
         }
@@ -2071,9 +2087,12 @@
             switchLanguage(newLang);
         });
 
-        // 页面加载时应用保存的语言
+        // 页面加载时应用保存的配置和语言
         document.addEventListener('DOMContentLoaded', function () {
-            switchLanguage(currentLang);
+            if (typeof setDefaultValues === 'function') {
+                setDefaultValues(); // 动作 B：先恢复配置
+            }
+            switchLanguage(currentLang); // 动作 A：再应用语言（依赖配置）
         });
 
         // 默认参数设置
@@ -6998,7 +7017,6 @@
 
         //
         window.onload = function () {
-            setDefaultValues();
             // v1.9: 更新历史记录按钮文本
             const t = translations[currentLang];
             viewHistoryBtn.textContent = t.historyBtn;
