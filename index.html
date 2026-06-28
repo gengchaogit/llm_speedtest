@@ -2771,7 +2771,7 @@
                 let optionsHtml = '';
                 models.forEach(m => {
                     const selected = m === savedModel ? ' selected' : '';
-                    optionsHtml += `<option value="${m}"${selected}>${m}</option>`;
+                    optionsHtml += `<option value="${escapeHtml(m)}"${selected}>${escapeHtml(m)}</option>`;
                 });
                 select.innerHTML = optionsHtml;
             }
