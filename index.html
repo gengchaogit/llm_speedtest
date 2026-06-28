@@ -2163,15 +2163,15 @@
 
         function updateDefaultValues(apiType) {
             const modelName = document.getElementById('modelName');
-            const apiUrlValue = (typeof getFullApiUrl === 'function' ? getFullApiUrl() : document.getElementById('apiUrl').value).trim();
             
-            let targetUrl = (apiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl;
-            let targetModel = (apiType === 'openai') ? d_openai_modelName : d_ollama_modelName;
+            let defaultUrl = (apiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl;
+            let targetUrl = localStorage.getItem('llmPerfTestApiUrl_' + apiType) || defaultUrl;
+            
+            let defaultModel = (apiType === 'openai') ? d_openai_modelName : d_ollama_modelName;
+            let targetModel = localStorage.getItem('llmPerfTestModelName_' + apiType) || defaultModel;
 
-            if (!apiUrlValue) {
-                splitAndSetApiUrl(targetUrl);
-            }
-            if (modelName && !modelName.value.trim()) {
+            splitAndSetApiUrl(targetUrl);
+            if (modelName) {
                 modelName.value = targetModel;
             }
             syncApiUrlAndRefreshModels(false);
@@ -5052,12 +5052,19 @@
                 throw new Error(`Ollama 错误: ${data.error}`);
             }
 
-            if (!data.prompt_eval_duration || !data.eval_duration) {
-                throw new Error("Ollama 响应中缺少*duration字段");
+            // 兼容缺少 duration 字段的情况（如兼容 API 或缓存命中）
+            let prefillDurationMs = 1;
+            if (data.prompt_eval_duration != null) {
+                prefillDurationMs = Math.max(data.prompt_eval_duration / 1_000_000, 1);
+            } else {
+                console.warn("[Ollama] 响应中缺少 prompt_eval_duration，回退为 1ms");
+                data.prompt_eval_duration = 1_000_000; // 1ms (in ns) fallback
             }
 
-            // prompt_eval_duration 和 eval_duration 是纳秒 (ns)
-            const prefillDurationMs = data.prompt_eval_duration / 1_000_000;
+            if (data.eval_duration == null) {
+                console.warn("[Ollama] 响应中缺少 eval_duration，回退为客户端网络总用时");
+                data.eval_duration = clientTotalTimeMs * 1_000_000;
+            }
 
             // 提取输出内容
             const outputText = data.message?.content || data.response || '';
@@ -5501,7 +5508,9 @@
             //  保存当前配置到 localStorage（扩展保存所有参数）
             try {
                 localStorage.setItem('llmPerfTestApiUrl', apiUrl);
+                localStorage.setItem('llmPerfTestApiUrl_' + currentApiType, apiUrl);
                 localStorage.setItem('llmPerfTestModelName', currentModelName);
+                localStorage.setItem('llmPerfTestModelName_' + currentApiType, currentModelName);
                 localStorage.setItem('llmPerfTestApiType', currentApiType);
                 localStorage.setItem('llmPerfTestApiKey', api_key);
                 localStorage.setItem('llmPerfTestNotes', notes);
@@ -6333,8 +6342,8 @@
         function setDefaultValues() {
             // 从 localStorage 加载保存的 API 类型、地址和模型名称
             const savedApiType = localStorage.getItem('llmPerfTestApiType') || 'openai';
-            const savedApiUrl = localStorage.getItem('llmPerfTestApiUrl');
-            const savedModelName = localStorage.getItem('llmPerfTestModelName');
+            const savedApiUrl = localStorage.getItem('llmPerfTestApiUrl_' + savedApiType) || localStorage.getItem('llmPerfTestApiUrl');
+            const savedModelName = localStorage.getItem('llmPerfTestModelName_' + savedApiType) || localStorage.getItem('llmPerfTestModelName');
             const savedApiKey = localStorage.getItem('llmPerfTestApiKey');
             const savedNotes = localStorage.getItem('llmPerfTestNotes');
             const savedRunCommand = localStorage.getItem('llmPerfTestRunCommand');
