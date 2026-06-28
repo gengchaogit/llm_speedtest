@@ -1048,26 +1048,30 @@
             }
         }
 
-        /* 模型刷新按钮与下拉选择框样式 */
+        /* 刷新按钮 - 紧凑图标样式 */
         .btn-refresh-models {
-            background: #f0f4f8;
-            border: 1px solid #cbd5e1;
-            color: #334155;
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #555;
             border-radius: 4px;
-            padding: 2px 8px;
-            font-size: 12px;
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            margin: 0;
+            font-size: 16px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
             transition: all 0.2s;
+            flex-shrink: 0;
         }
         .btn-refresh-models:hover {
-            background: #e2e8f0;
+            background: #f0f4f8;
             border-color: #94a3b8;
         }
         .btn-refresh-models:active {
-            background: #cbd5e1;
+            background: #e2e8f0;
         }
         .btn-refresh-models.loading .refresh-icon {
             display: inline-block;
@@ -1076,6 +1080,29 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        /* 模型名称下拉选择框 */
+        .model-select-native {
+            width: 100%;
+            height: 38px;
+            padding: 0 30px 0 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            background-color: #fff;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .model-select-native:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
         }
     </style>
 </head>
@@ -1111,29 +1138,24 @@
 
         <div class="config-section">
             <h2>API 信息</h2>
-            <div class="form-row">
-                <div class="form-group" style="flex: 1.3;">
-                    <label for="apiBaseUrl">API 地址 (服务器地址 + 接口路径后缀)</label>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <input type="text" id="apiBaseUrl" value="http://10.0.0.50:8000" placeholder="服务器地址，如 http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box;" oninput="syncApiUrlAndRefreshModels()">
-                        <input type="text" id="apiPathSuffix" value="/v1/chat/completions" placeholder="后缀，如 /v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
+            <div class="form-row" style="align-items: flex-end;">
+                <div class="form-group" style="flex: 1.5;">
+                    <label>API 地址</label>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <input type="text" id="apiBaseUrl" value="http://10.0.0.50:8000" placeholder="http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box; padding: 0 10px;" oninput="syncApiUrlAndRefreshModels()">
+                        <input type="text" id="apiPathSuffix" value="/v1/chat/completions" placeholder="/v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; padding: 0 8px; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
+                        <button type="button" id="btnRefreshModels" class="btn-refresh-models" title="刷新模型列表" onclick="refreshModelList()">
+                            <span class="refresh-icon">🔄</span>
+                        </button>
                     </div>
                     <input type="hidden" id="apiUrl" value="http://10.0.0.50:8000/v1/chat/completions">
                 </div>
-                <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <label for="modelName" style="margin-bottom: 0;">模型名称</label>
-                        <button type="button" id="btnRefreshModels" class="btn-refresh-models" title="重新获取模型列表" onclick="refreshModelList()">
-                            <span class="refresh-icon">🔄</span> <span id="refreshBtnText">刷新</span>
-                        </button>
-                    </div>
-                    <div class="model-select-wrapper" style="position: relative; display: flex; gap: 6px; align-items: center;">
-                        <select id="modelSelect" style="display: none; flex: 1; height: 38px; border: 1px solid #ccc; border-radius: 4px; padding: 0 10px; font-size: 14px; background-color: #fff; box-sizing: border-box;" onchange="handleModelSelectChange(this)">
-                        </select>
-                        <input type="text" id="modelName" value="" list="modelSuggest" autocomplete="off"
-                            placeholder="输入模型名称，自动匹配..." style="flex: 1; box-sizing: border-box;">
-                        <button type="button" id="btnToggleModelInput" onclick="toggleModelInputMode()" style="display: none; height: 38px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; background: #f8f9fa; font-size: 13px; cursor: pointer; white-space: nowrap;" title="切换手动输入/下拉选择">✏️ 手动输入</button>
-                    </div>
+                <div class="form-group" style="flex: 0.8;">
+                    <label for="modelName">模型名称</label>
+                    <select id="modelSelect" class="model-select-native" onchange="handleModelSelectChange(this)">
+                        <option value="" disabled selected>-- 请先点击刷新 --</option>
+                    </select>
+                    <input type="hidden" id="modelName" value="">
                     <datalist id="modelSuggest"></datalist>
                     <p id="modelSuggestStatus" class="model-suggest-status"
                         style="margin-top: 5px; font-size: 12px; color: #666;"></p>
@@ -2657,147 +2679,78 @@
 
         
         // ===============================================================================
-        // 模型下拉选择框、动态刷新与持久化保存逻辑 (v3.1)
+        // 模型下拉选择框、动态刷新与持久化保存逻辑 (v3.2)
         // ===============================================================================
-        let _isManualModelInput = false;
 
-        function updateModelSelectDropdown(models, forceShow = false) {
+        function updateModelSelectDropdown(models) {
             const select = document.getElementById('modelSelect');
-            const input = document.getElementById('modelName');
-            const toggleBtn = document.getElementById('btnToggleModelInput');
-            if (!select || !input) return;
+            const hiddenInput = document.getElementById('modelName');
+            if (!select || !hiddenInput) return;
 
             if (!models || models.length === 0) {
-                select.style.display = 'none';
-                if (toggleBtn) toggleBtn.style.display = 'none';
-                input.style.display = 'block';
+                select.innerHTML = '<option value="" disabled selected>-- 未获取到模型 --</option>';
                 return;
             }
 
-            const savedModel = localStorage.getItem('llmPerfTestModelName') || input.value.trim();
-            
-            let optionsHtml = '<option value="" disabled>-- 请选择模型 --</option>';
+            const savedModel = localStorage.getItem('llmPerfTestModelName') || hiddenInput.value.trim();
+
+            let optionsHtml = '';
             models.forEach(m => {
-                optionsHtml += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`;
+                const selected = m === savedModel ? ' selected' : '';
+                optionsHtml += `<option value="${escapeHtml(m)}"${selected}>${escapeHtml(m)}</option>`;
             });
-            optionsHtml += '<option value="__manual__">✏️ 手动输入其它模型...</option>';
             select.innerHTML = optionsHtml;
 
-            const hasMatch = models.includes(savedModel);
-            if (hasMatch) {
+            // Sync hidden input
+            if (models.includes(savedModel)) {
                 select.value = savedModel;
-                input.value = savedModel;
-            } else if (savedModel) {
-                select.value = '__manual__';
-                input.value = savedModel;
-            } else if (models.length > 0) {
-                select.value = models[0];
-                input.value = models[0];
-                localStorage.setItem('llmPerfTestModelName', models[0]);
-            }
-
-            if (toggleBtn) toggleBtn.style.display = 'inline-block';
-
-            if (_isManualModelInput && !forceShow) {
-                select.style.display = 'none';
-                input.style.display = 'block';
-                if (toggleBtn) toggleBtn.textContent = '📋 下拉选择';
+                hiddenInput.value = savedModel;
             } else {
-                if (select.value === '__manual__') {
-                    select.style.display = 'none';
-                    input.style.display = 'block';
-                    if (toggleBtn) toggleBtn.textContent = '📋 下拉选择';
-                } else {
-                    select.style.display = 'block';
-                    input.style.display = 'none';
-                    if (toggleBtn) toggleBtn.textContent = '✏️ 手动输入';
-                }
+                select.value = models[0];
+                hiddenInput.value = models[0];
+                localStorage.setItem('llmPerfTestModelName', models[0]);
             }
         }
 
         function handleModelSelectChange(selectEl) {
-            const input = document.getElementById('modelName');
-            const toggleBtn = document.getElementById('btnToggleModelInput');
-            if (selectEl.value === '__manual__') {
-                _isManualModelInput = true;
-                selectEl.style.display = 'none';
-                if (input) {
-                    input.style.display = 'block';
-                    input.focus();
-                }
-                if (toggleBtn) toggleBtn.textContent = '📋 下拉选择';
-            } else {
-                _isManualModelInput = false;
-                if (input) {
-                    input.value = selectEl.value;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    localStorage.setItem('llmPerfTestModelName', selectEl.value);
-                    if (typeof saveCurrentConfig === 'function') saveCurrentConfig();
-                }
-            }
-        }
-
-        function toggleModelInputMode() {
-            const select = document.getElementById('modelSelect');
-            const input = document.getElementById('modelName');
-            const toggleBtn = document.getElementById('btnToggleModelInput');
-            if (!select || !input) return;
-
-            if (select.style.display === 'none') {
-                _isManualModelInput = false;
-                select.style.display = 'block';
-                input.style.display = 'none';
-                if (toggleBtn) toggleBtn.textContent = '✏️ 手动输入';
-                if (select.value && select.value !== '__manual__') {
-                    input.value = select.value;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    localStorage.setItem('llmPerfTestModelName', select.value);
-                    if (typeof saveCurrentConfig === 'function') saveCurrentConfig();
-                }
-            } else {
-                _isManualModelInput = true;
-                select.style.display = 'none';
-                input.style.display = 'block';
-                if (toggleBtn) toggleBtn.textContent = '📋 下拉选择';
-                input.focus();
-            }
+            const hiddenInput = document.getElementById('modelName');
+            if (!hiddenInput) return;
+            hiddenInput.value = selectEl.value;
+            localStorage.setItem('llmPerfTestModelName', selectEl.value);
+            hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
         async function refreshModelList() {
-            const apiUrlInput = document.getElementById('apiUrl');
-            const apiUrl = apiUrlInput ? apiUrlInput.value.trim() : '';
-            if (!apiUrl) {
+            const fullUrl = getFullApiUrl();
+            if (!fullUrl) {
                 alert('请先输入有效的 API 地址！');
                 return;
             }
-            const { endpoint } = resolveModelCatalogEndpoint(apiUrl);
+            const { endpoint } = resolveModelCatalogEndpoint(fullUrl);
             if (!endpoint) {
                 alert('当前 API 地址不支持自动拉取模型列表！');
                 return;
             }
 
             const btn = document.getElementById('btnRefreshModels');
-            const btnText = document.getElementById('refreshBtnText');
             if (btn) btn.classList.add('loading');
-            if (btnText) btnText.textContent = '刷新中...';
 
             if (typeof _customModelNameCache !== 'undefined') delete _customModelNameCache[endpoint];
             if (typeof _customModelFetchState !== 'undefined') delete _customModelFetchState[endpoint];
 
             try {
-                const models = await fetchCustomModels(apiUrl);
+                const models = await fetchCustomModels(fullUrl);
                 if (models && models.length > 0) {
-                    _isManualModelInput = false;
-                    updateModelSelectDropdown(models, true);
+                    updateModelSelectDropdown(models);
                 } else {
-                    alert('未能获取到该 API 下的模型列表。');
+                    const select = document.getElementById('modelSelect');
+                    if (select) select.innerHTML = '<option value="" disabled selected>-- 未获取到模型 --</option>';
                 }
             } catch (e) {
                 console.error('[RefreshModels] Error:', e);
                 alert('获取模型列表失败，请检查网络或 API 地址。');
             } finally {
                 if (btn) btn.classList.remove('loading');
-                if (btnText) btnText.textContent = '刷新';
             }
         }
 
