@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- 原作者：纸鸢随风（B站）、DeepSeek-R1-0528-->
+<!-- v3.2 (Custom Mod - 2026-06-28 12:05):
+    1. 将 API 地址拆分为服务器地址 (Host/IP:Port) 与接口路径后缀两个可编辑输入框
+    2. 修改端点时自动清除旧模型缓存并重新拉取新端点的模型列表
+-->
 <!-- v3.1 (Custom Mod - 2026-06-28 11:57):
     1. 新增刷新模型列表按钮
     2. 模型名称支持下拉列表选择与手动输入动态切换
@@ -1108,9 +1112,13 @@
         <div class="config-section">
             <h2>API 信息</h2>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="apiUrl">API 地址</label>
-                    <input type="text" id="apiUrl" value="">
+                <div class="form-group" style="flex: 1.3;">
+                    <label for="apiBaseUrl">API 地址 (服务器地址 + 接口路径后缀)</label>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <input type="text" id="apiBaseUrl" value="http://10.0.0.50:8000" placeholder="服务器地址，如 http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box;" oninput="syncApiUrlAndRefreshModels()">
+                        <input type="text" id="apiPathSuffix" value="/v1/chat/completions" placeholder="后缀，如 /v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
+                    </div>
+                    <input type="hidden" id="apiUrl" value="http://10.0.0.50:8000/v1/chat/completions">
                 </div>
                 <div class="form-group">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -2092,16 +2100,13 @@
         }
 
         function updateDefaultValues(apiType) {
-            const apiUrl = document.getElementById('apiUrl');
             const modelName = document.getElementById('modelName');
+            let targetUrl = (apiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl;
+            let targetModel = (apiType === 'openai') ? d_openai_modelName : d_ollama_modelName;
 
-            if (apiType === 'openai') {
-                apiUrl.value = d_openai_apiUrl;
-                modelName.value = d_openai_modelName;
-            } else {
-                apiUrl.value = d_ollama_apiUrl;
-                modelName.value = d_ollama_modelName;
-            }
+            splitAndSetApiUrl(targetUrl);
+            if (modelName) modelName.value = targetModel;
+            syncApiUrlAndRefreshModels(false);
         }
 
         // 初始化
@@ -2564,6 +2569,73 @@
         let _customModelNameCache = {}; // { 'http://...': ['model1', 'model2'] }
         let _customModelFetchState = {}; // { endpoint: { kind: 'success'|'empty'|'error', message?: string } }
         let _isFetchingCustomModels = false;
+
+        
+        // ===============================================================================
+        // API 地址拆分 (BaseUrl + PathSuffix) 与自动同步拉取逻辑 (v3.2)
+        // ===============================================================================
+        function splitAndSetApiUrl(fullUrl) {
+            const baseUrlInput = document.getElementById('apiBaseUrl');
+            const suffixInput = document.getElementById('apiPathSuffix');
+            const hiddenInput = document.getElementById('apiUrl');
+            if (!fullUrl) return;
+
+            let baseUrl = fullUrl;
+            let suffix = '/v1/chat/completions';
+
+            if (fullUrl.includes('/v1/chat/completions')) {
+                const idx = fullUrl.indexOf('/v1/chat/completions');
+                baseUrl = fullUrl.slice(0, idx);
+                suffix = '/v1/chat/completions';
+            } else if (fullUrl.includes('/api/chat')) {
+                const idx = fullUrl.indexOf('/api/chat');
+                baseUrl = fullUrl.slice(0, idx);
+                suffix = '/api/chat';
+            } else {
+                const v1Idx = fullUrl.indexOf('/v1/');
+                const apiIdx = fullUrl.indexOf('/api/');
+                if (v1Idx !== -1) {
+                    baseUrl = fullUrl.slice(0, v1Idx);
+                    suffix = fullUrl.slice(v1Idx);
+                } else if (apiIdx !== -1) {
+                    baseUrl = fullUrl.slice(0, apiIdx);
+                    suffix = fullUrl.slice(apiIdx);
+                }
+            }
+
+            baseUrl = baseUrl.replace(/\/+$/, '');
+            if (baseUrlInput) baseUrlInput.value = baseUrl;
+            if (suffixInput) suffixInput.value = suffix;
+            if (hiddenInput) hiddenInput.value = fullUrl;
+        }
+
+        function getFullApiUrl() {
+            let baseUrl = document.getElementById('apiBaseUrl')?.value?.trim() || '';
+            let suffix = document.getElementById('apiPathSuffix')?.value?.trim() || '';
+            if (!baseUrl) return '';
+            baseUrl = baseUrl.replace(/\/+$/, '');
+            if (suffix && !suffix.startsWith('/')) {
+                suffix = '/' + suffix;
+            }
+            return baseUrl + suffix;
+        }
+
+        function syncApiUrlAndRefreshModels(debounce = true) {
+            const fullUrl = getFullApiUrl();
+            const hiddenApiUrl = document.getElementById('apiUrl');
+            if (hiddenApiUrl) {
+                hiddenApiUrl.value = fullUrl;
+                hiddenApiUrl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (typeof saveCurrentConfig === 'function') saveCurrentConfig();
+
+            if (fullUrl && typeof fetchCustomModels === 'function') {
+                if (window._apiUrlDebounceTimer) clearTimeout(window._apiUrlDebounceTimer);
+                window._apiUrlDebounceTimer = setTimeout(() => {
+                    fetchCustomModels(fullUrl);
+                }, debounce ? 500 : 0);
+            }
+        }
 
         function resolveModelCatalogEndpoint(apiUrl) {
             const normalized = (apiUrl || '').trim().replace(/\/+$/, '');
@@ -6235,8 +6307,10 @@
             updateApiDescription(savedApiType);
 
             // 如果 localStorage 有数据则使用，否则使用默认数据
-            document.getElementById('apiUrl').value = savedApiUrl || ((savedApiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl);
+            const targetUrl = savedApiUrl || ((savedApiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl);
+            splitAndSetApiUrl(targetUrl);
             document.getElementById('modelName').value = savedModelName || ((savedApiType === 'openai') ? d_openai_modelName : d_ollama_modelName);
+            syncApiUrlAndRefreshModels(false);
             document.getElementById('apiKey').value = savedApiKey || d_api_key;
             document.getElementById('notes').value = savedNotes || '';
             document.getElementById('runCommand').value = savedRunCommand || '';
