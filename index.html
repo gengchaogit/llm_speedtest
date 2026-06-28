@@ -1085,18 +1085,12 @@
         .model-select-native {
             width: 100%;
             height: 38px;
-            padding: 0 30px 0 12px;
+            padding: 0 12px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 1em;
             background-color: #fff;
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            cursor: pointer;
+            cursor: text;
             box-sizing: border-box;
         }
         .model-select-native:focus {
@@ -1140,7 +1134,7 @@
             <h2>API 信息</h2>
             <div class="form-row">
                 <div class="form-group" style="flex: 1.5;">
-                    <label>API 地址</label>
+                    <label for="apiUrl">API 地址</label>
                     <div style="display: flex; gap: 4px; align-items: center;">
                         <input type="text" id="apiBaseUrl" value="http://10.0.0.50:8000" placeholder="http://192.168.2.167:9055" style="flex: 2; height: 38px; box-sizing: border-box; padding: 0 10px;" oninput="syncApiUrlAndRefreshModels()">
                         <input type="text" id="apiPathSuffix" value="/v1/chat/completions" placeholder="/v1/chat/completions" style="flex: 1.2; height: 38px; box-sizing: border-box; padding: 0 8px; font-size: 13px; color: #555;" oninput="syncApiUrlAndRefreshModels()">
@@ -1152,10 +1146,7 @@
                 </div>
                 <div class="form-group" style="flex: 0.8;">
                     <label for="modelName">模型名称</label>
-                    <select id="modelSelect" class="model-select-native" onchange="handleModelSelectChange(this)">
-                        <option value="" disabled selected>-- 请先点击刷新 --</option>
-                    </select>
-                    <input type="hidden" id="modelName" value="">
+                    <input type="text" id="modelName" class="model-select-native" value="" list="modelSuggest" autocomplete="off" placeholder="输入模型名称，将自动联想...">
                     <datalist id="modelSuggest"></datalist>
                     <p id="modelSuggestStatus" class="model-suggest-status"
                         style="margin-top: 5px; font-size: 12px; color: #666;"></p>
@@ -1380,6 +1371,7 @@
                 sectionApiInfo: 'API 信息',
                 labelApiUrl: 'API 地址',
                 labelModelName: '模型名称',
+                placeholderModelName: '输入模型名称，将自动联想...',
                 labelApiKey: 'API-Key',
                 placeholderApiKey: '未设置 API-Key 则留空',
                 labelNotes: '备注',
@@ -1387,6 +1379,13 @@
                 labelRunCommand: '启动命令',
                 placeholderRunCommand: '例如：vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 labelSaveDetail: '保存测试详情（提示词和输出内容）',
+                modelRefreshTitle: '刷新模型列表',
+                modelSelectInit: '-- 请先点击刷新 --',
+                modelSelectEmpty: '-- 未获取到模型 --',
+                alertInvalidApiUrl: '请先输入有效的 API 地址！',
+                alertUnsupportedApiUrl: '当前 API 地址不支持自动拉取模型列表！',
+                alertModelFetchFailed: '获取模型列表失败，请检查网络或 API 地址。',
+
                 noteSaveDetail: '💡 勾选后会保存完整的提示词和输出内容到历史记录，方便查看详情。不勾选可节省存储空间。',
                 modelSuggestLoading: '正在加载模型列表...',
                 modelSuggestLoaded: '已加载 {count} 个模型',
@@ -1641,6 +1640,7 @@
                 sectionApiInfo: 'API Information',
                 labelApiUrl: 'API URL',
                 labelModelName: 'Model Name',
+                placeholderModelName: 'Enter model name, auto-suggest...',
                 labelApiKey: 'API Key',
                 placeholderApiKey: 'Leave empty if no API key is required',
                 labelNotes: 'Notes',
@@ -1648,6 +1648,13 @@
                 labelRunCommand: 'Run Command',
                 placeholderRunCommand: 'Example: vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0',
                 labelSaveDetail: 'Save Test Details (Prompts and Outputs)',
+                modelRefreshTitle: 'Refresh Model List',
+                modelSelectInit: '-- Please click refresh --',
+                modelSelectEmpty: '-- No models fetched --',
+                alertInvalidApiUrl: 'Please enter a valid API URL first!',
+                alertUnsupportedApiUrl: 'Current API URL does not support automatic model list fetching!',
+                alertModelFetchFailed: 'Failed to fetch model list, please check network or API URL.',
+
                 noteSaveDetail: '💡 When checked, complete prompt and output content will be saved to history for viewing details. Unchecking saves storage space.',
                 modelSuggestLoading: 'Loading model list...',
                 modelSuggestLoaded: 'Loaded {count} models',
@@ -1980,6 +1987,9 @@
             // 更新标签
             document.querySelector('label[for="apiUrl"]').textContent = t.labelApiUrl;
             document.querySelector('label[for="modelName"]').textContent = t.labelModelName;
+            document.getElementById('modelName').placeholder = t.placeholderModelName || '输入模型名称，将自动联想...';
+            const btnRefresh = document.getElementById('btnRefreshModels');
+            if (btnRefresh) btnRefresh.title = t.modelRefreshTitle || '刷新模型列表';
             document.querySelector('label[for="apiKey"]').textContent = t.labelApiKey;
             document.getElementById('apiKey').placeholder = t.placeholderApiKey;
             document.querySelector('label[for="notes"]').textContent = t.labelNotes;
@@ -2247,6 +2257,27 @@
         document.getElementById('modelName')?.addEventListener('input', (e) => {
             const val = e.target.value.trim();
             if (val) localStorage.setItem('llmPerfTestModelName', val);
+        });
+
+        // 失去焦点时验证模型名称是否在拉取到的列表中
+        document.getElementById('modelName')?.addEventListener('blur', (e) => {
+            const val = e.target.value.trim();
+            const fullUrl = getFullApiUrl();
+            const { endpoint } = resolveModelCatalogEndpoint(fullUrl);
+            
+            if (Object.prototype.hasOwnProperty.call(_customModelNameCache, endpoint)) {
+                const models = _customModelNameCache[endpoint];
+                if (models && models.length > 0 && !models.includes(val)) {
+                    const savedModel = localStorage.getItem('llmPerfTestModelName');
+                    if (savedModel && models.includes(savedModel)) {
+                        e.target.value = savedModel;
+                    } else {
+                        e.target.value = models[0];
+                        localStorage.setItem('llmPerfTestModelName', models[0]);
+                    }
+                    e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
         });
 
         document.getElementById('apiUrl').addEventListener('input', () => updateBrowserEnvironmentWarning());
@@ -2591,6 +2622,7 @@
         let _customModelNameCache = {}; // { 'http://...': ['model1', 'model2'] }
         let _customModelFetchState = {}; // { endpoint: { kind: 'success'|'empty'|'error', message?: string } }
         let _isFetchingCustomModels = false;
+        let _fetchingCustomModelsMap = {};
 
         
         // ===============================================================================
@@ -2642,21 +2674,7 @@
             return baseUrl + suffix;
         }
 
-        // 实时保存当前配置到 localStorage（每次输入变化时调用）
-        function saveCurrentConfig() {
-            try {
-                const fullUrl = getFullApiUrl();
-                if (fullUrl) localStorage.setItem('llmPerfTestApiUrl', fullUrl);
-                const modelVal = document.getElementById('modelName')?.value?.trim();
-                if (modelVal) localStorage.setItem('llmPerfTestModelName', modelVal);
-                const apiKey = document.getElementById('apiKey')?.value?.trim();
-                if (apiKey !== undefined) localStorage.setItem('llmPerfTestApiKey', apiKey);
-                const apiType = document.querySelector('.api-option.active')?.dataset?.type;
-                if (apiType) localStorage.setItem('llmPerfTestApiType', apiType);
-            } catch (e) {
-                console.warn('[saveCurrentConfig] 保存失败:', e);
-            }
-        }
+
 
         function syncApiUrlAndRefreshModels(debounce = true) {
             const fullUrl = getFullApiUrl();
@@ -2698,52 +2716,37 @@
         // ===============================================================================
 
         function updateModelSelectDropdown(models) {
-            const select = document.getElementById('modelSelect');
-            const hiddenInput = document.getElementById('modelName');
-            if (!select || !hiddenInput) return;
+            const input = document.getElementById('modelName');
+            if (!input) return;
 
-            if (!models || models.length === 0) {
-                select.innerHTML = '<option value="" disabled selected>-- 未获取到模型 --</option>';
-                return;
-            }
+            if (!models || models.length === 0) return;
 
-            const savedModel = localStorage.getItem('llmPerfTestModelName') || hiddenInput.value.trim();
-
-            let optionsHtml = '';
-            models.forEach(m => {
-                const selected = m === savedModel ? ' selected' : '';
-                optionsHtml += `<option value="${escapeHtml(m)}"${selected}>${escapeHtml(m)}</option>`;
-            });
-            select.innerHTML = optionsHtml;
-
-            // Sync hidden input
-            if (models.includes(savedModel)) {
-                select.value = savedModel;
-                hiddenInput.value = savedModel;
-            } else {
-                select.value = models[0];
-                hiddenInput.value = models[0];
-                localStorage.setItem('llmPerfTestModelName', models[0]);
+            const savedModel = localStorage.getItem('llmPerfTestModelName') || input.value.trim();
+            const currentValue = input.value.trim();
+            
+            // 如果当前输入框里的值不在列表中，强制回滚到合法的模型
+            if (!models.includes(currentValue)) {
+                 if (models.includes(savedModel)) {
+                     input.value = savedModel;
+                 } else {
+                     input.value = models[0];
+                     localStorage.setItem('llmPerfTestModelName', models[0]);
+                 }
+                 input.dispatchEvent(new Event('input', { bubbles: true }));
             }
         }
 
-        function handleModelSelectChange(selectEl) {
-            const hiddenInput = document.getElementById('modelName');
-            if (!hiddenInput) return;
-            hiddenInput.value = selectEl.value;
-            localStorage.setItem('llmPerfTestModelName', selectEl.value);
-            hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+
 
         async function refreshModelList() {
             const fullUrl = getFullApiUrl();
             if (!fullUrl) {
-                alert('请先输入有效的 API 地址！');
+                const t = typeof translations !== 'undefined' ? (translations[currentLang] || translations.zh) : {}; alert(t.alertInvalidApiUrl || '请先输入有效的 API 地址！');
                 return;
             }
             const { endpoint } = resolveModelCatalogEndpoint(fullUrl);
             if (!endpoint) {
-                alert('当前 API 地址不支持自动拉取模型列表！');
+                const t = typeof translations !== 'undefined' ? (translations[currentLang] || translations.zh) : {}; alert(t.alertUnsupportedApiUrl || '当前 API 地址不支持自动拉取模型列表！');
                 return;
             }
 
@@ -2759,11 +2762,11 @@
                     updateModelSelectDropdown(models);
                 } else {
                     const select = document.getElementById('modelSelect');
-                    if (select) select.innerHTML = '<option value="" disabled selected>-- 未获取到模型 --</option>';
+                    if (select) { const t = typeof translations !== 'undefined' ? (translations[currentLang] || translations.zh) : {}; select.innerHTML = `<option value="" disabled selected>${t.modelSelectEmpty || '-- 未获取到模型 --'}</option>`; }
                 }
             } catch (e) {
                 console.error('[RefreshModels] Error:', e);
-                alert('获取模型列表失败，请检查网络或 API 地址。');
+                const t = typeof translations !== 'undefined' ? (translations[currentLang] || translations.zh) : {}; alert(t.alertModelFetchFailed || '获取模型列表失败，请检查网络或 API 地址。');
             } finally {
                 if (btn) btn.classList.remove('loading');
             }
@@ -2786,17 +2789,32 @@
                 updateModelSelectDropdown(cachedModels);
                 return cachedModels;
             }
-            if (_isFetchingCustomModels) return null;
+            if (_fetchingCustomModelsMap[endpoint]) return null;
 
-            _isFetchingCustomModels = true;
+            _fetchingCustomModelsMap[endpoint] = true;
             try {
-                setModelSuggestStatusKey('modelSuggestLoading');
+                const currentFullUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+                const { endpoint: currentEndpoint } = resolveModelCatalogEndpoint(currentFullUrl);
+                if (endpoint === currentEndpoint) {
+                    setModelSuggestStatusKey('modelSuggestLoading');
+                }
                 console.log(`[ModelSuggest] 开始从接口拉取模型: ${endpoint}`);
                 const apiKey = document.getElementById('apiKey')?.value?.trim() || '';
                 const headers = { 'Accept': 'application/json' };
                 if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-                const resp = await fetch(endpoint, { headers, signal: AbortSignal.timeout(3000) });
+                let signal;
+                let timeoutId;
+                if (typeof AbortSignal.timeout === 'function') {
+                    signal = AbortSignal.timeout(3000);
+                } else {
+                    const controller = new AbortController();
+                    signal = controller.signal;
+                    timeoutId = setTimeout(() => controller.abort(), 3000);
+                }
+
+                const resp = await fetch(endpoint, { headers, signal });
+                if (timeoutId) clearTimeout(timeoutId);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const json = await resp.json();
 
@@ -2810,18 +2828,28 @@
                 _customModelNameCache[endpoint] = names;
                 _customModelFetchState[endpoint] = { kind: names.length > 0 ? 'success' : 'empty' };
                 console.log(`[ModelSuggest] 从接口 ${endpoint} 成功拉取 ${names.length} 个模型`);
-                setModelSuggestStatusKey(names.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: names.length });
-                updateModelSelectDropdown(names);
+                
+                const checkFullUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+                const { endpoint: checkEndpoint } = resolveModelCatalogEndpoint(checkFullUrl);
+                if (endpoint === checkEndpoint) {
+                    setModelSuggestStatusKey(names.length > 0 ? 'modelSuggestLoaded' : 'modelSuggestEmpty', { count: names.length });
+                    updateModelSelectDropdown(names);
+                }
                 return names;
             } catch (err) {
                 const friendlyMessage = getFriendlyFetchErrorMessage(err, endpoint);
                 console.warn(`[ModelSuggest] 从 ${endpoint} 拉取模型失败:`, friendlyMessage);
                 _customModelNameCache[endpoint] = []; // 避免重复请求
                 _customModelFetchState[endpoint] = { kind: 'error', message: friendlyMessage };
-                setModelSuggestStatusKey('modelSuggestLoadFailed', { message: friendlyMessage }, true);
+                
+                const checkFullUrl = document.getElementById('apiUrl')?.value?.trim() || '';
+                const { endpoint: checkEndpoint } = resolveModelCatalogEndpoint(checkFullUrl);
+                if (endpoint === checkEndpoint) {
+                    setModelSuggestStatusKey('modelSuggestLoadFailed', { message: friendlyMessage }, true);
+                }
                 return [];
             } finally {
-                _isFetchingCustomModels = false;
+                _fetchingCustomModelsMap[endpoint] = false;
             }
         }
 
