@@ -2144,11 +2144,17 @@
 
         function updateDefaultValues(apiType) {
             const modelName = document.getElementById('modelName');
+            const apiUrlValue = (typeof getFullApiUrl === 'function' ? getFullApiUrl() : document.getElementById('apiUrl').value).trim();
+            
             let targetUrl = (apiType === 'openai') ? d_openai_apiUrl : d_ollama_apiUrl;
             let targetModel = (apiType === 'openai') ? d_openai_modelName : d_ollama_modelName;
 
-            splitAndSetApiUrl(targetUrl);
-            if (modelName) modelName.value = targetModel;
+            if (!apiUrlValue) {
+                splitAndSetApiUrl(targetUrl);
+            }
+            if (modelName && !modelName.value.trim()) {
+                modelName.value = targetModel;
+            }
             syncApiUrlAndRefreshModels(false);
         }
 
