@@ -16,6 +16,21 @@ if %errorlevel% neq 0 (
 REM 获取当前脚本所在目录
 cd /d "%~dp0"
 
+REM 检查并激活虚拟环境（如果存在）
+if exist "..\.venv\Scripts\activate.bat" (
+    echo [提示] 激活虚拟环境 (..\.venv)...
+    call "..\.venv\Scripts\activate.bat"
+) else if exist ".venv\Scripts\activate.bat" (
+    echo [提示] 激活虚拟环境 (.venv)...
+    call ".venv\Scripts\activate.bat"
+) else if exist "..\venv\Scripts\activate.bat" (
+    echo [提示] 激活虚拟环境 (..\venv)...
+    call "..\venv\Scripts\activate.bat"
+) else if exist "venv\Scripts\activate.bat" (
+    echo [提示] 激活虚拟环境 (venv)...
+    call "venv\Scripts\activate.bat"
+)
+
 echo [1/3] 检查依赖...
 REM 检查requirements.txt中的所有依赖
 set MISSING_DEPS=0
@@ -30,6 +45,8 @@ if %errorlevel% neq 0 set MISSING_DEPS=1
 pip show pydantic >nul 2>&1
 if %errorlevel% neq 0 set MISSING_DEPS=1
 pip show slowapi >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show h2 >nul 2>&1
 if %errorlevel% neq 0 set MISSING_DEPS=1
 
 if %MISSING_DEPS%==1 (

@@ -16,6 +16,21 @@ if %errorlevel% neq 0 (
 REM Change to script directory
 cd /d "%~dp0"
 
+REM Activate virtual environment if present
+if exist "..\.venv\Scripts\activate.bat" (
+    echo [INFO] Activating virtual environment (..\.venv)...
+    call "..\.venv\Scripts\activate.bat"
+) else if exist ".venv\Scripts\activate.bat" (
+    echo [INFO] Activating virtual environment (.venv)...
+    call ".venv\Scripts\activate.bat"
+) else if exist "..\venv\Scripts\activate.bat" (
+    echo [INFO] Activating virtual environment (..\venv)...
+    call "..\venv\Scripts\activate.bat"
+) else if exist "venv\Scripts\activate.bat" (
+    echo [INFO] Activating virtual environment (venv)...
+    call "venv\Scripts\activate.bat"
+)
+
 echo [1/3] Checking dependencies...
 REM Check all dependencies in requirements.txt
 set MISSING_DEPS=0
@@ -30,6 +45,8 @@ if %errorlevel% neq 0 set MISSING_DEPS=1
 pip show pydantic >nul 2>&1
 if %errorlevel% neq 0 set MISSING_DEPS=1
 pip show slowapi >nul 2>&1
+if %errorlevel% neq 0 set MISSING_DEPS=1
+pip show h2 >nul 2>&1
 if %errorlevel% neq 0 set MISSING_DEPS=1
 
 if %MISSING_DEPS%==1 (

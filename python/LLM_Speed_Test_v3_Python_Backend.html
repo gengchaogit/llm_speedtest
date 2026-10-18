@@ -1005,15 +1005,320 @@
             margin-top: 25px;
         }
 
-        @media (max-width: 768px) {
-            .form-row {
-                flex-direction: column;
-                gap: 10px;
-            }
+        /* Benchmark Paradigm Mode Selector & Panels */
+        .benchmark-mode-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px solid #e1e4e8;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .mode-option {
+            flex: 1 1 0;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #ffffff;
+            border: 1.5px solid #d0d7de;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            outline: none;
+            box-sizing: border-box;
+        }
+        .mode-option:hover:not(.active) {
+            background: #f0f7ff;
+            border-color: #1a73e8;
+            color: #1a73e8;
+            box-shadow: 0 3px 8px rgba(26, 115, 232, 0.16);
+            transform: translateY(-1px);
+        }
+        .mode-option.active {
+            background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+            border-color: #1557b0;
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(26, 115, 232, 0.35);
+        }
+        .mode-radio-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            border-radius: 50%;
+            border: 2px solid #8c959f;
+            background: #ffffff;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+        .mode-option.active .mode-radio-icon {
+            border-color: #ffffff;
+            background: #ffffff;
+            box-shadow: inset 0 0 0 3.5px #1557b0;
+        }
+        .mode-icon {
+            font-size: 16px;
+        }
+        .mode-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.25;
+        }
+        .mode-title {
+            font-size: 13.5px;
+            font-weight: 600;
+        }
+        .mode-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+            font-weight: normal;
+        }
+        .config-subpanel {
+            background: #fdfefe;
+            border: 1px solid #c8d9ea;
+            border-left: 4px solid #1a73e8;
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 6px rgba(26, 115, 232, 0.08);
+        }
 
-            .action-buttons {
-                flex-direction: column;
-            }
+        /* 2D Matrix Heatmap */
+        .matrix-heatmap-container {
+            background: var(--dark-bg);
+            color: #e6edf3;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            overflow-x: auto;
+        }
+        .matrix-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #3d444d;
+            padding-bottom: 10px;
+        }
+        .matrix-header h3 {
+            color: #58a6ff;
+            margin: 0;
+            font-size: 1.15em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .matrix-legend {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 12px;
+            color: #8b949e;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .legend-low { background: #1f3d3d; border: 1px solid #238636; }
+        .legend-mid { background: #1a5c3a; border: 1px solid #2ea043; }
+        .legend-high { background: #238636; border: 1px solid #3fb950; }
+        .matrix-heatmap-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+            font-size: 13px;
+        }
+        .matrix-heatmap-table th {
+            background: #21262d;
+            color: #c9d1d9;
+            padding: 10px 8px;
+            text-align: center;
+            font-weight: 600;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+        }
+        .matrix-heatmap-table th.context-header {
+            text-align: left;
+            background: #161b22;
+        }
+        .matrix-heatmap-table td.heatmap-row-label {
+            background: #161b22;
+            color: #8b949e;
+            font-weight: 600;
+            padding: 10px 8px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            white-space: nowrap;
+        }
+        .heatmap-cell {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 10px 8px;
+            text-align: center;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+            min-width: 110px;
+            cursor: pointer;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+            z-index: 2;
+        }
+        .heatmap-cell.selected-cell {
+            outline: 2px solid #58a6ff !important;
+            outline-offset: -2px !important;
+            box-shadow: 0 0 14px rgba(88, 166, 255, 0.6) !important;
+            z-index: 5 !important;
+            position: relative;
+        }
+        .matrix-cell-detail {
+            background: rgba(22, 27, 34, 0.95);
+            border: 1px solid rgba(88, 166, 255, 0.35);
+            border-radius: 8px;
+            padding: 16px 20px;
+            color: #c9d1d9;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.2s ease-in-out;
+        }
+        .heatmap-cell.skipped {
+            background: rgba(255, 255, 255, 0.04);
+            color: #888;
+        }
+        .heatmap-cell.error {
+            background: rgba(224, 108, 117, 0.2);
+            color: #c62828;
+        }
+        .heatmap-cell .cell-tps {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f0f6fc;
+            line-height: 1.2;
+        }
+        .heatmap-cell .cell-meta, .heatmap-cell .cell-sub {
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 3px;
+        }
+        .badge-saturated {
+            display: inline-block;
+            background: #d29922;
+            color: #0d1117;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: 3px;
+            vertical-align: middle;
+        }
+        .badge-loop {
+            display: inline-block;
+            background: #f85149;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            animation: pulse-loop 1.5s infinite;
+        }
+        @keyframes pulse-loop {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        .badge-capacity {
+            display: inline-block;
+            background: #6e7681;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .badge-skip {
+            background: rgba(255, 255, 255, 0.08);
+            color: #8b949e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .badge-verified {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: #1f6feb22;
+            color: #58a6ff;
+            border: 1px solid #1f6feb;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        /* Sustained Live Dashboard */
+        .sustained-dashboard {
+            margin-top: 30px;
+            background: rgba(20, 28, 40, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e6edf3;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+        }
+        .sustained-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .sustained-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .sustained-label {
+            font-size: 12px;
+            color: #8b949e;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .sustained-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #f0f6fc;
+            font-family: monospace;
+        }
+        .sustained-value.highlight {
+            color: #10b981;
         }
     </style>
 </head>
@@ -1099,33 +1404,121 @@
         </div>
 
         <div class="config-section">
-            <h2>测试参数配置</h2>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="minLength">最小提示词长度</label>
-                    <input type="number" id="minLength" value="" step="128">
+            <h2 id="configSectionTitle">测试参数配置</h2>
+
+            <!-- Benchmark Paradigm Mode Selector -->
+            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 13.5px;" id="lblBenchmarkModeSelector">
+                🎯 测试模式选择（点击单选切换）：
+            </label>
+            <div class="benchmark-mode-selector" id="benchmarkModeSelector" role="radiogroup" aria-label="测试模式切换">
+                <div class="mode-option active" data-mode="1d_sweep" id="mode1dSweep" role="radio" aria-checked="true" tabindex="0">
+                    <span class="mode-radio-icon"></span>
+                    <span class="mode-icon">📈</span>
+                    <div class="mode-text">
+                        <span class="mode-title">标准提示词阶梯</span>
+                        <span class="mode-subtitle">1D Sweep</span>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="maxLength">最大提示词长度</label>
-                    <input type="number" id="maxLength" value="" step="128">
+                <div class="mode-option" data-mode="2d_matrix" id="mode2dMatrix" role="radio" aria-checked="false" tabindex="0">
+                    <span class="mode-radio-icon"></span>
+                    <span class="mode-icon">🔲</span>
+                    <div class="mode-text">
+                        <span class="mode-title">2D 并发 × 上下文矩阵</span>
+                        <span class="mode-subtitle">2D Matrix</span>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="step">步长</label>
-                    <input type="number" id="step" value="" step="128">
-                </div>
-                <div class="form-group">
-                    <label for="stepMultiplier">步长倍数</label>
-                    <input type="number" id="stepMultiplier" value="" min="1" step="1">
-                </div>
-                <div class="form-group">
-                    <label for="outputLength">期望输出长度</label>
-                    <input type="number" id="outputLength" value="" min="1">
+                <div class="mode-option" data-mode="sustained_decode" id="modeSustained" role="radio" aria-checked="false" tabindex="0">
+                    <span class="mode-radio-icon"></span>
+                    <span class="mode-icon">⏱️</span>
+                    <div class="mode-text">
+                        <span class="mode-title">稳态持续解码</span>
+                        <span class="mode-subtitle">Sustained Decode</span>
+                    </div>
                 </div>
             </div>
+
+            <!-- Task Workload / Task Type Selector -->
+            <label style="display: block; margin-top: 15px; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 13.5px;" id="lblTaskTypeSelector">
+                🧪 评测场景题库（测试类型）：
+            </label>
+            <div class="task-type-selector-wrapper" style="margin-bottom: 18px;">
+                <select id="taskTypeSelect" style="width: 100%; padding: 9px 12px; border: 1px solid #d0d7de; border-radius: 6px; font-size: 14px; background: #fff; color: #24292f; cursor: pointer; font-weight: 500;">
+                    <option value="general" id="optTaskGeneral">🌐 通用混合场景 (General / Essay) — 基础哲学散文基准</option>
+                    <option value="code" id="optTaskCode">💻 代码解码任务 (Code Decode) — 高确定性、低熵、投机采样高命中</option>
+                    <option value="structured" id="optTaskStructured">📋 结构化数据 (Structured JSON) — 状态机约束解码、Schema 数据生成</option>
+                    <option value="prose" id="optTaskProse">✍️ 散文与深度问答 (Prose &amp; QA) — 高发散性自然语言、纯显存带宽基线</option>
+                    <option value="prefill_16k" id="optTaskPrefill16k">📚 16K 长上下文首字 (Prefill @ 16K) — 纯算力受限长文本 TTFT 预填充</option>
+                    <option value="reasoning" id="optTaskReasoning">🧠 深度思考推理 (Reasoning CoT) — 复杂逻辑与数学思维链超长输出</option>
+                </select>
+                <small id="tipTaskTypeNote" style="display: block; font-size: 12px; color: #666; margin-top: 4px;">
+                    💡 不同任务的解码效率与投机命中率差异显著，根据实际业务场景选择对应测试题库。
+                </small>
+            </div>
+
+            <!-- Standard 1D Config Panel -->
+            <div id="standard1dConfigPanel">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="minLength" id="lblMinLength">最小提示词长度</label>
+                        <input type="number" id="minLength" value="" step="128">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxLength" id="lblMaxLength">最大提示词长度</label>
+                        <input type="number" id="maxLength" value="" step="128">
+                    </div>
+                    <div class="form-group">
+                        <label for="step" id="lblStep">步长</label>
+                        <input type="number" id="step" value="" step="128">
+                    </div>
+                    <div class="form-group">
+                        <label for="stepMultiplier" id="lblStepMultiplier">步长倍数</label>
+                        <input type="number" id="stepMultiplier" value="" min="1" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="outputLength" id="lblOutputLength">期望输出长度</label>
+                        <input type="number" id="outputLength" value="" min="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2D Matrix Configuration Panel (shown in 2D mode) -->
+            <div id="matrixConfigPanel" class="config-subpanel" style="display: none;">
+                <h4 style="margin-bottom: 10px; color: #1a73e8;" id="titleMatrixConfig">2D 并发 × 上下文矩阵配置</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="matrixConcurrencyLadder" id="lblMatrixConcurrencyLadder">并发阶梯 (逗号分隔)</label>
+                        <input type="text" id="matrixConcurrencyLadder" value="1, 2, 4, 8" placeholder="1, 2, 4, 8">
+                    </div>
+                    <div class="form-group">
+                        <label for="matrixContextLadder" id="lblMatrixContextLadder">上下文长度阶梯 (tokens，逗号分隔)</label>
+                        <input type="text" id="matrixContextLadder" value="512, 1024, 2048, 4096" placeholder="512, 1024, 2048, 4096">
+                    </div>
+                    <div class="form-group">
+                        <label for="matrixMaxKvTokens" id="lblMatrixMaxKvTokens">KV Cache 预算上限 (Tokens, 0为无限制)</label>
+                        <input type="number" id="matrixMaxKvTokens" value="32768" min="0" step="1024">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sustained Decode Configuration Panel (shown in Sustained mode) -->
+            <div id="sustainedConfigPanel" class="config-subpanel" style="display: none;">
+                <h4 style="margin-bottom: 10px; color: #1a73e8;" id="titleSustainedConfig">稳态持续解码配置</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sustainedDuration" id="lblSustainedDuration">稳态测量窗口时长 (秒)</label>
+                        <input type="number" id="sustainedDuration" value="30" min="5" max="300" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label for="sustainedPromptLength" id="lblSustainedPromptLength">测试提示词长度 (Tokens)</label>
+                        <input type="number" id="sustainedPromptLength" value="128" min="16" step="128">
+                    </div>
+                </div>
+            </div>
+
             <div class="form-row">
-                <div class="form-group">
-                    <label for="concurrency">并发数</label>
-                    <input type="number" id="concurrency" value="1" min="1" max="50">
+                <div class="form-group" id="concurrencyGroup">
+                    <label for="concurrency" id="lblConcurrency">并发数</label>
+                    <input type="number" id="concurrency" value="1" min="1" max="256">
                 </div>
                 <div class="form-group">
                     <label for="timeout">请求超时 (ms)</label>
@@ -1160,6 +1553,8 @@
             <button id="exportCSV" style="display: none; background: #4eb8a6;">导出 CSV 数据</button>
             <!-- v1.8: 合并图表导出 -->
             <button id="exportCombinedChart" style="display: none; background: #f39c12;">导出一张图表</button>
+            <!-- 截图功能 -->
+            <button id="screenshotComparison" style="display: none; background: #8e44ad;">📸 截图对比结果</button>
             <!-- v1.9: 历史记录 -->
             <button id="viewHistory" style="background: #9b59b6;">📚 查看/对比历史记录</button>
             <!-- v1.9.1: 重置参数 -->
@@ -1178,21 +1573,72 @@
             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
         </div>
 
-        <!-- v1.8: 新增对比功能 -->
-        <div class="config-section">
+        <!-- v1.8: 新增对比功能 (仅用于 1D 模式) -->
+        <div class="config-section" id="comparisonSection">
             <h2>多结果对比</h2>
             <div class="form-group">
                 <label for="importFiles">导入CSV结果文件 (可多选)</label>
                 <input type="file" id="importFiles" multiple accept=".csv" style="padding: 5px;">
             </div>
-            <button id="startComparison" style="background: #27ae60;">生成对比图表</button>
-            <button id="screenshotComparison" style="display: none; background: #8e44ad; margin-left: 10px;">📸
-                截图对比结果</button>
+            <div class="action-buttons" style="margin-top: 15px;">
+                <button id="startComparison" style="background: #27ae60; width: 160px; flex: none;">生成对比图表</button>
+            </div>
             <p id="comparisonNoteText" class="notes" style="margin-top: 10px;">说明：先"开始测试"运行一次，然后再导入其他CSV文件，点击"生成对比图表"</p>
         </div>
 
         <div id="results">
             <p class="info">等待开始测试...</p>
+        </div>
+
+        <!-- 2D Concurrency x Context Matrix Heatmap Container -->
+        <div id="matrixHeatmapContainer" class="matrix-heatmap-container" style="display: none;">
+            <div class="matrix-header">
+                <h3 id="matrixHeatmapTitle">📊 2D 并发 × 上下文吞吐与时延热力图矩阵</h3>
+                <div class="matrix-legend">
+                    <span class="legend-item"><span class="legend-color-box legend-low"></span> <span id="legendLowText">低吞吐</span></span>
+                    <span class="legend-item"><span class="legend-color-box legend-mid"></span> <span id="legendMidText">中吞吐</span></span>
+                    <span class="legend-item"><span class="legend-color-box legend-high"></span> <span id="legendHighText">高吞吐</span></span>
+                    <span class="legend-item"><span class="badge-saturated">(X/Y)*</span> <span id="legendSaturatedText">调度饱和/排队</span></span>
+                    <span class="legend-item"><span class="badge-loop">ERROR: loop</span> <span id="legendLoopText">死循环熔断</span></span>
+                    <span class="legend-item"><span class="badge-skip">SKIP</span> <span id="legendSkipText">KV预算跳过</span></span>
+                </div>
+            </div>
+            <p id="matrixNotesMessage" class="notes" style="display: none; margin: 12px 0 16px 0; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); padding: 10px 14px; border-radius: 6px; color: #98c379; font-size: 13px; font-weight: 500;"></p>
+            <div class="table-responsive" style="overflow-x: auto;">
+                <table id="matrixHeatmapTable" class="matrix-heatmap-table">
+                    <thead id="matrixHeatmapThead"></thead>
+                    <tbody id="matrixHeatmapTbody"></tbody>
+                </table>
+            </div>
+            <!-- 2D 单元格详情抽屉面板 (单例展示，点选单元格即时切换) -->
+            <div id="matrixCellDetailContainer" class="matrix-cell-detail" style="display: none; margin-top: 15px;"></div>
+            <div id="matrixSummaryStats" class="matrix-summary-stats" style="margin-top: 15px; font-size: 13px; color: #8b949e;"></div>
+        </div>
+
+        <!-- Sustained Decode Live Dashboard Container -->
+        <div id="sustainedDashboard" class="sustained-dashboard" style="display: none;">
+            <div class="matrix-header">
+                <h3 id="sustainedDashboardTitle">⏱️ 稳态持续解码实时监控看板</h3>
+            </div>
+            <div class="sustained-grid">
+                <div class="sustained-card">
+                    <div class="sustained-label" id="lblSustainedTimer">剩余时间 / 窗口</div>
+                    <div class="sustained-value" id="sustainedTimerVal">--s / --s</div>
+                </div>
+                <div class="sustained-card">
+                    <div class="sustained-label" id="lblSustainedLiveTps">稳态解码吞吐</div>
+                    <div class="sustained-value highlight" id="sustainedLiveTpsVal">-- tokens/s</div>
+                </div>
+                <div class="sustained-card">
+                    <div class="sustained-label" id="lblSustainedTokens">累计生成 Tokens</div>
+                    <div class="sustained-value" id="sustainedTokensVal">0</div>
+                </div>
+                <div class="sustained-card">
+                    <div class="sustained-label" id="lblSustainedWorkers">并发工作流 (活跃/池)</div>
+                    <div class="sustained-value" id="sustainedWorkersVal">0 / 0</div>
+                </div>
+            </div>
+            <div id="sustainedSummaryStats" class="matrix-summary-stats" style="margin-top: 15px; font-size: 13px; color: #8b949e;"></div>
         </div>
 
         <!-- 绘图区域：包含四个 canvas -->
@@ -1327,6 +1773,7 @@
                 labelStepMultiplier: '步长倍数 <span style="font-size: 0.85em; color: #666;">(指数级：倍数^n，如2则128→256→512→1024...)</span>',
                 labelOutputLength: '期望输出长度',
                 labelConcurrency: '并发数',
+                lblConcurrencySustained: '并发流数 (流池规模)',
                 labelTimeout: '请求超时 (ms)',
                 labelTemperatureForm: 'Temperature (温度/随机性)',
                 labelTopPForm: 'Top P (核采样)',
@@ -1338,6 +1785,7 @@
                 tipStepMultiplier: '如果大于1，则按倍数递增（例如倍数2，起始128：128, 256, 512...）。如果为1则按步长线性递增。',
                 tipOutputLength: '期望模型输出的Token数量。',
                 tipConcurrency: '同时发送的请求数量，用于测试并发处理能力。',
+                tipConcurrencySustained: '持续窗口内并行保持的请求流数量 (如 1、4、8、16 流池)。',
                 tipTimeout: 'API请求的最大等待时间，超过将视为失败。',
                 tipTemperature: '【温度 / 随机性】\n控制生成文本的随机性和创造性。\n• 较低值 (如 0.2): 回答更集中、确定性更高，适合代码、数据提取等严谨任务。\n• 较高值 (如 0.8): 回答更多样、更具创造性，适合写作、头脑风暴等任务。',
                 tipTopP: '【核采样 / 局部随机性】\n另一种控制随机性的方法，通常与 Temperature 二选一调整。\n• 较低值 (如 0.1): 只考虑概率前 10% 的可能词汇，回答非常稳定。\n• 较高值 (如 0.9): 考虑更广泛的词汇，增加回答的丰富度。',
@@ -1370,6 +1818,8 @@
                 chartAxisTime: '时间 (ms)',
                 btnExportComparisonChart: '导出一张对比图',
                 btnScreenshotComparison: '截图Prefill&Decode结果',
+                btnScreenshot2dMatrix: '📸 截图2D矩阵热力图',
+                btnScreenshotSustained: '📸 截图稳态测试看板',
                 concurrentStatsTitle: '总吞吐量性能统计',
                 concurrentLabel: '并发',
                 // 表格标题
@@ -1587,7 +2037,37 @@
                 batchUploadDailyLimit: '已达到每天最多上传 100 次的限制，批量上传终止。',
                 batchUploadResult: '⚠️ 上传结束。成功: {success}，失败: {fail}。<br>最后错误: {error}',
                 batchUploadSuccess: '✅ 批量上传成功！共上传 {count} 个测试记录。',
-                batchUploadUnknownModel: '未知历史模型'
+                batchUploadUnknownModel: '未知历史模型',
+                mode1dSweep: "标准提示词阶梯",
+                mode2dMatrix: "2D 并发 × 上下文矩阵",
+                modeSustainedDecode: "稳态持续解码",
+                titleMatrixConfig: "2D 并发 × 上下文矩阵配置",
+                lblMatrixConcurrencyLadder: "并发阶梯 (逗号分隔)",
+                lblMatrixContextLadder: "上下文长度阶梯 (tokens，逗号分隔)",
+                lblMatrixMaxKvTokens: "KV Cache 预算上限 (Tokens, 0为无限制)",
+                titleSustainedConfig: "稳态持续解码配置",
+                lblSustainedDuration: "稳态测量窗口时长 (秒)",
+                lblSustainedPromptLength: "测试提示词长度 (Tokens)",
+                matrixHeatmapTitle: "📊 2D 并发 × 上下文吞吐与时延热力图矩阵",
+                legendLowText: "低吞吐",
+                legendMidText: "中吞吐",
+                legendHighText: "高吞吐",
+                legendSaturatedText: "调度饱和/排队",
+                legendLoopText: "死循环熔断",
+                legendSkipText: "KV预算跳过",
+                sustainedDashboardTitle: "⏱️ 稳态持续解码实时监控看板",
+                lblSustainedTimer: "剩余时间 / 窗口",
+                lblSustainedLiveTps: "稳态解码吞吐",
+                lblSustainedTokens: "累计生成 Tokens",
+                lblSustainedWorkers: "并发工作流 (活跃/池)",
+                lblTaskTypeSelector: '🧪 评测场景题库（测试类型）：',
+                tipTaskTypeNote: '💡 不同任务的解码效率与投机命中率差异显著，根据实际业务场景选择对应测试题库。',
+                optTaskGeneral: '🌐 通用混合场景 (General / Essay) — 基础哲学散文基准',
+                optTaskCode: '💻 代码解码任务 (Code Decode) — 高确定性、低熵、投机采样高命中',
+                optTaskStructured: '📋 结构化数据 (Structured JSON) — 状态机约束解码、Schema 数据生成',
+                optTaskProse: '✍️ 散文与深度问答 (Prose & QA) — 高发散性自然语言、纯显存带宽基线',
+                optTaskPrefill16k: '📚 16K 长上下文首字 (Prefill @ 16K) — 纯算力受限长文本 TTFT 预填充',
+                optTaskReasoning: '🧠 深度思考推理 (Reasoning CoT) — 复杂逻辑与数学思维链超长输出'
             },
             'en': {
                 pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3 (chao mod)',
@@ -1632,6 +2112,7 @@
                 labelStepMultiplier: 'Step Multiplier <span style="font-size: 0.85em; color: #666;">(Exponential: multiplier^n, e.g., 2 gives 128→256→512→1024...)</span>',
                 labelOutputLength: 'Expected Output Length',
                 labelConcurrency: 'Concurrency',
+                lblConcurrencySustained: 'Concurrent Streams (Pool Size)',
                 labelTimeout: 'Request Timeout (ms)',
                 labelTemperatureForm: 'Temperature',
                 labelTopPForm: 'Top P',
@@ -1643,6 +2124,7 @@
                 tipStepMultiplier: 'If > 1, increments exponentially (e.g., multiplier 2, start 128: 128, 256, 512...). If 1, increments linearly by step.',
                 tipOutputLength: 'Expected number of output tokens.',
                 tipConcurrency: 'Number of requests sent simultaneously to test concurrent processing capabilities.',
+                tipConcurrencySustained: 'Number of parallel requests maintained continuously in sustained window (e.g. 1, 4, 8, 16 streams).',
                 tipTimeout: 'Maximum wait time for API requests, exceeding this is considered a failure.',
                 tipTemperature: '[Temperature]\nControls the randomness and creativity of the generated text.\n• Low (e.g., 0.2): More focused and deterministic, ideal for coding or data extraction.\n• High (e.g., 0.8): More diverse and creative, ideal for writing or brainstorming.',
                 tipTopP: '[Top P / Nucleus Sampling]\nAn alternative to Temperature, usually only one is adjusted.\n• Low (e.g., 0.1): Only considers top 10% probable tokens, highly stable.\n• High (e.g., 0.9): Considers a wider range of tokens, increasing richness.',
@@ -1675,6 +2157,8 @@
                 chartAxisTime: 'Time (ms)',
                 btnExportComparisonChart: 'Export Comparison Chart',
                 btnScreenshotComparison: 'Screenshot Prefill&Decode',
+                btnScreenshot2dMatrix: '📸 Screenshot 2D Matrix',
+                btnScreenshotSustained: '📸 Screenshot Sustained Dashboard',
                 concurrentStatsTitle: 'Total Throughput Performance Statistics',
                 concurrentLabel: 'Concurrent',
                 // Table headers
@@ -1892,7 +2376,37 @@
                 batchUploadDailyLimit: 'Daily limit of 100 uploads reached. Batch upload stopped.',
                 batchUploadResult: '⚠️ Upload finished. Success: {success}, Fail: {fail}.<br>Last Error: {error}',
                 batchUploadSuccess: '✅ Batch upload successful! Total {count} records uploaded.',
-                batchUploadUnknownModel: 'Unknown Historical Model'
+                batchUploadUnknownModel: 'Unknown Historical Model',
+                mode1dSweep: "1D Context Sweep",
+                mode2dMatrix: "2D Concurrency × Context Matrix",
+                modeSustainedDecode: "Sustained Steady-State Decode",
+                titleMatrixConfig: "2D Concurrency × Context Matrix Config",
+                lblMatrixConcurrencyLadder: "Concurrency Ladder (comma separated)",
+                lblMatrixContextLadder: "Context Length Ladder (tokens, comma separated)",
+                lblMatrixMaxKvTokens: "KV Cache Budget Limit (Tokens, 0 for unlimited)",
+                titleSustainedConfig: "Sustained Decode Config",
+                lblSustainedDuration: "Window Duration (seconds)",
+                lblSustainedPromptLength: "Prompt Length (Tokens)",
+                matrixHeatmapTitle: "📊 2D Concurrency × Context Throughput & Latency Heatmap Matrix",
+                legendLowText: "Low TPS",
+                legendMidText: "Mid TPS",
+                legendHighText: "High TPS",
+                legendSaturatedText: "Saturation/Queueing",
+                legendLoopText: "Watchdog Loop",
+                legendSkipText: "KV Limit Skipped",
+                sustainedDashboardTitle: "⏱️ Sustained Decode Live Dashboard",
+                lblSustainedTimer: "Elapsed / Window",
+                lblSustainedLiveTps: "Steady Decode TPS",
+                lblSustainedTokens: "Total Tokens Generated",
+                lblSustainedWorkers: "Active Workers (Active / Pool)",
+                lblTaskTypeSelector: '🧪 Benchmark Task Workload (Scenario Library):',
+                tipTaskTypeNote: '💡 Decode throughput & speculative acceptance vary across workloads; select according to scenario.',
+                optTaskGeneral: '🌐 General Mixed (General / Essay) — Philosophical baseline',
+                optTaskCode: '💻 Code Generation (Code Decode) — Low entropy, high speculative hit rate',
+                optTaskStructured: '📋 Structured JSON (Structured Decode) — Grammar constrained, schema data',
+                optTaskProse: '✍️ Prose & Deep QA (Prose Decode) — Creative text, memory-bandwidth baseline',
+                optTaskPrefill16k: '📚 16K Context First Token (Prefill @ 16K) — Compute-bound long prefill TTFT',
+                optTaskReasoning: '🧠 Deep Reasoning (Reasoning CoT) — Step-by-step math & logic deduction'
             }
         };
 
@@ -2088,6 +2602,37 @@
             if (runCommandInput) runCommandInput.placeholder = t.cloudRunCommandPlaceholder;
             if (_e('doUploadBtn')) _e('doUploadBtn').textContent = t.cloudUploadBtn;
             if (_e('cloudUploadNote')) _e('cloudUploadNote').textContent = t.cloudUploadNote;
+
+            // 2D 矩阵与稳态持续解码界面元素
+            if (_e('titleMatrixConfig')) _e('titleMatrixConfig').textContent = t.titleMatrixConfig;
+            if (_e('lblMatrixConcurrencyLadder')) _e('lblMatrixConcurrencyLadder').textContent = t.lblMatrixConcurrencyLadder;
+            if (_e('lblMatrixContextLadder')) _e('lblMatrixContextLadder').textContent = t.lblMatrixContextLadder;
+            if (_e('lblMatrixMaxKvTokens')) _e('lblMatrixMaxKvTokens').textContent = t.lblMatrixMaxKvTokens;
+            if (_e('titleSustainedConfig')) _e('titleSustainedConfig').textContent = t.titleSustainedConfig;
+            if (_e('lblSustainedDuration')) _e('lblSustainedDuration').textContent = t.lblSustainedDuration;
+            if (_e('lblSustainedPromptLength')) _e('lblSustainedPromptLength').textContent = t.lblSustainedPromptLength;
+            if (_e('matrixHeatmapTitle')) _e('matrixHeatmapTitle').textContent = t.matrixHeatmapTitle;
+            if (_e('legendLowText')) _e('legendLowText').textContent = t.legendLowText;
+            if (_e('legendMidText')) _e('legendMidText').textContent = t.legendMidText;
+            if (_e('legendHighText')) _e('legendHighText').textContent = t.legendHighText;
+            if (_e('legendSaturatedText')) _e('legendSaturatedText').textContent = t.legendSaturatedText;
+            if (_e('legendLoopText')) _e('legendLoopText').textContent = t.legendLoopText;
+            if (_e('legendSkipText')) _e('legendSkipText').textContent = t.legendSkipText;
+            if (_e('sustainedDashboardTitle')) _e('sustainedDashboardTitle').textContent = t.sustainedDashboardTitle;
+            if (_e('lblSustainedTimer')) _e('lblSustainedTimer').textContent = t.lblSustainedTimer;
+            if (_e('lblSustainedLiveTps')) _e('lblSustainedLiveTps').textContent = t.lblSustainedLiveTps;
+            if (_e('lblSustainedTokens')) _e('lblSustainedTokens').textContent = t.lblSustainedTokens;
+            if (_e('lblSustainedWorkers')) _e('lblSustainedWorkers').textContent = t.lblSustainedWorkers;
+
+            // 评测任务场景题库标签更新
+            if (_e('lblTaskTypeSelector')) _e('lblTaskTypeSelector').textContent = t.lblTaskTypeSelector;
+            if (_e('tipTaskTypeNote')) _e('tipTaskTypeNote').textContent = t.tipTaskTypeNote;
+            if (_e('optTaskGeneral')) _e('optTaskGeneral').textContent = t.optTaskGeneral;
+            if (_e('optTaskCode')) _e('optTaskCode').textContent = t.optTaskCode;
+            if (_e('optTaskStructured')) _e('optTaskStructured').textContent = t.optTaskStructured;
+            if (_e('optTaskProse')) _e('optTaskProse').textContent = t.optTaskProse;
+            if (_e('optTaskPrefill16k')) _e('optTaskPrefill16k').textContent = t.optTaskPrefill16k;
+            if (_e('optTaskReasoning')) _e('optTaskReasoning').textContent = t.optTaskReasoning;
         }
 
         // 绑定语言切换按钮
@@ -2096,9 +2641,12 @@
             switchLanguage(newLang);
         });
 
-        // 页面加载时应用保存的语言
+        // 页面加载时应用保存的语言与初始化测试模式
         document.addEventListener('DOMContentLoaded', function () {
             switchLanguage(currentLang);
+            if (typeof setupBenchmarkModeSelector === 'function') {
+                setupBenchmarkModeSelector();
+            }
         });
 
         // 默认参数设置
@@ -2218,6 +2766,25 @@
             "harmony", "unity", "solidarity", "partnership", "network", "community", "integration", "bond"
         ];
 
+        const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant.';
+
+        const TASK_SYSTEM_PROMPTS = {
+            general: DEFAULT_SYSTEM_PROMPT,
+            code: 'You are an expert systems programmer and computer scientist. Write clean, idiomatic, high-performance, and syntactically complete code with thorough edge-case handling, full type annotations, and proper indentation. Avoid placeholder comments or unfinished stubs.',
+            structured: 'You are an automated backend service that strictly outputs valid, parseable JSON conforming to RFC 8259. Do NOT wrap output in markdown fences. Output ONLY the raw JSON object with complete fields and valid types.',
+            prose: 'You are a distinguished essayist, historian, and philosopher. Compose deep, eloquent, coherent essays with historical nuance, conceptual depth, and lucid argumentation.',
+            prefill_16k: 'You are an expert technical documentation analyst. Read the long technical specification below carefully and provide a rigorous, comprehensive response to the verification questions at the end.',
+            reasoning: 'You are an expert mathematician and logic theorist. You must think step by step, explicitly detailing every deduction, intermediate lemma, verification step, and edge case analysis before reaching your final conclusion.'
+        };
+
+        function getSystemPromptForTask(taskType = 'general') {
+            return TASK_SYSTEM_PROMPTS[taskType] || DEFAULT_SYSTEM_PROMPT;
+        }
+
+        function getSelectedTaskType() {
+            return document.getElementById('taskTypeSelect')?.value || 'general';
+        }
+
         // 根据指定长度生成提示词
         function generatePrompt(length, apiType, seed = 0) {
             let prompt = [];
@@ -2313,6 +2880,13 @@
             const notesElem = document.getElementById('currentTestNotesMessage') || document.querySelector('#results p.notes');
             if (notesElem) {
                 notesElem.textContent = `${t.labelNotesPrefix || '备注：'}${notes} | ${t.labelConcurrencyPrefix || '并发:'} ${concurrency} | ${t.labelTimeoutPrefix || '超时:'} ${timeout / 1000}s`;
+            }
+
+            // 实时更新 2D 矩阵看板内部的测速备注标题栏
+            const matrixNotesEl = document.getElementById('matrixNotesMessage');
+            if (matrixNotesEl) {
+                const matrixConcLadder = document.getElementById('matrixConcurrencyLadder')?.value || (typeof d_matrixConcurrencyLadder !== 'undefined' ? d_matrixConcurrencyLadder : '1, 2, 4, 8');
+                matrixNotesEl.textContent = `${t.labelNotesPrefix || '备注：'}${notes} | ${t.labelConcurrencyPrefix || '并发:'} ${matrixConcLadder} | ${t.labelTimeoutPrefix || '超时:'} ${timeout / 1000}s`;
             }
 
             // 2. 实时更新图表标题
@@ -2623,17 +3197,23 @@
                         apiUrl: config.apiUrl,
                         modelName: config.modelName,
                         apiType: config.apiType,
+                        benchmarkMode: config.benchmarkMode || currentBenchmarkMode || '1d_sweep',
                         minLength: config.minLength,
                         maxLength: config.maxLength,
                         step: config.step,
-                        stepMultiplier: config.stepMultiplier,
+                        stepMultiplier: config.stepMultiplier || document.getElementById('stepMultiplier')?.value || 1,
                         outputLength: config.outputLength,
                         concurrency: config.concurrency,
+                        matrixConcurrencyLadder: config.matrixConcurrencyLadder || document.getElementById('matrixConcurrencyLadder')?.value || '',
+                        matrixContextLadder: config.matrixContextLadder || document.getElementById('matrixContextLadder')?.value || '',
+                        sustainedDuration: config.sustainedDuration || document.getElementById('sustainedDuration')?.value || '',
                         temperature: config.temperature,
                         topP: config.topP,
                         presencePenalty: config.presencePenalty,
                         frequencyPenalty: config.frequencyPenalty,
-                        timeout: config.timeout
+                        timeout: config.timeout,
+                        runCommand: config.runCommand || document.getElementById('runCommand')?.value || '',
+                        notes: config.notes || ''
                     },
                     results: resultsToSave, // 根据设置保存完整或简化的结果
                     stats: stats // 统计信息（min/max/avg/P50/P90/P95）
@@ -2667,6 +3247,47 @@
 
                 return false;
             }
+        }
+
+        /**
+         * 自动探测历史记录的评测模式 (1d_sweep, 2d_matrix, sustained_decode)
+         * 具备向下兼容性，能从 tags / ladder 参数 / 结果结构中恢复旧版记录的模式
+         */
+        function detectRecordMode(record) {
+            if (record?.config?.benchmarkMode) {
+                return record.config.benchmarkMode;
+            }
+            const results = record?.results || [];
+            for (const r of results) {
+                if (Array.isArray(r.recordTags)) {
+                    if (r.recordTags.includes('mode:2d_matrix') || r.recordTags.includes('benchmark_mode:2d_matrix')) {
+                        return '2d_matrix';
+                    }
+                    if (r.recordTags.includes('mode:sustained_decode') || r.recordTags.includes('benchmark_mode:sustained_decode')) {
+                        return 'sustained_decode';
+                    }
+                    if (r.recordTags.includes('mode:1d_sweep') || r.recordTags.includes('benchmark_mode:1d_sweep')) {
+                        return '1d_sweep';
+                    }
+                }
+                if (r.benchmarkMode) {
+                    return r.benchmarkMode;
+                }
+            }
+            if (record?.config?.matrixConcurrencyLadder || record?.config?.matrixContextLadder) {
+                return '2d_matrix';
+            }
+            if (record?.config?.sustainedDuration) {
+                return 'sustained_decode';
+            }
+            if (results.length === 1 && (results[0]?.completedStreams !== undefined || results[0]?.sustainedTps !== undefined || results[0]?.ttft_stats !== undefined || results[0]?.itl_stats !== undefined)) {
+                return 'sustained_decode';
+            }
+            const concurrencies = new Set(results.map(r => r.concurrency).filter(c => c !== undefined && c !== null && c !== ''));
+            if (concurrencies.size > 1) {
+                return '2d_matrix';
+            }
+            return '1d_sweep';
         }
 
         /**
@@ -3647,43 +4268,87 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
             const statsDiv = document.createElement('div');
             statsDiv.className = 'concurrent-stats';
 
-            // 确保显示的值不是Infinity
-            const minP = isFinite(concurrencyStats.minPrefillSpeed) ? concurrencyStats.minPrefillSpeed.toFixed(2) : 'N/A';
-            const maxP = isFinite(concurrencyStats.maxPrefillSpeed) && concurrencyStats.maxPrefillSpeed > 0 ? concurrencyStats.maxPrefillSpeed.toFixed(2) : 'N/A';
-            const minO = isFinite(concurrencyStats.minOutputSpeed) ? concurrencyStats.minOutputSpeed.toFixed(2) : 'N/A';
-            const maxO = isFinite(concurrencyStats.maxOutputSpeed) && concurrencyStats.maxOutputSpeed > 0 ? concurrencyStats.maxOutputSpeed.toFixed(2) : 'N/A';
-            const avgP = isFinite(concurrencyStats.avgPrefillSpeed) && concurrencyStats.avgPrefillSpeed > 0 ? concurrencyStats.avgPrefillSpeed.toFixed(2) : 'N/A';
-            const avgO = isFinite(concurrencyStats.avgOutputSpeed) && concurrencyStats.avgOutputSpeed > 0 ? concurrencyStats.avgOutputSpeed.toFixed(2) : 'N/A';
+            // Dynamically derive min/max/avg across all valid results in testResultsData
+            const successfulResults = testResultsData.filter(hasSuccessfulResult);
+            const validPrefill = successfulResults
+                .map(r => parseFloat(r.prefillSpeed || r.prefill_speed))
+                .filter(v => Number.isFinite(v) && v > 0);
+            const validDecode = successfulResults
+                .map(r => parseFloat(r.outputSpeed || r.output_speed))
+                .filter(v => Number.isFinite(v) && v > 0);
+
+            let minPrefill = isFinite(concurrencyStats.minPrefillSpeed) && concurrencyStats.minPrefillSpeed > 0 ? concurrencyStats.minPrefillSpeed : null;
+            let maxPrefill = concurrencyStats.maxPrefillSpeed > 0 ? concurrencyStats.maxPrefillSpeed : null;
+            let avgPrefill = concurrencyStats.avgPrefillSpeed > 0 ? concurrencyStats.avgPrefillSpeed : null;
+
+            if (validPrefill.length > 0) {
+                minPrefill = minPrefill !== null ? Math.min(minPrefill, ...validPrefill) : Math.min(...validPrefill);
+                maxPrefill = maxPrefill !== null ? Math.max(maxPrefill, ...validPrefill) : Math.max(...validPrefill);
+                avgPrefill = validPrefill.reduce((a, b) => a + b, 0) / validPrefill.length;
+            }
+
+            let minDecode = isFinite(concurrencyStats.minOutputSpeed) && concurrencyStats.minOutputSpeed > 0 ? concurrencyStats.minOutputSpeed : null;
+            let maxDecode = concurrencyStats.maxOutputSpeed > 0 ? concurrencyStats.maxOutputSpeed : null;
+            let avgDecode = concurrencyStats.avgOutputSpeed > 0 ? concurrencyStats.avgOutputSpeed : null;
+
+            if (validDecode.length > 0) {
+                minDecode = minDecode !== null ? Math.min(minDecode, ...validDecode) : Math.min(...validDecode);
+                maxDecode = maxDecode !== null ? Math.max(maxDecode, ...validDecode) : Math.max(...validDecode);
+                avgDecode = validDecode.reduce((a, b) => a + b, 0) / validDecode.length;
+            }
+
+            const minP = minPrefill !== null ? minPrefill.toFixed(2) : 'N/A';
+            const maxP = maxPrefill !== null ? maxPrefill.toFixed(2) : 'N/A';
+            const avgP = avgPrefill !== null ? avgPrefill.toFixed(2) : 'N/A';
+            const minO = minDecode !== null ? minDecode.toFixed(2) : 'N/A';
+            const maxO = maxDecode !== null ? maxDecode.toFixed(2) : 'N/A';
+            const avgO = avgDecode !== null ? avgDecode.toFixed(2) : 'N/A';
 
             // 收集所有并发详情数据用于计算百分位数
             const allPrefillSpeedValues = [];
             const allDecodeSpeedValues = [];
 
             testResultsData.forEach(res => {
-                if (res.concurrentDetails && Array.isArray(res.concurrentDetails)) {
+                if (res.concurrentDetails && Array.isArray(res.concurrentDetails) && res.concurrentDetails.length > 0) {
                     res.concurrentDetails.forEach(detail => {
-                        // 后端返回的是下划线格式字段名
-                        const prefillSpeed = parseFloat(detail.prefill_speed);
-                        const decodeSpeed = parseFloat(detail.output_speed);
+                        const prefillSpeed = parseFloat(detail.prefill_speed ?? detail.prefillSpeed);
+                        const decodeSpeed = parseFloat(detail.output_speed ?? detail.outputSpeed);
 
-                        if (!isNaN(prefillSpeed) && isFinite(prefillSpeed)) allPrefillSpeedValues.push(prefillSpeed);
-                        if (!isNaN(decodeSpeed) && isFinite(decodeSpeed)) allDecodeSpeedValues.push(decodeSpeed);
+                        if (!isNaN(prefillSpeed) && isFinite(prefillSpeed) && prefillSpeed > 0) allPrefillSpeedValues.push(prefillSpeed);
+                        if (!isNaN(decodeSpeed) && isFinite(decodeSpeed) && decodeSpeed > 0) allDecodeSpeedValues.push(decodeSpeed);
                     });
+                } else if (hasSuccessfulResult(res)) {
+                    const prefillSpeed = parseFloat(res.prefillSpeed || res.prefill_speed);
+                    const decodeSpeed = parseFloat(res.outputSpeed || res.output_speed);
+                    if (!isNaN(prefillSpeed) && isFinite(prefillSpeed) && prefillSpeed > 0) allPrefillSpeedValues.push(prefillSpeed);
+                    if (!isNaN(decodeSpeed) && isFinite(decodeSpeed) && decodeSpeed > 0) allDecodeSpeedValues.push(decodeSpeed);
                 }
             });
 
-            // 计算百分位数
-            const prefillP50 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 50).toFixed(2) : 'N/A';
-            const prefillP90 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 90).toFixed(2) : 'N/A';
-            const prefillP95 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 95).toFixed(2) : 'N/A';
+            // If concurrentDetails wasn't populated or was empty, fall back to validPrefill / validDecode
+            if (allPrefillSpeedValues.length === 0 && validPrefill.length > 0) {
+                allPrefillSpeedValues.push(...validPrefill);
+            }
+            if (allDecodeSpeedValues.length === 0 && validDecode.length > 0) {
+                allDecodeSpeedValues.push(...validDecode);
+            }
 
-            const decodeP50 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 50).toFixed(2) : 'N/A';
-            const decodeP90 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 90).toFixed(2) : 'N/A';
-            const decodeP95 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 95).toFixed(2) : 'N/A';
+            // 计算百分位数
+            const prefillP50 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 50).toFixed(2) : (avgP !== 'N/A' ? avgP : 'N/A');
+            const prefillP90 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 90).toFixed(2) : (maxP !== 'N/A' ? maxP : 'N/A');
+            const prefillP95 = allPrefillSpeedValues.length > 0 ? calculatePercentile(allPrefillSpeedValues, 95).toFixed(2) : (maxP !== 'N/A' ? maxP : 'N/A');
+
+            const decodeP50 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 50).toFixed(2) : (avgO !== 'N/A' ? avgO : 'N/A');
+            const decodeP90 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 90).toFixed(2) : (maxO !== 'N/A' ? maxO : 'N/A');
+            const decodeP95 = allDecodeSpeedValues.length > 0 ? calculatePercentile(allDecodeSpeedValues, 95).toFixed(2) : (maxO !== 'N/A' ? maxO : 'N/A');
 
             const t = translations[currentLang];
+            const currentConcurrencyLabel = (typeof currentBenchmarkMode !== 'undefined' && currentBenchmarkMode === '2d_matrix')
+                ? (document.getElementById('matrixConcurrencyLadder')?.value || (typeof d_matrixConcurrencyLadder !== 'undefined' ? d_matrixConcurrencyLadder : '1, 2, 4, 8'))
+                : (document.getElementById('concurrency')?.value || '1');
+
             statsDiv.innerHTML = `
-                <h3>${t.concurrentStatsTitle} (${document.getElementById('concurrency').value} ${t.concurrentLabel})</h3>
+                <h3>${t.concurrentStatsTitle} (${currentConcurrencyLabel} ${t.concurrentLabel})</h3>
                 <div class="stat-item">
                     <span>${t.statTotalPrefillRange}</span>
                     <span class="stat-value">${minP} - ${maxP} tokens/s</span>
@@ -3712,6 +4377,14 @@ async function executeAndMeasureRequest(apiUrl, fetchOptions, timeout, promptLen
                 </div>
             `;
             resultsDiv.appendChild(statsDiv);
+
+            // Also update concurrencyStats object in-place so references to it stay accurate
+            if (minPrefill !== null) concurrencyStats.minPrefillSpeed = minPrefill;
+            if (maxPrefill !== null) concurrencyStats.maxPrefillSpeed = maxPrefill;
+            if (avgPrefill !== null) concurrencyStats.avgPrefillSpeed = avgPrefill;
+            if (minDecode !== null) concurrencyStats.minOutputSpeed = minDecode;
+            if (maxDecode !== null) concurrencyStats.maxOutputSpeed = maxDecode;
+            if (avgDecode !== null) concurrencyStats.avgOutputSpeed = avgDecode;
 
             // 返回统计数据（用于保存历史记录）
             return {
@@ -4044,6 +4717,635 @@ async function processOllamaResponse(response, promptLength) {
         }
 */
 
+        // Benchmark Paradigm Mode & Visualizations
+        let currentBenchmarkMode = '1d_sweep';
+        let matrixMaxObservedTps = 50.0;
+
+        function setBenchmarkMode(mode) {
+            currentBenchmarkMode = mode || '1d_sweep';
+            if (typeof closeCellDetailModal === 'function') closeCellDetailModal();
+            const options = document.querySelectorAll('.mode-option');
+            options.forEach(opt => {
+                if (opt.dataset.mode === currentBenchmarkMode) {
+                    opt.classList.add('active');
+                    opt.setAttribute('aria-checked', 'true');
+                } else {
+                    opt.classList.remove('active');
+                    opt.setAttribute('aria-checked', 'false');
+                }
+            });
+
+            const standard1dPanel = document.getElementById('standard1dConfigPanel');
+            const matrixPanel = document.getElementById('matrixConfigPanel');
+            const sustainedPanel = document.getElementById('sustainedConfigPanel');
+            const concurrencyGrp = document.getElementById('concurrencyGroup');
+            const matrixHeatmap = document.getElementById('matrixHeatmapContainer');
+            const sustainedDash = document.getElementById('sustainedDashboard');
+            const chartCont = document.getElementById('chartContainer');
+            const comparisonSec = document.getElementById('comparisonSection');
+            const comparisonChartCont = document.getElementById('comparisonChartContainer');
+
+            if (standard1dPanel) standard1dPanel.style.display = (currentBenchmarkMode === '1d_sweep') ? 'block' : 'none';
+            if (matrixPanel) matrixPanel.style.display = (currentBenchmarkMode === '2d_matrix') ? 'block' : 'none';
+            if (sustainedPanel) sustainedPanel.style.display = (currentBenchmarkMode === 'sustained_decode') ? 'block' : 'none';
+            if (concurrencyGrp) concurrencyGrp.style.display = (currentBenchmarkMode === '2d_matrix') ? 'none' : 'block';
+
+            if (matrixHeatmap) matrixHeatmap.style.display = (currentBenchmarkMode === '2d_matrix') ? 'block' : 'none';
+            if (sustainedDash) sustainedDash.style.display = (currentBenchmarkMode === 'sustained_decode') ? 'block' : 'none';
+            if (chartCont && currentBenchmarkMode !== '1d_sweep') chartCont.style.display = 'none';
+            if (comparisonSec) comparisonSec.style.display = (currentBenchmarkMode === '1d_sweep') ? 'block' : 'none';
+            if (comparisonChartCont && currentBenchmarkMode !== '1d_sweep') comparisonChartCont.style.display = 'none';
+            if (resultsDiv) resultsDiv.style.display = (currentBenchmarkMode === '2d_matrix') ? 'none' : 'block';
+
+            const exportCombined = document.getElementById('exportCombinedChart');
+            const screenshotBtn = document.getElementById('screenshotComparison');
+            const t = translations[currentLang];
+
+            const lblConcurrency = document.getElementById('lblConcurrency') || document.querySelector('label[for="concurrency"]');
+            if (currentBenchmarkMode === 'sustained_decode') {
+                if (lblConcurrency) {
+                    lblConcurrency.textContent = t?.lblConcurrencySustained || '并发流数 (流池规模)';
+                    lblConcurrency.title = t?.tipConcurrencySustained || '持续窗口内并行保持的请求流数量 (如 1、4、8、16 流池)。';
+                }
+            } else {
+                if (lblConcurrency) {
+                    lblConcurrency.textContent = t?.labelConcurrency || '并发数';
+                    lblConcurrency.title = t?.tipConcurrency || '同时发送的请求数量，用于测试并发处理能力。';
+                }
+            }
+
+            if (currentBenchmarkMode === '1d_sweep') {
+                if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
+            } else if (currentBenchmarkMode === '2d_matrix') {
+                if (exportCombined) exportCombined.style.display = 'none';
+                if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshot2dMatrix || (currentLang === 'zh' ? '📸 截图2D矩阵热力图' : '📸 Screenshot 2D Matrix');
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                if (exportCombined) exportCombined.style.display = 'none';
+                if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotSustained || (currentLang === 'zh' ? '📸 截图稳态测试看板' : '📸 Screenshot Sustained Dashboard');
+            }
+        }
+
+        function setupBenchmarkModeSelector() {
+            const options = document.querySelectorAll('.mode-option');
+            options.forEach(opt => {
+                opt.addEventListener('click', function () {
+                    const mode = this.dataset.mode;
+                    setBenchmarkMode(mode);
+                });
+                opt.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const mode = this.dataset.mode;
+                        setBenchmarkMode(mode);
+                    }
+                });
+            });
+            const activeOpt = document.querySelector('.mode-option.active');
+            setBenchmarkMode(activeOpt ? activeOpt.dataset.mode : '1d_sweep');
+        }
+
+        function parseIntegerLadder(inputStr, fallback) {
+            if (!inputStr || typeof inputStr !== 'string') return fallback;
+            const parts = inputStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+            return parts.length > 0 ? parts : fallback;
+        }
+
+        function renderMatrixHeatmapSkeleton(concurrencyLadder, contextLadder) {
+            const thead = document.getElementById('matrixHeatmapThead');
+            const tbody = document.getElementById('matrixHeatmapTbody');
+            const statsDiv = document.getElementById('matrixSummaryStats');
+            if (!thead || !tbody) return;
+
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+            if (statsDiv) statsDiv.innerHTML = '';
+            matrixMaxObservedTps = 50.0;
+
+            const htr = document.createElement('tr');
+            const cornerTh = document.createElement('th');
+            cornerTh.textContent = '并发 \\ 上下文';
+            htr.appendChild(cornerTh);
+
+            contextLadder.forEach(ctx => {
+                const th = document.createElement('th');
+                th.textContent = `${ctx} ctx`;
+                htr.appendChild(th);
+            });
+            thead.appendChild(htr);
+
+            concurrencyLadder.forEach(conc => {
+                const btr = document.createElement('tr');
+                const rth = document.createElement('th');
+                rth.textContent = `${conc}x`;
+                btr.appendChild(rth);
+
+                contextLadder.forEach(ctx => {
+                    const td = document.createElement('td');
+                    td.id = `matrix-cell-${conc}-${ctx}`;
+                    td.className = 'heatmap-cell';
+                    td.innerHTML = '<span style="color:#666;">--</span>';
+                    btr.appendChild(td);
+                });
+                tbody.appendChild(btr);
+            });
+
+            const heatmapContainer = document.getElementById('matrixHeatmapContainer');
+            if (heatmapContainer) heatmapContainer.style.display = 'block';
+        }
+
+        function handleMatrixProgress(msg) {
+            if (msg.cell_current && msg.cell_total && progressBar) {
+                progressBar.style.width = `${(msg.cell_current / msg.cell_total) * 100}%`;
+            }
+            if (msg.concurrency && msg.context) {
+                const cell = document.getElementById(`matrix-cell-${msg.concurrency}-${msg.context}`);
+                if (cell && !cell.classList.contains('completed') && !cell.classList.contains('skipped')) {
+                    cell.classList.add('running');
+                    cell.innerHTML = '<span style="color:#61afef;">⏳ 压测中...</span>';
+                    cell.style.background = 'rgba(97, 175, 239, 0.12)';
+                }
+            }
+        }
+
+        function getHeatmapColorForTps(tps, maxTps) {
+            const bg = getHeatmapCellColor(tps, maxTps);
+            return { bg: bg, text: '#ffffff' };
+        }
+
+        function getHeatmapCellColor(tps, maxTps) {
+            if (!Number.isFinite(tps) || tps <= 0) return 'rgba(255, 255, 255, 0.04)';
+            const ratio = (maxTps > 0) ? Math.min(1, Math.max(0, tps / maxTps)) : 0.5;
+            if (ratio < 0.25) {
+                return `rgba(59, 130, 246, ${0.12 + ratio * 0.4})`;
+            } else if (ratio < 0.6) {
+                return `rgba(14, 165, 233, ${0.2 + ratio * 0.4})`;
+            } else {
+                return `rgba(16, 185, 129, ${0.25 + ratio * 0.45})`;
+            }
+        }
+
+        function closeCellDetailModal() {
+            const detailContainer = document.getElementById('matrixCellDetailContainer');
+            if (detailContainer) {
+                detailContainer.style.display = 'none';
+                detailContainer.innerHTML = '';
+            }
+            document.querySelectorAll('.matrix-heatmap-table td.heatmap-cell').forEach(td => {
+                td.classList.remove('selected-cell');
+                td.style.outline = '';
+                td.style.outlineOffset = '';
+            });
+            document.querySelectorAll('.detail-modal-overlay').forEach(el => el.remove());
+        }
+        window.closeCellDetailModal = closeCellDetailModal;
+
+        function showCellDetailModal(cellData, clickedElement) {
+            if (!cellData) return;
+            const t = (typeof translations !== 'undefined' && translations[currentLang]) ? translations[currentLang] : (translations?.zh || {});
+
+            const concurrency = cellData.concurrency;
+            const context = cellData.context || cellData.promptLength || '-';
+            const decodeTps = Number(cellData.decode_tps ?? (cellData.outputSpeed ? parseFloat(cellData.outputSpeed) : (cellData.avg_decode_speed ? parseFloat(cellData.avg_decode_speed) : 0)));
+            const ttftMs = Number(cellData.ttft_ms ?? (cellData.avgTtftMs ?? (cellData.avg_ttft_ms ?? (cellData.prefillTimeMs ?? 0))));
+            const p50Itl = Number(cellData.p50_itl ?? (cellData.avgItlMean ?? (cellData.itl_stats?.avg ?? (cellData.itl_stats?.p50 ?? 0))));
+            const p90Itl = Number(cellData.p90_itl ?? (cellData.avgItlStd ?? (cellData.itl_stats?.p90 ?? 0)));
+            const p99Itl = Number(cellData.p99_itl ?? (cellData.itl_stats?.p99 ?? 0));
+            const prefillSpeed = cellData.prefillSpeed ? parseFloat(cellData.prefillSpeed) : (cellData.avg_prefill_speed ? parseFloat(cellData.avg_prefill_speed) : null);
+
+            const isSkipped = cellData.status === 'SKIP_KV_LIMIT' || cellData.skipped || (cellData.decode_tps === -1);
+            const loopDetected = Boolean(cellData.loop_detected || cellData.hasConfirmedLoop || String(cellData.status || '').includes('loop'));
+            const isSaturated = Boolean(cellData.is_saturated || cellData.isSaturationDetected || (typeof cellData.effectiveConcurrency === 'string' && cellData.effectiveConcurrency.includes('*')) || (typeof cellData.effective_concurrency === 'string' && cellData.effective_concurrency.includes('*')) || (typeof cellData.status === 'string' && cellData.status.includes('*')));
+            const effectiveConcurrency = cellData.effective_concurrency || cellData.effectiveConcurrency || cellData.status || `${concurrency}/${concurrency}`;
+            const streams = cellData.concurrencyResults || cellData.concurrentDetails || cellData.concurrent_details || [];
+
+            const targetEl = clickedElement || document.getElementById(`matrix-cell-${concurrency}-${context}`) || document.getElementById(`matrix_cell_${concurrency}_${context}`);
+            const detailContainer = document.getElementById('matrixCellDetailContainer');
+
+            if (targetEl && targetEl.classList.contains('selected-cell') && detailContainer && detailContainer.style.display !== 'none') {
+                closeCellDetailModal();
+                return;
+            }
+
+            document.querySelectorAll('.matrix-heatmap-table td.heatmap-cell').forEach(td => {
+                td.classList.remove('selected-cell');
+                td.style.outline = '';
+                td.style.outlineOffset = '';
+            });
+            if (targetEl) {
+                targetEl.classList.add('selected-cell');
+            }
+
+            document.querySelectorAll('.detail-modal-overlay').forEach(el => el.remove());
+
+            let container = detailContainer;
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'matrixCellDetailContainer';
+                container.className = 'matrix-cell-detail';
+                const heatmapCont = document.getElementById('matrixHeatmapContainer');
+                const summaryStats = document.getElementById('matrixSummaryStats');
+                if (heatmapCont) {
+                    if (summaryStats) {
+                        heatmapCont.insertBefore(container, summaryStats);
+                    } else {
+                        heatmapCont.appendChild(container);
+                    }
+                } else {
+                    document.body.appendChild(container);
+                }
+            }
+
+            let statusBadgeHtml = '';
+            if (isSkipped) {
+                statusBadgeHtml = '<span class="badge-capacity" style="font-size:12px; padding:2px 8px;">KV LIMIT SKIP</span>';
+            } else if (loopDetected) {
+                statusBadgeHtml = '<span class="badge-loop" style="font-size:12px; padding:2px 8px;">ERROR: loop (死循环熔断)</span>';
+            } else if (isSaturated) {
+                statusBadgeHtml = `<span class="badge-saturated" style="font-size:12px; padding:2px 8px;">${effectiveConcurrency} (排队饱和)</span>`;
+            } else if (decodeTps > 0) {
+                statusBadgeHtml = '<span style="background:rgba(16,185,129,0.2); color:#10b981; border:1px solid rgba(16,185,129,0.4); font-size:12px; padding:2px 8px; border-radius:4px;">正常通过</span>';
+            } else {
+                statusBadgeHtml = '<span style="background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.4); font-size:12px; padding:2px 8px; border-radius:4px;">测试异常</span>';
+            }
+
+            const satText = isSaturated
+                ? `<span class="badge-saturated">${effectiveConcurrency}</span>`
+                : `<span style="color:#10b981;">${effectiveConcurrency}</span>`;
+            const loopText = loopDetected
+                ? `<span class="badge-loop">ERROR: loop</span>`
+                : '<span style="color:#10b981;">未触发 (正常)</span>';
+
+            let streamHtml = '';
+            if (Array.isArray(streams) && streams.length > 1) {
+                streamHtml = `
+                    <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px;">📊 并发流吞吐细分 (${streams.length} 路请求):</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto;">
+                            ${streams.map((s, idx) => {
+                                const sSpeed = parseFloat(s.output_speed || s.outputSpeed || 0).toFixed(1);
+                                const sTtft = (s.ttft_ms || s.avgTtftMs) ? Math.round(parseFloat(s.ttft_ms || s.avgTtftMs)) : null;
+                                return `
+                                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        <span style="color:#8b949e;">#${idx + 1}:</span>
+                                        <span style="color:#10b981; font-weight:600;">${sSpeed} t/s</span>
+                                        ${sTtft !== null ? `<span style="color:#8b949e; margin-left:4px;">(${sTtft}ms)</span>` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-size: 15px; font-weight: bold; color: #58a6ff;">🧊 单元格详情: ${concurrency}x 并发 @ ${context} ctx</span>
+                        ${statusBadgeHtml}
+                    </div>
+                    <button class="cell-detail-close-btn" style="background: none; border: none; color: #8b949e; font-size: 22px; cursor: pointer; padding: 0 6px; line-height: 1; border-radius: 4px;" title="关闭详情">&times;</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; font-size: 13px;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">解码吞吐 (Decode TPS)</div>
+                        <div style="font-size: 18px; font-weight: bold; color: ${decodeTps > 0 ? '#10b981' : '#e06c75'};">${decodeTps > 0 ? decodeTps.toFixed(1) + ' t/s' : (isSkipped ? 'SKIP' : '0.0 t/s')}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">首字延迟 (TTFT Mean)</div>
+                        <div style="font-size: 18px; font-weight: bold; color: #e6edf3;">${ttftMs > 0 ? ttftMs.toFixed(0) + ' ms' : '-'}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">有效并发 / 调度状态</div>
+                        <div style="font-size: 15px; font-weight: bold; margin-top: 2px;">${satText}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">死循环守卫状态</div>
+                        <div style="font-size: 14px; margin-top: 3px;">${loopText}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">P50 ITL (中位间隔)</div>
+                        <div style="font-size: 15px; font-weight: 500; color: #e6edf3;">${p50Itl > 0 ? p50Itl.toFixed(1) + ' ms' : '-'}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">P90 ITL (90分位抖动)</div>
+                        <div style="font-size: 15px; font-weight: 500; color: #e6edf3;">${p90Itl > 0 ? p90Itl.toFixed(1) + ' ms' : '-'}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">P99 ITL (长尾抖动)</div>
+                        <div style="font-size: 15px; font-weight: 500; color: #e6edf3;">${p99Itl > 0 ? p99Itl.toFixed(1) + ' ms' : '-'}</div>
+                    </div>
+                    ${prefillSpeed !== null ? `
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">预填充速度 (Prefill Speed)</div>
+                        <div style="font-size: 15px; font-weight: 500; color: #61afef;">${prefillSpeed.toFixed(1)} t/s</div>
+                    </div>
+                    ` : ''}
+                </div>
+                ${streamHtml}
+            `;
+
+            container.style.display = 'block';
+
+            const closeBtn = container.querySelector('.cell-detail-close-btn');
+            if (closeBtn) {
+                closeBtn.onclick = closeCellDetailModal;
+            }
+        }
+        window.showCellDetailModal = showCellDetailModal;
+
+        function handleMatrixCellResult(msg) {
+            const conc = msg.concurrency;
+            const ctx = msg.context;
+            const cell = document.getElementById(`matrix-cell-${conc}-${ctx}`);
+            if (!cell) return;
+
+            cell.classList.remove('pending', 'running');
+            cell.onclick = function() { showCellDetailModal(msg, this); };
+
+            if (msg.skipped) {
+                cell.className = 'heatmap-cell skipped';
+                cell.style.background = 'rgba(255, 255, 255, 0.04)';
+                cell.innerHTML = `
+                    <span class="badge-capacity">KV LIMIT</span>
+                    <div style="font-size:10px; color:#888;">${msg.tokens_needed ? `${msg.tokens_needed} > ${msg.max_kv_tokens || 32768}` : 'KV预算跳过'}</div>
+                `;
+                cell.title = `跳过 (KV Cache上限): 需要 ${msg.tokens_needed || '-'} tokens > 预算 ${msg.max_kv_tokens || 32768}`;
+                testResultsData.push({
+                    promptLength: ctx,
+                    context: ctx,
+                    prefillSpeed: '0',
+                    outputSpeed: '0',
+                    prefillTimeMs: '0',
+                    outputTimeMs: '0',
+                    avgTtftMs: '0',
+                    avgItlMean: null,
+                    avgItlStd: null,
+                    concurrency: conc,
+                    status: 'SKIP_KV_LIMIT',
+                    skipped: true,
+                    decode_tps: -1,
+                    effectiveConcurrency: 'SKIP',
+                    effective_concurrency: 'SKIP',
+                    benchmarkMode: '2d_matrix',
+                    recordTags: ['mode:2d_matrix']
+                });
+            } else if (msg.loop_detected || (msg.status && String(msg.status).includes('loop'))) {
+                cell.className = 'heatmap-cell error';
+                cell.style.background = 'rgba(198, 120, 221, 0.3)';
+                cell.innerHTML = `<span class="badge-loop">ERROR: loop</span><div class="cell-sub" style="font-size:10px; color:#e06c75;">4-cycle abort</div>`;
+                cell.title = `死循环熔断: ${msg.error || '4-cycle repetitive loop detected'}`;
+                testResultsData.push({
+                    promptLength: ctx,
+                    context: ctx,
+                    prefillSpeed: '0',
+                    outputSpeed: '0',
+                    prefillTimeMs: '0',
+                    outputTimeMs: '0',
+                    avgTtftMs: '0',
+                    avgItlMean: null,
+                    avgItlStd: null,
+                    concurrency: conc,
+                    status: 'ERROR: loop',
+                    decode_tps: 0,
+                    effectiveConcurrency: 'ERROR',
+                    effective_concurrency: 'ERROR',
+                    hasConfirmedLoop: true,
+                    loop_detected: true,
+                    benchmarkMode: '2d_matrix',
+                    recordTags: ['mode:2d_matrix']
+                });
+            } else if (msg.status === 'ERROR' || (msg.decode_tps <= 0 && !msg.avg_decode_speed)) {
+                cell.className = 'heatmap-cell error';
+                cell.style.background = 'rgba(224, 108, 117, 0.2)';
+                cell.innerHTML = `
+                    <span style="color:#e06c75; font-size:11px;">ERROR</span>
+                    <div style="font-size:9px; color:#aaa;">${msg.error || '失败'}</div>
+                `;
+                cell.title = `错误: ${msg.error || '请求全部失败'}`;
+                testResultsData.push({
+                    promptLength: ctx,
+                    context: ctx,
+                    prefillSpeed: '0',
+                    outputSpeed: '0',
+                    prefillTimeMs: '0',
+                    outputTimeMs: '0',
+                    avgTtftMs: '0',
+                    avgItlMean: null,
+                    avgItlStd: null,
+                    concurrency: conc,
+                    status: 'ERROR',
+                    decode_tps: 0,
+                    effectiveConcurrency: 'ERROR',
+                    effective_concurrency: 'ERROR',
+                    benchmarkMode: '2d_matrix',
+                    recordTags: ['mode:2d_matrix']
+                });
+            } else {
+                cell.className = 'heatmap-cell completed';
+                const tps = Number(msg.decode_tps || msg.avg_decode_speed || 0);
+                if (tps > matrixMaxObservedTps) {
+                    matrixMaxObservedTps = tps;
+                }
+                const ttft = Number(msg.avg_ttft_ms || msg.ttft_ms || 0);
+                const ttftStr = ttft > 0 ? `${Math.round(ttft)}ms` : '-';
+                const p50Itl = Number(msg.p50_itl ?? msg.itl_stats?.p50 ?? msg.itl_stats?.avg ?? 0);
+
+                let satBadge = (msg.is_saturated || (typeof msg.effective_concurrency === 'string' && msg.effective_concurrency.includes('*')))
+                    ? `<span class="badge-saturated" style="margin-left:4px;">${msg.effective_concurrency}</span>`
+                    : '';
+
+                cell.innerHTML = `
+                    <div class="cell-tps" style="font-weight:bold; font-size:14px; color:#fff;">${tps.toFixed(1)} <span style="font-size:10px; font-weight:normal; color:#8b949e;">t/s</span> ${satBadge}</div>
+                    <div class="cell-sub" style="font-size:10px; color:#8b949e; margin-top:2px;">TTFT: ${ttftStr} | ITL: ${p50Itl.toFixed(1)}ms</div>
+                `;
+                cell.style.background = getHeatmapCellColor(tps, matrixMaxObservedTps || 100);
+
+                cell.title = `并发: ${conc}, 上下文: ${ctx}\n解码吞吐: ${tps.toFixed(2)} tokens/s\n平均TTFT: ${ttftStr}\n有效并发: ${msg.effective_concurrency || `${conc}/${conc}`}`;
+
+                testResultsData.push({
+                    promptLength: ctx,
+                    context: ctx,
+                    prefillSpeed: (msg.avg_prefill_speed || 0).toFixed(2),
+                    outputSpeed: tps.toFixed(2),
+                    prefillTimeMs: ttft.toFixed(2),
+                    outputTimeMs: '1000',
+                    avgTtftMs: ttft.toFixed(2),
+                    ttft_ms: ttft,
+                    decode_tps: tps,
+                    p50_itl: msg.itl_stats?.p50 ?? (msg.itl_stats?.avg ?? null),
+                    p90_itl: msg.itl_stats?.p90 ?? null,
+                    p99_itl: msg.itl_stats?.p99 ?? null,
+                    avgItlMean: msg.itl_stats?.avg ? Number(msg.itl_stats.avg).toFixed(2) : (msg.itl_stats?.p50 ? Number(msg.itl_stats.p50).toFixed(2) : null),
+                    avgItlStd: msg.itl_stats?.p90 ? Number(msg.itl_stats.p90).toFixed(2) : null,
+                    concurrency: conc,
+                    status: msg.status || '成功',
+                    effectiveConcurrency: msg.effective_concurrency || `${conc}/${conc}`,
+                    effective_concurrency: msg.effective_concurrency || `${conc}/${conc}`,
+                    isSaturationDetected: Boolean(msg.is_saturated || (typeof msg.effective_concurrency === 'string' && msg.effective_concurrency.includes('*'))),
+                    hasConfirmedLoop: Boolean(msg.loop_detected),
+                    loop_detected: Boolean(msg.loop_detected),
+                    ttft_stats: msg.ttft_stats || null,
+                    itl_stats: msg.itl_stats || null,
+                    benchmarkMode: '2d_matrix',
+                    recordTags: ['mode:2d_matrix'],
+                    concurrentDetails: msg.concurrent_details || []
+                });
+            }
+
+            if (resultsDiv) resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function handleMatrixComplete(msg) {
+            const statsDiv = document.getElementById('matrixSummaryStats');
+            if (!statsDiv) return;
+
+            window.matrixGridData = msg.matrix_grid || {};
+            window.matrixSummaryData = msg.matrix_summary || {};
+
+            const summary = msg.matrix_summary || {};
+            const peakTps = summary.peak_decode_tps || 0;
+            const peakPt = summary.peak_point || {};
+            const satOnset = summary.saturation_onset || 'None';
+            const total = summary.total_cells || 0;
+            const completed = summary.completed_cells || 0;
+            const skipped = summary.skipped_cells || 0;
+
+            statsDiv.innerHTML = `
+                <div style="display:flex; flex-wrap:wrap; gap:16px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:6px; margin-top:10px;">
+                    <div>⚡ <strong>峰值解码吞吐 (Peak Decode):</strong> <span style="color:#10b981; font-weight:bold;">${peakTps} t/s</span> ${peakPt.concurrency ? `(${peakPt.concurrency}x @ ${peakPt.context} ctx)` : ''}</div>
+                    <div>🚨 <strong>排队饱和拐点 (Saturation Onset):</strong> <span style="color:#f59e0b;">${satOnset !== 'None' ? satOnset : '未触发排队饱和'}</span></div>
+                    <div>📦 <strong>单元格统计:</strong> <span>完成 ${completed} / 跳过 ${skipped} / 总计 ${total}</span></div>
+                </div>
+            `;
+        }
+
+        function handleSustainedProgress(msg) {
+            const timerVal = document.getElementById('sustainedTimerVal');
+            const liveTpsVal = document.getElementById('sustainedLiveTpsVal');
+            const tokensVal = document.getElementById('sustainedTokensVal');
+            const workersVal = document.getElementById('sustainedWorkersVal');
+
+            if (timerVal) {
+                timerVal.textContent = `${Math.round(msg.elapsed_sec || 0)}s / ${Math.round(msg.duration_sec || 0)}s`;
+            }
+            if (liveTpsVal) {
+                liveTpsVal.textContent = `${(msg.live_tps || 0).toFixed(1)} tokens/s`;
+            }
+            if (tokensVal) {
+                tokensVal.textContent = String(msg.total_tokens || 0);
+            }
+            if (workersVal) {
+                workersVal.textContent = `${msg.active_workers || 0} / ${currentConcurrency}`;
+            }
+
+            if (progressBar && msg.duration_sec) {
+                const pct = Math.min(100, ((msg.elapsed_sec || 0) / msg.duration_sec) * 100);
+                progressBar.style.width = `${pct}%`;
+            }
+        }
+
+        function handleSustainedResult(msg) {
+            window.sustainedSummaryData = msg;
+            const summaryDiv = document.getElementById('sustainedSummaryStats');
+            const liveTpsVal = document.getElementById('sustainedLiveTpsVal');
+
+            if (liveTpsVal) {
+                liveTpsVal.textContent = `${(msg.steady_decode_tps || msg.avg_decode_speed || 0).toFixed(1)} tokens/s (稳态)`;
+            }
+
+            if (summaryDiv) {
+                const steadyTps = msg.steady_decode_tps || msg.avg_decode_speed || 0;
+                const ttftAvg = msg.ttft_stats?.avg ?? msg.avg_ttft_ms ?? 0;
+                const ttftP50 = msg.ttft_stats?.p50 ?? '-';
+                const ttftP90 = msg.ttft_stats?.p90 ?? '-';
+                const ttftP99 = msg.ttft_stats?.p99 ?? '-';
+                const itlAvg = msg.itl_stats?.avg ?? '-';
+                const itlP50 = msg.itl_stats?.p50 ?? '-';
+                const itlP90 = msg.itl_stats?.p90 ?? '-';
+                const effConc = msg.effective_concurrency || `${msg.concurrency}/${msg.concurrency}`;
+                const isSaturated = msg.is_saturated;
+                const loopDet = msg.loop_detected;
+                const vh = msg.verification_hash || 'N/A';
+
+                const pureDecodeTimeS = msg.pure_decode_time_s || '--';
+                const avgStreamTps = msg.avg_stream_decode_tps ? `${Number(msg.avg_stream_decode_tps).toFixed(1)} t/s` : '--';
+                const e2eTps = msg.e2e_throughput_tps ? `${Number(msg.e2e_throughput_tps).toFixed(1)} tokens/s` : (msg.actual_duration_sec > 0 ? `${(msg.total_tokens / msg.actual_duration_sec).toFixed(1)} tokens/s` : '--');
+
+                summaryDiv.innerHTML = `
+                    <div style="background: rgba(20, 28, 40, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 16px; margin-top: 15px; color: #e6edf3;">
+                        <h4 style="margin: 0 0 10px 0; color: #58a6ff;">🎯 稳态持续解码评测报告</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 13px;">
+                            <div><strong>稳态纯解码吞吐:</strong> <span style="color: #10b981; font-weight: bold; font-size: 15px;">${Number(steadyTps).toFixed(2)} tokens/s</span> <span style="font-size:11px; color:#8b949e;">(扣除Prefill)</span></div>
+                            <div><strong>端到端总生成吞吐:</strong> <span style="color: #61afef; font-weight: bold;">${e2eTps}</span> <span style="font-size:11px; color:#8b949e;">(含首字及排队)</span></div>
+                            <div><strong>单流纯解码速度:</strong> ${avgStreamTps}</div>
+                            <div><strong>实际运行时长:</strong> ${msg.actual_duration_sec || msg.target_duration_sec}s (纯解码累计: ${pureDecodeTimeS}s)</div>
+                            <div><strong>累计生成 Token:</strong> ${msg.total_tokens}</div>
+                            <div><strong>完成流数量:</strong> ${msg.completed_streams}</div>
+                            <div><strong>TTFT 分位:</strong> Avg ${ttftAvg}ms (P50: ${ttftP50}ms, P90: ${ttftP90}ms, P99: ${ttftP99}ms)</div>
+                            <div><strong>ITL 分位:</strong> Avg ${itlAvg}ms (P50: ${itlP50}ms, P90: ${itlP90}ms)</div>
+                            <div><strong>有效调度并发:</strong> <span class="${isSaturated ? 'badge-saturated' : ''}">${effConc}</span> ${isSaturated ? '(调度排队)' : ''}</div>
+                            <div><strong>死循环熔断:</strong> ${loopDet ? '<span class="badge-loop">检测到死循环熔断</span>' : '<span style="color:#10b981;">正常</span>'}</div>
+                            <div style="grid-column: 1 / -1;"><strong>校验哈希 (Attestation):</strong> <code style="background: rgba(255,255,255,0.06); color: #58a6ff; padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1);">${vh}</code></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const prefSpeed = parseFloat(msg.avg_prefill_speed || msg.prefill_speed || 0);
+            const decSpeed = parseFloat(msg.steady_decode_tps || msg.avg_decode_speed || msg.output_speed || 0);
+            if (prefSpeed > 0 || decSpeed > 0) {
+                updateConcurrencyStats(prefSpeed, decSpeed);
+            }
+
+            const resultEntry = {
+                promptLength: msg.prompt_length || 128,
+                prefillSpeed: prefSpeed > 0 ? prefSpeed.toFixed(2) : 'N/A',
+                outputSpeed: decSpeed > 0 ? decSpeed.toFixed(2) : 'N/A',
+                outputTokens: msg.total_tokens || 0,
+                completedStreams: msg.completed_streams || 0,
+                successful: msg.completed_streams !== undefined ? msg.completed_streams : 1,
+                prefillTimeMs: (msg.avg_ttft_ms || 0).toFixed(2),
+                outputTimeMs: ((msg.actual_duration_sec || 30) * 1000).toFixed(0),
+                avgTtftMs: (msg.avg_ttft_ms || 0).toFixed(2),
+                avgItlMean: msg.itl_stats?.avg ? Number(msg.itl_stats.avg).toFixed(2) : (msg.itl_stats?.p50 ? Number(msg.itl_stats.p50).toFixed(2) : null),
+                avgItlStd: msg.itl_stats?.p90 ? Number(msg.itl_stats.p90).toFixed(2) : (msg.itl_stats?.std ? Number(msg.itl_stats.std).toFixed(2) : null),
+                concurrency: msg.concurrency || 1,
+                effectiveConcurrency: msg.effective_concurrency || `${msg.concurrency || 1}/${msg.concurrency || 1}`,
+                effective_concurrency: msg.effective_concurrency || `${msg.concurrency || 1}/${msg.concurrency || 1}`,
+                isSaturationDetected: Boolean(msg.is_saturated),
+                ttft_stats: msg.ttft_stats || {
+                    avg: msg.avg_ttft_ms || 0,
+                    p50: msg.ttft_stats?.p50 ?? msg.avg_ttft_ms ?? 0,
+                    p90: msg.ttft_stats?.p90 ?? 0,
+                    p99: msg.ttft_stats?.p99 ?? 0,
+                    std: msg.ttft_stats?.std ?? 0
+                },
+                itl_stats: msg.itl_stats || {
+                    avg: msg.itl_stats?.avg ?? 0,
+                    p50: msg.itl_stats?.p50 ?? 0,
+                    p90: msg.itl_stats?.p90 ?? 0,
+                    std: msg.itl_stats?.std ?? 0
+                },
+                status: '成功',
+                concurrentDetails: msg.completed_requests || [],
+                benchmarkMode: 'sustained_decode',
+                recordTags: ['mode:sustained_decode']
+            };
+
+            const existingIndex = testResultsData.findIndex(r => r.recordTags && r.recordTags.includes('mode:sustained_decode'));
+            if (existingIndex >= 0) {
+                testResultsData[existingIndex] = resultEntry;
+            } else {
+                testResultsData.push(resultEntry);
+            }
+        }
+
+        function handleSustainedComplete(msg) {
+            if (msg.sustained_summary) {
+                handleSustainedResult(msg.sustained_summary);
+            }
+        }
+
         // WebSocket-based test functions for Python backend
         async function testOpenAI(apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout) {
             return await testWithBackend('openai', apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
@@ -4067,24 +5369,42 @@ async function processOllamaResponse(response, promptLength) {
                 ws.onopen = () => {
                     console.log('[WebSocket] Connected successfully');
 
+                    const taskType = document.getElementById('taskTypeSelect')?.value || 'general';
+
                     // Send test configuration to backend
                     const config = {
                         api_url: apiUrl,
                         model_name: modelName,
                         api_key: api_key,
                         api_type: apiType,
+                        task_type: taskType,
                         min_length: minLength,
                         max_length: maxLength,
                         step: step,
-                        test_lengths: testLengths,  // 传递测试点列表
+                        test_lengths: testLengths,
                         output_length: outputLength,
                         concurrency: concurrency,
                         timeout: timeout,
                         temperature: temperature,
                         top_p: top_p,
                         presence_penalty: presence_penalty,
-                        frequency_penalty: frequency_penalty
+                        frequency_penalty: frequency_penalty,
+                        benchmark_mode: currentBenchmarkMode
                     };
+
+                    if (currentBenchmarkMode === '2d_matrix') {
+                        const concLadderStr = document.getElementById('matrixConcurrencyLadder')?.value || '1, 2, 4, 8';
+                        const ctxLadderStr = document.getElementById('matrixContextLadder')?.value || '512, 1024, 2048, 4096';
+                        const maxKv = parseInt(document.getElementById('matrixMaxKvTokens')?.value, 10) || 0;
+                        config.matrix_concurrency_ladder = parseIntegerLadder(concLadderStr, [1, 2, 4, 8]);
+                        config.matrix_context_ladder = parseIntegerLadder(ctxLadderStr, [512, 1024, 2048, 4096]);
+                        config.matrix_max_kv_tokens = maxKv;
+                    } else if (currentBenchmarkMode === 'sustained_decode') {
+                        const dur = parseFloat(document.getElementById('sustainedDuration')?.value) || 30.0;
+                        const pLen = parseInt(document.getElementById('sustainedPromptLength')?.value, 10) || 128;
+                        config.sustained_duration = dur;
+                        config.sustained_prompt_length = pLen;
+                    }
 
                     console.log('[WebSocket] Sending config:', config);
                     ws.send(JSON.stringify(config));
@@ -4098,15 +5418,31 @@ async function processOllamaResponse(response, promptLength) {
                         console.log(`[Info] ${message.message}`);
                     }
                     else if (message.type === 'progress') {
-                        console.log(`[Progress] Testing length ${message.testing_length} (${message.current}/${message.total})`);
+                        if (message.benchmark_mode === '2d_matrix') {
+                            handleMatrixProgress(message);
+                        } else if (message.benchmark_mode === 'sustained_decode') {
+                            handleSustainedProgress(message);
+                        } else {
+                            console.log(`[Progress] Testing length ${message.testing_length} (${message.current}/${message.total})`);
+                        }
                     }
                     else if (message.type === 'result') {
-                        handleBackendResult(message);
+                        if (message.benchmark_mode === '2d_matrix') {
+                            handleMatrixCellResult(message);
+                        } else if (message.benchmark_mode === 'sustained_decode') {
+                            handleSustainedResult(message);
+                        } else {
+                            handleBackendResult(message);
+                        }
                     }
                     else if (message.type === 'complete') {
                         console.log('[WebSocket] Test complete');
+                        if (message.benchmark_mode === '2d_matrix') {
+                            handleMatrixComplete(message);
+                        } else if (message.benchmark_mode === 'sustained_decode') {
+                            handleSustainedComplete(message);
+                        }
                         ws.close();
-                        // 显示云端分享按钮
                         if (typeof showShareButton === 'function') showShareButton();
                         resolve();
                     }
@@ -4799,6 +6135,7 @@ async function processOllamaResponse(response, promptLength) {
                 localStorage.setItem('llmPerfTestApiKey', api_key);
                 localStorage.setItem('llmPerfTestNotes', notes);
                 localStorage.setItem('llmPerfTestRunCommand', runCommand);
+                localStorage.setItem('llmPerfTestTaskType', document.getElementById('taskTypeSelect')?.value || 'general');
                 localStorage.setItem('llmPerfTestMinLength', minLength);
                 localStorage.setItem('llmPerfTestMaxLength', maxLength);
                 localStorage.setItem('llmPerfTestStep', baseStep);
@@ -4816,16 +6153,32 @@ async function processOllamaResponse(response, promptLength) {
             }
 
             // 验证输入
-            if (!apiUrl || !currentModelName || !minLength || !maxLength || !step || !outputLength || !timeout) {
-                alert("请填写所有必填的配置参数！");
-                return;
+            if (currentBenchmarkMode === '1d_sweep') {
+                if (!apiUrl || !currentModelName || isNaN(minLength) || isNaN(maxLength) || isNaN(baseStep) || isNaN(outputLength) || isNaN(timeout)) {
+                    alert("请填写所有必填的配置参数！");
+                    return;
+                }
+                if (testLengths.length <= 0) {
+                    alert("最大长度必须大于最小长度，步长必须为正数。");
+                    return;
+                }
+                totalTests = testLengths.length;
+            } else if (currentBenchmarkMode === '2d_matrix') {
+                if (!apiUrl || !currentModelName || isNaN(outputLength) || isNaN(timeout)) {
+                    alert("请填写所有必填的配置参数！");
+                    return;
+                }
+                const concLadder = parseIntegerLadder(document.getElementById('matrixConcurrencyLadder')?.value, [1, 2, 4, 8]);
+                const ctxLadder = parseIntegerLadder(document.getElementById('matrixContextLadder')?.value, [512, 1024, 2048, 4096]);
+                totalTests = concLadder.length * ctxLadder.length;
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                if (!apiUrl || !currentModelName || isNaN(outputLength) || isNaN(timeout)) {
+                    alert("请填写所有必填的配置参数！");
+                    return;
+                }
+                totalTests = 1;
             }
 
-            totalTests = Math.floor((maxLength - minLength) / step) + 1;
-            if (totalTests <= 0) {
-                alert("最大长度必须大于最小长度，步长必须为正数。");
-                return;
-            }
             completedTests = 0;
 
             concurrencyStats = {
@@ -4843,10 +6196,16 @@ async function processOllamaResponse(response, promptLength) {
             exportCSVBtn.style.display = 'none';
             exportCombinedChartBtn.style.display = 'none'; // v1.8
             screenshotComparisonBtn.style.display = 'none'; // 截图按钮
-            // chartContainer.style.display = 'none';
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
             testResultsData.length = 0; // Fix reference so window.testResultsData reflects this
+            window.sustainedSummaryData = null;
+            if (typeof closeCellDetailModal === 'function') closeCellDetailModal();
+            if (currentBenchmarkMode === '2d_matrix') {
+                resultsDiv.style.display = 'none';
+            } else {
+                resultsDiv.style.display = 'block';
+            }
 
             // 销毁旧图表（所有6个图表）
             if (prefillChartInstance) prefillChartInstance.destroy();
@@ -4870,31 +6229,75 @@ async function processOllamaResponse(response, promptLength) {
             notesMessage.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${concurrency} | ${t.labelTimeoutPrefix} ${timeout / 1000}s`;
             resultsDiv.appendChild(notesMessage);
 
-            // Python后端版本不受浏览器并发连接限制，无需警告
+            const matrixNotesEl = document.getElementById('matrixNotesMessage');
+            if (matrixNotesEl) {
+                if (currentBenchmarkMode === '2d_matrix') {
+                    const matrixConcLadder = document.getElementById('matrixConcurrencyLadder')?.value || (typeof d_matrixConcurrencyLadder !== 'undefined' ? d_matrixConcurrencyLadder : '1, 2, 4, 8');
+                    matrixNotesEl.textContent = `${t.labelNotesPrefix}${notes} | ${t.labelConcurrencyPrefix} ${matrixConcLadder} | ${t.labelTimeoutPrefix} ${timeout / 1000}s`;
+                    matrixNotesEl.style.display = 'block';
+                } else {
+                    matrixNotesEl.style.display = 'none';
+                }
+            }
 
-            const table = document.createElement('table');
-            const thead = document.createElement('thead');
-            const tbody = document.createElement('tbody');
-            table.appendChild(thead);
-            table.appendChild(tbody);
-            resultsDiv.appendChild(table);
+            // 根据模式初始化测试结果视图
+            if (currentBenchmarkMode === '1d_sweep') {
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                resultsDiv.appendChild(table);
 
-            const headerRow = document.createElement('tr');
-            [
-                t.tableHeaderPromptLen,
-                t.tableHeaderTTFT,
-                t.tableHeaderITL,
-                t.tableHeaderPrefillSpeed,
-                t.tableHeaderOutputSpeed,
-                t.tableHeaderStatus,
-                t.tableHeaderDetail
-            ].forEach(text => {
-                const th = document.createElement('th');
-                th.innerHTML = text;
-                headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
-            chartContainer.style.display = 'block';
+                const headerRow = document.createElement('tr');
+                [
+                    t.tableHeaderPromptLen,
+                    t.tableHeaderTTFT,
+                    t.tableHeaderITL,
+                    t.tableHeaderPrefillSpeed,
+                    t.tableHeaderOutputSpeed,
+                    t.tableHeaderStatus,
+                    t.tableHeaderDetail
+                ].forEach(text => {
+                    const th = document.createElement('th');
+                    th.innerHTML = text;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                chartContainer.style.display = 'block';
+
+                const mCont = document.getElementById('matrixHeatmapContainer');
+                if (mCont) mCont.style.display = 'none';
+                const sDash = document.getElementById('sustainedDashboard');
+                if (sDash) sDash.style.display = 'none';
+            } else if (currentBenchmarkMode === '2d_matrix') {
+                chartContainer.style.display = 'none';
+                const sDash = document.getElementById('sustainedDashboard');
+                if (sDash) sDash.style.display = 'none';
+
+                const concLadder = parseIntegerLadder(document.getElementById('matrixConcurrencyLadder')?.value, [1, 2, 4, 8]);
+                const ctxLadder = parseIntegerLadder(document.getElementById('matrixContextLadder')?.value, [512, 1024, 2048, 4096]);
+                renderMatrixHeatmapSkeleton(concLadder, ctxLadder);
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                chartContainer.style.display = 'none';
+                const mCont = document.getElementById('matrixHeatmapContainer');
+                if (mCont) mCont.style.display = 'none';
+
+                const sDash = document.getElementById('sustainedDashboard');
+                if (sDash) sDash.style.display = 'block';
+
+                const dur = parseFloat(document.getElementById('sustainedDuration')?.value) || 30.0;
+                const timerVal = document.getElementById('sustainedTimerVal');
+                if (timerVal) timerVal.textContent = `0s / ${Math.round(dur)}s`;
+                const liveTpsVal = document.getElementById('sustainedLiveTpsVal');
+                if (liveTpsVal) liveTpsVal.textContent = `-- tokens/s`;
+                const tokensVal = document.getElementById('sustainedTokensVal');
+                if (tokensVal) tokensVal.textContent = `0`;
+                const workersVal = document.getElementById('sustainedWorkersVal');
+                if (workersVal) workersVal.textContent = `0 / ${concurrency}`;
+                const sSummary = document.getElementById('sustainedSummaryStats');
+                if (sSummary) sSummary.innerHTML = '';
+            }
 
             stopTestBtn.disabled = false;
             stopTestBtn.textContent = translations[currentLang].btnTextStop;
@@ -4909,25 +6312,33 @@ async function processOllamaResponse(response, promptLength) {
 
             try {
                 if (currentApiType === 'openai') {
-                    await testOpenAI(apiUrl, currentModelName, minLength, maxLength, 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOpenAI(apiUrl, currentModelName, minLength, maxLength, baseStep || 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 } else {
-                    await testOllama(apiUrl, currentModelName, minLength, maxLength, 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
+                    await testOllama(apiUrl, currentModelName, minLength, maxLength, baseStep || 128, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout);
                 }
             } catch (e) {
                 console.error('测试过程中发生错误:', e);
-                const errorRow = document.createElement('tr');
-                errorRow.innerHTML = `<td colspan="8" class="error">${t.msgTestUnexpectedTermination} ${e.message}</td>`;
-                resultsDiv.querySelector('tbody').appendChild(errorRow);
+                const tbody = resultsDiv.querySelector('tbody');
+                if (tbody) {
+                    const errorRow = document.createElement('tr');
+                    errorRow.innerHTML = `<td colspan="8" class="error">${t.msgTestUnexpectedTermination} ${e.message}</td>`;
+                    tbody.appendChild(errorRow);
+                } else {
+                    const errP = document.createElement('p');
+                    errP.className = 'error';
+                    errP.textContent = `${t.msgTestUnexpectedTermination} ${e.message}`;
+                    resultsDiv.appendChild(errP);
+                }
             }
 
             //
             const wasManuallyStopped = !isTestingRunning;
+            const tbody = resultsDiv.querySelector('tbody');
 
             // 无论测试是完成还是被手动停止，只要有数据就显示统计
             let statsData = null;
             if (testResultsData.some(hasSuccessfulResult)) {
                 statsData = showConcurrencyStats();
-                // generateCharts(); //
 
                 // v2.0: 保存历史记录（无论是否手动停止）
                 if (statsData) {
@@ -4935,12 +6346,17 @@ async function processOllamaResponse(response, promptLength) {
                         apiUrl: apiUrl,
                         modelName: currentModelName,
                         apiType: currentApiType,
+                        benchmarkMode: currentBenchmarkMode || '1d_sweep',
+                        task_type: document.getElementById('taskTypeSelect')?.value || 'general',
                         minLength: minLength,
                         maxLength: maxLength,
                         step: baseStep,
                         stepMultiplier: stepMultiplier,
                         outputLength: outputLength,
-                        concurrency: concurrency,
+                        concurrency: currentBenchmarkMode === '2d_matrix' ? (document.getElementById('matrixConcurrencyLadder')?.value || d_matrixConcurrencyLadder) : concurrency,
+                        matrixConcurrencyLadder: document.getElementById('matrixConcurrencyLadder')?.value || '',
+                        matrixContextLadder: document.getElementById('matrixContextLadder')?.value || '',
+                        sustainedDuration: document.getElementById('sustainedDuration')?.value || '',
                         temperature: temperature,
                         topP: top_p,
                         presencePenalty: presence_penalty,
@@ -4959,13 +6375,22 @@ async function processOllamaResponse(response, promptLength) {
 
             // 根据测试是否被手动停止来显示不同的最终消息
             if (wasManuallyStopped) {
-                const stopRow = document.createElement('tr');
-                stopRow.innerHTML = `<td colspan="8" class="info">${t.msgTestStopped}</td>`;
-                resultsDiv.querySelector('tbody').appendChild(stopRow);
-            } else if (!testResultsData.some(hasSuccessfulResult)) {
-                const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="8" class="info">${t.msgTestCompleteNoData}</td>`;
-                resultsDiv.querySelector('tbody').appendChild(noDataRow);
+                if (tbody) {
+                    const stopRow = document.createElement('tr');
+                    stopRow.innerHTML = `<td colspan="8" class="info">${t.msgTestStopped}</td>`;
+                    tbody.appendChild(stopRow);
+                } else {
+                    const stopP = document.createElement('p');
+                    stopP.className = 'info';
+                    stopP.textContent = t.msgTestStopped;
+                    resultsDiv.appendChild(stopP);
+                }
+            } else if (currentBenchmarkMode === '1d_sweep' && !testResultsData.some(hasSuccessfulResult)) {
+                if (tbody) {
+                    const noDataRow = document.createElement('tr');
+                    noDataRow.innerHTML = `<td colspan="8" class="info">${t.msgTestCompleteNoData}</td>`;
+                    tbody.appendChild(noDataRow);
+                }
             }
 
             isTestingRunning = false; //
@@ -4987,8 +6412,15 @@ async function processOllamaResponse(response, promptLength) {
             startTestBtn.textContent = translations[currentLang].btnTextStart;
             copyMarkdownBtn.style.display = 'block';
             exportCSVBtn.style.display = 'block';
-            exportCombinedChartBtn.style.display = 'block'; // v1.8
+            exportCombinedChartBtn.style.display = (currentBenchmarkMode === '1d_sweep') ? 'block' : 'none'; // v1.8
             screenshotComparisonBtn.style.display = 'block'; // 截图按钮
+            if (currentBenchmarkMode === '2d_matrix') {
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshot2dMatrix || (currentLang === 'zh' ? '📸 截图2D矩阵热力图' : '📸 Screenshot 2D Matrix');
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotSustained || (currentLang === 'zh' ? '📸 截图稳态测试看板' : '📸 Screenshot Sustained Dashboard');
+            } else {
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
+            }
             stopTestBtn.style.display = 'none';
             if (window._onTestComplete) window._onTestComplete();
         });
@@ -5244,67 +6676,119 @@ async function processOllamaResponse(response, promptLength) {
             );
         });
 
-        // 截图功能：截取表格+Prefill+Decode图表并复制到剪贴板
+        // 截图功能：根据当前测速模式截取对应结果并复制到剪贴板
         screenshotComparisonBtn.addEventListener('click', async () => {
             const t = translations[currentLang];
+            const activeMode = (typeof currentBenchmarkMode !== 'undefined' && currentBenchmarkMode) ? currentBenchmarkMode : '1d_sweep';
 
             try {
-                // 1. 获取图表容器的实际显示宽度（不含padding）
-                const chartContainer = document.getElementById('chartContainer');
-                const containerStyle = window.getComputedStyle(chartContainer);
-                const containerWidth = chartContainer.clientWidth -
-                    parseFloat(containerStyle.paddingLeft) -
-                    parseFloat(containerStyle.paddingRight);
+                let tempContainer;
+                if (activeMode === '2d_matrix') {
+                    const heatmapContainer = document.getElementById('matrixHeatmapContainer');
+                    const containerWidth = Math.max(heatmapContainer?.scrollWidth || 0, heatmapContainer?.clientWidth || 0, resultsDiv?.clientWidth || 0, 960);
+                    tempContainer = document.createElement('div');
+                    tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: #0d1117; color: #e6edf3; padding: 24px; width: ${containerWidth + 40}px; border-radius: 8px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;`;
+                    document.body.appendChild(tempContainer);
 
-                // 2. 创建一个临时容器，宽度与图表显示区域一致
-                const tempContainer = document.createElement('div');
-                tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: white; padding: 20px; width: ${containerWidth + 40}px;`;
-                document.body.appendChild(tempContainer);
+                    // 克隆热力图容器 (内部已自带 #matrixNotesMessage 测速配置备注信息)
+                    if (heatmapContainer) {
+                        const heatmapClone = heatmapContainer.cloneNode(true);
+                        heatmapClone.style.display = 'block';
+                        heatmapClone.style.marginTop = '0';
+                        heatmapClone.style.boxShadow = 'none';
+                        heatmapClone.style.background = '#0d1117';
+                        const mNotesInClone = heatmapClone.querySelector('#matrixNotesMessage');
+                        const mNotesOrig = document.getElementById('matrixNotesMessage');
+                        if (mNotesInClone && mNotesOrig && mNotesOrig.textContent) {
+                            mNotesInClone.style.display = 'block';
+                        }
+                        tempContainer.appendChild(heatmapClone);
+                    }
+                } else if (activeMode === 'sustained_decode') {
+                    if (resultsDiv && resultsDiv.querySelector('.sustained-live-dashboard')) {
+                        const containerWidth = Math.max(resultsDiv?.scrollWidth || 0, resultsDiv?.clientWidth || 0, 880);
+                        tempContainer = document.createElement('div');
+                        tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: #0d1117; color: #e6edf3; padding: 24px; width: ${containerWidth + 40}px; border-radius: 8px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;`;
+                        document.body.appendChild(tempContainer);
 
-                // 3. 克隆表格，让其自适应容器宽度
-                const resultsClone = resultsDiv.cloneNode(true);
-                resultsClone.style.width = '100%';
-                resultsClone.style.maxWidth = '100%';
-                const tableInClone = resultsClone.querySelector('table');
-                if (tableInClone) {
-                    tableInClone.style.width = '100%';
+                        const resultsClone = resultsDiv.cloneNode(true);
+                        resultsClone.style.width = '100%';
+                        resultsClone.style.maxWidth = '100%';
+                        tempContainer.appendChild(resultsClone);
+                    } else {
+                        const sustainedDash = document.getElementById('sustainedDashboard');
+                        const containerWidth = Math.max(sustainedDash?.scrollWidth || 0, sustainedDash?.clientWidth || 0, resultsDiv?.clientWidth || 0, 880);
+                        tempContainer = document.createElement('div');
+                        tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: #0d1117; color: #e6edf3; padding: 24px; width: ${containerWidth + 40}px; border-radius: 8px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;`;
+                        document.body.appendChild(tempContainer);
+
+                        const notesEl = document.getElementById('currentTestNotesMessage') || resultsDiv.querySelector('.notes');
+                        if (notesEl) {
+                            const notesClone = notesEl.cloneNode(true);
+                            notesClone.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); padding: 12px 16px; border-radius: 6px; color: #98c379; font-weight: 500; margin-top: 0; margin-bottom: 18px; font-size: 14px;';
+                            tempContainer.appendChild(notesClone);
+                        }
+
+                        if (sustainedDash) {
+                            const dashClone = sustainedDash.cloneNode(true);
+                            dashClone.style.display = 'block';
+                            tempContainer.appendChild(dashClone);
+                        }
+                    }
+                } else {
+                    // 默认 1d_sweep 模式
+                    const chartContainer = document.getElementById('chartContainer');
+                    const containerWidth = Math.max(chartContainer?.clientWidth || 0, resultsDiv?.clientWidth || 0, 800);
+
+                    tempContainer = document.createElement('div');
+                    tempContainer.style.cssText = `position: absolute; left: -9999px; top: 0; background: white; padding: 20px; width: ${containerWidth + 40}px; box-sizing: border-box;`;
+                    document.body.appendChild(tempContainer);
+
+                    // 克隆表格
+                    const resultsClone = resultsDiv.cloneNode(true);
+                    resultsClone.style.width = '100%';
+                    resultsClone.style.maxWidth = '100%';
+                    const tableInClone = resultsClone.querySelector('table');
+                    if (tableInClone) {
+                        tableInClone.style.width = '100%';
+                    }
+                    tempContainer.appendChild(resultsClone);
+
+                    // 添加Prefill图表标题和canvas
+                    const prefillTitle = document.createElement('h3');
+                    prefillTitle.textContent = t.chartPrefillTitle;
+                    prefillTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px; color: #333;';
+                    tempContainer.appendChild(prefillTitle);
+                    const prefillClone = prefillChartCanvas.cloneNode(true);
+                    tempContainer.appendChild(prefillClone);
+
+                    // 添加Decode图表标题和canvas
+                    const decodeTitle = document.createElement('h3');
+                    decodeTitle.textContent = t.chartDecodeTitle;
+                    decodeTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px; color: #333;';
+                    tempContainer.appendChild(decodeTitle);
+                    const decodeClone = outputChartCanvas.cloneNode(true);
+                    tempContainer.appendChild(decodeClone);
+
+                    // 将canvas内容绘制到克隆的canvas上
+                    const prefillCloneCtx = prefillClone.getContext('2d');
+                    prefillCloneCtx.drawImage(prefillChartCanvas, 0, 0);
+                    const decodeCloneCtx = decodeClone.getContext('2d');
+                    decodeCloneCtx.drawImage(outputChartCanvas, 0, 0);
                 }
-                tempContainer.appendChild(resultsClone);
 
-                // 4. 添加Prefill图表标题和canvas
-                const prefillTitle = document.createElement('h3');
-                prefillTitle.textContent = t.chartPrefillTitle;
-                prefillTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px;';
-                tempContainer.appendChild(prefillTitle);
-                const prefillClone = prefillChartCanvas.cloneNode(true);
-                tempContainer.appendChild(prefillClone);
-
-                // 5. 添加Decode图表标题和canvas
-                const decodeTitle = document.createElement('h3');
-                decodeTitle.textContent = t.chartDecodeTitle;
-                decodeTitle.style.cssText = 'margin-top: 25px; margin-bottom: 10px;';
-                tempContainer.appendChild(decodeTitle);
-                const decodeClone = outputChartCanvas.cloneNode(true);
-                tempContainer.appendChild(decodeClone);
-
-                // 6. 将canvas内容绘制到克隆的canvas上
-                const prefillCloneCtx = prefillClone.getContext('2d');
-                prefillCloneCtx.drawImage(prefillChartCanvas, 0, 0);
-                const decodeCloneCtx = decodeClone.getContext('2d');
-                decodeCloneCtx.drawImage(outputChartCanvas, 0, 0);
-
-                // 7. 使用html2canvas截图（降低scale提高速度）
+                // 使用 html2canvas 截图
                 const canvas = await html2canvas(tempContainer, {
-                    backgroundColor: '#ffffff',
+                    backgroundColor: activeMode === '1d_sweep' ? '#ffffff' : '#0d1117',
                     scale: 1.5,
                     logging: false,
                     useCORS: true
                 });
 
-                // 8. 清理临时容器
+                // 清理临时容器
                 document.body.removeChild(tempContainer);
 
-                // 9. 将canvas转换为blob并复制到剪贴板
+                // 将canvas转换为blob并复制到剪贴板
                 canvas.toBlob(async (blob) => {
                     try {
                         await navigator.clipboard.write([
@@ -6383,6 +7867,32 @@ async function processOllamaResponse(response, promptLength) {
             document.getElementById('topPInput').value = savedTopP || d_top_p;
             document.getElementById('presencePenaltyInput').value = savedPresencePenalty || d_presence_penalty;
             document.getElementById('frequencyPenaltyInput').value = savedFrequencyPenalty || d_frequency_penalty;
+
+            // 恢复评测任务场景
+            const savedTaskType = localStorage.getItem('llmPerfTestTaskType');
+            const taskTypeSelect = document.getElementById('taskTypeSelect');
+            if (taskTypeSelect && savedTaskType) {
+                taskTypeSelect.value = savedTaskType;
+            }
+            taskTypeSelect?.addEventListener('change', (e) => {
+                const val = e.target.value;
+                localStorage.setItem('llmPerfTestTaskType', val);
+                if (val === 'prefill_16k') {
+                    const minLengthEl = document.getElementById('minLength');
+                    const maxLengthEl = document.getElementById('maxLength');
+                    const sustainedPromptEl = document.getElementById('sustainedPromptLength');
+                    if (minLengthEl && (parseInt(minLengthEl.value, 10) < 16384 || !minLengthEl.value)) {
+                        minLengthEl.value = '16384';
+                    }
+                    if (maxLengthEl && (parseInt(maxLengthEl.value, 10) < 16384 || !maxLengthEl.value)) {
+                        maxLengthEl.value = '16384';
+                    }
+                    if (sustainedPromptEl && (parseInt(sustainedPromptEl.value, 10) < 16384 || !sustainedPromptEl.value)) {
+                        sustainedPromptEl.value = '16384';
+                    }
+                }
+            });
+
             scheduleModelFetch();
 
             document.getElementById('notes')?.addEventListener('input', syncNotesToUI);
@@ -6455,6 +7965,26 @@ async function processOllamaResponse(response, promptLength) {
                 recordDiv.className = 'history-record';
 
                 const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+                const recMode = detectRecordMode(record);
+                let modeBadge = '';
+                let configSummaryHtml = '';
+                let statsSummaryHtml = '';
+
+                if (recMode === '2d_matrix') {
+                    modeBadge = `<span style="background: #8e44ad; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">2D 矩阵</span>`;
+                    const matrixConc = record.config.matrixConcurrencyLadder || record.config.concurrency;
+                    configSummaryHtml = `<div><strong>并发阶梯:</strong> ${matrixConc} | <strong>输出长度:</strong> ${record.config.outputLength} | <strong>测试单元格:</strong> ${record.results?.length || 0}</div>`;
+                    statsSummaryHtml = `<div><strong>2D 解码吞吐:</strong> P50/P90/P95: ${record.stats?.decode?.p50 || '-'}/${record.stats?.decode?.p90 || '-'}/${record.stats?.decode?.p95 || '-'} tokens/s</div>`;
+                } else if (recMode === 'sustained_decode') {
+                    modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
+                    const sItem = record.results?.[0] || {};
+                    configSummaryHtml = `<div><strong>并发池规模:</strong> ${record.config.concurrency}x | <strong>提示词长度:</strong> ${sItem.promptLength || '-'} | <strong>总 Token:</strong> ${sItem.outputTokens || '-'}</div>`;
+                    statsSummaryHtml = `<div><strong>稳态吞吐:</strong> <span style="color:#10b981; font-weight:bold;">${sItem.outputSpeed || '-'} tokens/s</span> | <strong>完成流:</strong> ${sItem.successful || sItem.completedStreams || '-'} | <strong>平均TTFT:</strong> ${sItem.avgTtftMs || sItem.prefillTimeMs || '-'}ms</div>`;
+                } else {
+                    modeBadge = `<span style="background: #1a73e8; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">1D 扫频</span>`;
+                    configSummaryHtml = `<div><strong>${t.historyRecordConcurrency}</strong> ${record.config.concurrency} | <strong>${t.historyRecordPromptRange}</strong> ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}) | <strong>${t.historyRecordOutputLen}</strong> ${record.config.outputLength}</div>`;
+                    statsSummaryHtml = `<div><strong>Stats:</strong> Prefill P50/P90/P95: ${record.stats?.prefill?.p50 || '-'}/${record.stats?.prefill?.p90 || '-'}/${record.stats?.prefill?.p95 || '-'} | Decode P50/P90/P95: ${record.stats?.decode?.p50 || '-'}/${record.stats?.decode?.p90 || '-'}/${record.stats?.decode?.p95 || '-'} tokens/s</div>`;
+                }
 
                 recordDiv.innerHTML = `
                     <div class="history-record-checkbox">
@@ -6466,9 +7996,9 @@ async function processOllamaResponse(response, promptLength) {
                         </div>
                         <div class="history-record-info">
                             <div><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</div>
-                            <div><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</div>
-                            <div><strong>${t.historyRecordConcurrency}</strong> ${record.config.concurrency} | <strong>${t.historyRecordPromptRange}</strong> ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}) | <strong>${t.historyRecordOutputLen}</strong> ${record.config.outputLength}</div>
-                            <div><strong>Stats:</strong> Prefill P50/P90/P95: ${record.stats.prefill.p50}/${record.stats.prefill.p90}/${record.stats.prefill.p95} | Decode P50/P90/P95: ${record.stats.decode.p50}/${record.stats.decode.p90}/${record.stats.decode.p95} tokens/s</div>
+                            <div><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText}) ${modeBadge}</div>
+                            ${configSummaryHtml}
+                            ${statsSummaryHtml}
                         </div>
                         <div class="history-record-actions">
                             <button class="history-record-btn history-record-btn-view" data-id="${record.id}">${t.historyBtnView}</button>
@@ -6538,70 +8068,201 @@ async function processOllamaResponse(response, promptLength) {
 
             const detailContent = document.getElementById('historyDetailContent');
             const apiTypeText = record.config.apiType === 'openai' ? t.apiOpenAI : t.apiOllama;
+            const recMode = detectRecordMode(record);
 
-            // 创建详情HTML
+            let modeBadge = '';
+            let configItemsHtml = '';
+            let statsBlockHtml = '';
+            let tableHeaderHtml = '';
+            let tableRowsHtml = '';
+
+            if (recMode === '2d_matrix') {
+                modeBadge = `<span style="background: #8e44ad; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">2D 矩阵</span>`;
+                const matrixConc = record.config.matrixConcurrencyLadder || record.config.concurrency || '-';
+                const matrixCtx = record.config.matrixContextLadder || '-';
+                configItemsHtml = `
+                    <li>API URL: ${record.config.apiUrl}</li>
+                    <li>评测模式: 2D 并发 × 上下文矩阵</li>
+                    <li>并发阶梯: ${matrixConc}</li>
+                    <li>上下文阶梯: ${matrixCtx}</li>
+                    <li>${t.historyRecordOutputLen} ${record.config.outputLength}</li>
+                    <li>Temperature: ${record.config.temperature}, Top P: ${record.config.topP}</li>
+                    <li>Timeout: ${record.config.timeout}ms</li>
+                `;
+
+                const decodeStats = record.stats?.decode || {};
+                statsBlockHtml = `
+                    <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
+                        <h4 style="color: #61afef; margin-bottom: 10px;">📊 2D 矩阵聚合统计 (2D Matrix Stats)</h4>
+                        <p><strong>解码吞吐范围:</strong> ${decodeStats.min || '-'} - ${decodeStats.max || '-'} tokens/s</p>
+                        <p><strong>平均解码吞吐:</strong> ${decodeStats.avg || '-'} tokens/s</p>
+                        <p><strong>解码吞吐分位数:</strong> P50: ${decodeStats.p50 || '-'} | P90: ${decodeStats.p90 || '-'} | P95: ${decodeStats.p95 || '-'} tokens/s</p>
+                        <p><strong>完成单元格:</strong> ${record.results?.length || 0}</p>
+                    </div>
+                `;
+
+                tableHeaderHtml = `
+                    <tr>
+                        <th style="padding: 8px; border: 1px solid #ddd;">并发</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">上下文长度</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">首字时间 TTFT (ms)</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">单字抖动 ITL (ms)</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">解码吞吐 (t/s)</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">有效并发</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">状态</th>
+                    </tr>
+                `;
+
+                record.results.forEach(res => {
+                    const ttft = res.avgTtftMs || res.prefillTimeMs || res.ttft_ms || '-';
+                    const itl = res.avgItlMean || res.p50_itl || '-';
+                    const effConc = res.effectiveConcurrency || res.effective_concurrency || `${res.concurrency}/${res.concurrency}`;
+                    tableRowsHtml += `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.concurrency}x</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.promptLength}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${ttft}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${itl}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #10b981;">${res.outputSpeed}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${effConc}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.status || '成功'}</td>
+                        </tr>
+                    `;
+                });
+
+            } else if (recMode === 'sustained_decode') {
+                modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
+                const sItem = record.results?.[0] || {};
+                const durSec = parseFloat(sItem.outputTimeMs) / 1000 || parseFloat(record.config?.sustainedDuration) || 30;
+                configItemsHtml = `
+                    <li>API URL: ${record.config.apiUrl}</li>
+                    <li>评测模式: 稳态持续解码</li>
+                    <li>并发流池规模: ${record.config.concurrency}x</li>
+                    <li>持续实测窗口: ${durSec.toFixed(1)}s</li>
+                    <li>提示词长度: ${sItem.promptLength || record.config.minLength || '-'}</li>
+                    <li>${t.historyRecordOutputLen} ${record.config.outputLength}</li>
+                    <li>Temperature: ${record.config.temperature}, Top P: ${record.config.topP}</li>
+                    <li>Timeout: ${record.config.timeout}ms</li>
+                `;
+
+                const ttftAvg = sItem.avgTtftMs || sItem.prefillTimeMs || '-';
+                const itlP50 = sItem.itl_stats?.p50 ?? sItem.avgItlMean ?? '-';
+                const itlStd = sItem.itl_stats?.std ?? sItem.avgItlStd ?? '-';
+                statsBlockHtml = `
+                    <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
+                        <h4 style="color: #61afef; margin-bottom: 10px;">⏱️ 稳态持续解码报告 (Sustained Decode Stats)</h4>
+                        <p><strong>稳态解码吞吐:</strong> <span style="color:#10b981; font-weight:bold; font-size:16px;">${sItem.outputSpeed || '-'} tokens/s</span></p>
+                        <p><strong>实测持续时长:</strong> ${durSec.toFixed(1)} 秒</p>
+                        <p><strong>累计生成 Token:</strong> ${sItem.outputTokens || '-'}</p>
+                        <p><strong>完成流数量:</strong> ${sItem.successful || sItem.completedStreams || '-'}</p>
+                        <p><strong>平均 TTFT:</strong> ${ttftAvg}ms</p>
+                        <p><strong>单字抖动 (ITL):</strong> P50: ${itlP50}ms | σ: ${itlStd}ms</p>
+                    </div>
+                `;
+
+                tableHeaderHtml = `
+                    <tr>
+                        <th style="padding: 8px; border: 1px solid #ddd;">并发池</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">提示词长度</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">稳态吞吐 (t/s)</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">产出总 Token</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">运行窗口</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">完成并发流</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">状态</th>
+                    </tr>
+                `;
+
+                record.results.forEach(res => {
+                    const elapsedSec = (parseFloat(res.outputTimeMs) / 1000) || durSec;
+                    tableRowsHtml += `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.concurrency || record.config.concurrency}x</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.promptLength}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #10b981;">${res.outputSpeed}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputTokens}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${elapsedSec.toFixed(1)}s</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.successful || res.completedStreams || 1}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.status || '成功'}</td>
+                        </tr>
+                    `;
+                });
+
+            } else {
+                // 1d_sweep
+                modeBadge = `<span style="background: #1a73e8; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">1D 扫频</span>`;
+                configItemsHtml = `
+                    <li>API URL: ${record.config.apiUrl}</li>
+                    <li>${t.historyRecordConcurrency} ${record.config.concurrency}</li>
+                    <li>${t.historyRecordPromptRange} ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step}${record.config.stepMultiplier > 1 ? ` x${record.config.stepMultiplier}` : ''})</li>
+                    <li>${t.historyRecordOutputLen} ${record.config.outputLength}</li>
+                    <li>Temperature: ${record.config.temperature}, Top P: ${record.config.topP}</li>
+                    <li>Timeout: ${record.config.timeout}ms</li>
+                `;
+
+                if (record.stats && record.stats.prefill && record.stats.decode) {
+                    statsBlockHtml = `
+                        <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
+                            <h4 style="color: #61afef; margin-bottom: 10px;">${t.concurrentStatsTitle}</h4>
+                            <p><strong>${t.statTotalPrefillRange}</strong> ${record.stats.prefill.min} - ${record.stats.prefill.max} tokens/s</p>
+                            <p><strong>${t.statTotalDecodeRange}</strong> ${record.stats.decode.min} - ${record.stats.decode.max} tokens/s</p>
+                            <p><strong>${t.statAvgPrefill}</strong> ${record.stats.prefill.avg} tokens/s</p>
+                            <p><strong>${t.statAvgDecode}</strong> ${record.stats.decode.avg} tokens/s</p>
+                            <hr style="margin: 10px 0; border: none; border-top: 1px solid #555;">
+                            <h4 style="color: #61afef; margin: 10px 0;">${t.statPercentileTitle}</h4>
+                            <p><strong>${t.statPrefillPercentile}</strong> P50: ${record.stats.prefill.p50} | P90: ${record.stats.prefill.p90} | P95: ${record.stats.prefill.p95} tokens/s</p>
+                            <p><strong>${t.statDecodePercentile}</strong> P50: ${record.stats.decode.p50} | P90: ${record.stats.decode.p90} | P95: ${record.stats.decode.p95} tokens/s</p>
+                        </div>
+                    `;
+                }
+
+                tableHeaderHtml = `
+                    <tr>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPromptLen.replace('<br>', ' ')}</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderTTFT.replace('<br>', ' ')}</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderITL.replace('<br>', ' ')}</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPrefillSpeed.replace('<br>', ' ')}</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputSpeed.replace('<br>', ' ')}</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderStatus}</th>
+                    </tr>
+                `;
+
+                record.results.forEach(res => {
+                    const ttft = res.avgTtftMs ?? res.prefillTimeMs ?? 'N/A';
+                    const itl = res.avgItlMean ?? res.outputTimeMs ?? 'N/A';
+                    tableRowsHtml += `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.promptLength}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${ttft}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${itl}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.prefillSpeed}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputSpeed}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.status}</td>
+                        </tr>
+                    `;
+                });
+            }
+
             let html = `
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
                     <h3>${t.historyViewTitle}</h3>
                     <p><strong>${t.historyRecordTime}</strong> ${record.timestamp}</p>
                     <p><strong>${t.historyRecordNotes}</strong> ${record.notes || 'N/A'}</p>
-                    <p><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText})</p>
+                    <p><strong>${t.historyRecordModel}</strong> ${record.config.modelName} (${apiTypeText}) ${modeBadge}</p>
                     <p><strong>${t.historyRecordConfig}</strong></p>
                     <ul>
-                        <li>API URL: ${record.config.apiUrl}</li>
-                        <li>${t.historyRecordConcurrency} ${record.config.concurrency}</li>
-                        <li>${t.historyRecordPromptRange} ${record.config.minLength}-${record.config.maxLength} (step ${record.config.step})</li>
-                        <li>${t.historyRecordOutputLen} ${record.config.outputLength}</li>
-                        <li>Temperature: ${record.config.temperature}, Top P: ${record.config.topP}</li>
-                        <li>Timeout: ${record.config.timeout}ms</li>
+                        ${configItemsHtml}
                     </ul>
                 </div>
-
-                <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
-                    <h4 style="color: #61afef; margin-bottom: 10px;">${t.concurrentStatsTitle}</h4>
-                    <p><strong>${t.statTotalPrefillRange}</strong> ${record.stats.prefill.min} - ${record.stats.prefill.max} tokens/s</p>
-                    <p><strong>${t.statTotalDecodeRange}</strong> ${record.stats.decode.min} - ${record.stats.decode.max} tokens/s</p>
-                    <p><strong>${t.statAvgPrefill}</strong> ${record.stats.prefill.avg} tokens/s</p>
-                    <p><strong>${t.statAvgDecode}</strong> ${record.stats.decode.avg} tokens/s</p>
-                    <hr style="margin: 10px 0; border: none; border-top: 1px solid #555;">
-                    <h4 style="color: #61afef; margin: 10px 0;">${t.statPercentileTitle}</h4>
-                    <p><strong>${t.statPrefillPercentile}</strong> P50: ${record.stats.prefill.p50} | P90: ${record.stats.prefill.p90} | P95: ${record.stats.prefill.p95} tokens/s</p>
-                    <p><strong>${t.statDecodePercentile}</strong> P50: ${record.stats.decode.p50} | P90: ${record.stats.decode.p90} | P95: ${record.stats.decode.p95} tokens/s</p>
-                </div>
-
+                ${statsBlockHtml}
                 <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
                     <h4>${t.mdTestResults}</h4>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                             <thead style="background: #2c3e50; color: white;">
-                                <tr>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPromptLen.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPrefillTime.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderPrefillSpeed.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputLen.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputTime.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderOutputSpeed.replace('<br>', ' ')}</th>
-                                    <th style="padding: 8px; border: 1px solid #ddd;">${t.tableHeaderStatus}</th>
-                                </tr>
+                                ${tableHeaderHtml}
                             </thead>
                             <tbody>
-            `;
-
-            record.results.forEach(res => {
-                html += `
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.promptLength}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.prefillTimeMs}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.prefillSpeed}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputTokens}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputTimeMs}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.outputSpeed}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${res.status}</td>
-                    </tr>
-                `;
-            });
-
-            html += `
+                                ${tableRowsHtml}
                             </tbody>
                         </table>
                     </div>
@@ -6627,6 +8288,12 @@ async function processOllamaResponse(response, promptLength) {
             // 清空当前数据
             testResultsData.length = 0;
 
+            // 切换/恢复测试模式
+            const recMode = detectRecordMode(record);
+            if (typeof setBenchmarkMode === 'function') {
+                setBenchmarkMode(recMode);
+            }
+
             // 填充表单参数
             if (record.config) {
                 // 设置 API 类型（通过按钮选择）
@@ -6647,6 +8314,18 @@ async function processOllamaResponse(response, promptLength) {
                 document.getElementById('stepMultiplier').value = record.config.stepMultiplier || 1;
                 document.getElementById('outputLength').value = record.config.outputLength || '';
                 document.getElementById('concurrency').value = record.config.concurrency || '';
+                if (record.config.matrixConcurrencyLadder) {
+                    const el = document.getElementById('matrixConcurrencyLadder');
+                    if (el) el.value = record.config.matrixConcurrencyLadder;
+                }
+                if (record.config.matrixContextLadder) {
+                    const el = document.getElementById('matrixContextLadder');
+                    if (el) el.value = record.config.matrixContextLadder;
+                }
+                if (record.config.sustainedDuration) {
+                    const el = document.getElementById('sustainedDuration');
+                    if (el) el.value = record.config.sustainedDuration;
+                }
                 document.getElementById('temperatureInput').value = record.config.temperature !== undefined ? record.config.temperature : '';
                 document.getElementById('topPInput').value = record.config.topP !== undefined ? record.config.topP : '';
                 document.getElementById('presencePenaltyInput').value = record.config.presencePenalty !== undefined ? record.config.presencePenalty : '';
@@ -6662,6 +8341,9 @@ async function processOllamaResponse(response, promptLength) {
             currentModelName = record.config.modelName || '/model';
             currentConcurrency = record.config.concurrency || 1;
             notes = record.notes || '';
+            if (typeof syncNotesToUI === 'function') {
+                syncNotesToUI();
+            }
 
             // 加载历史记录的结果数据
             testResultsData.length = 0;
@@ -6678,84 +8360,297 @@ async function processOllamaResponse(response, promptLength) {
             notesMessage.textContent = `${t.labelNotesPrefix}${record.notes} | ${t.labelConcurrencyPrefix} ${record.config.concurrency} | ${t.labelTimeoutPrefix} ${record.config.timeout / 1000}s`;
             resultsDiv.appendChild(notesMessage);
 
-            // 创建表格（限制最大宽度与图表一致）
-            const table = document.createElement('table');
-            table.style.maxWidth = '800px';
-            const thead = document.createElement('thead');
-            const tbody = document.createElement('tbody');
-            table.appendChild(thead);
-            table.appendChild(tbody);
-            resultsDiv.appendChild(table);
+            if (typeof closeCellDetailModal === 'function') closeCellDetailModal();
+            const matrixNotesEl = document.getElementById('matrixNotesMessage');
+            if (recMode === '2d_matrix') {
+                resultsDiv.style.display = 'none';
+                const chartContainer = document.getElementById('chartContainer');
+                if (chartContainer) chartContainer.style.display = 'none';
+                const sustainedDash = document.getElementById('sustainedDashboard');
+                if (sustainedDash) sustainedDash.style.display = 'none';
+                const comparisonSec = document.getElementById('comparisonSection');
+                if (comparisonSec) comparisonSec.style.display = 'none';
+                const comparisonChartContainer = document.getElementById('comparisonChartContainer');
+                if (comparisonChartContainer) comparisonChartContainer.style.display = 'none';
 
-            // 创建表头
-            const headerRow = document.createElement('tr');
-            [
-                t.tableHeaderPromptLen,
-                t.tableHeaderTTFT,
-                t.tableHeaderITL,
-                t.tableHeaderPrefillSpeed,
-                t.tableHeaderOutputSpeed,
-                t.tableHeaderStatus,
-                t.tableHeaderDetail
-            ].forEach(text => {
-                const th = document.createElement('th');
-                th.innerHTML = text;
-                headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
+                const heatmapContainer = document.getElementById('matrixHeatmapContainer');
+                if (heatmapContainer) heatmapContainer.style.display = 'block';
 
-            // 渲染每一行数据
-            testResultsData.forEach(resultEntry => {
-                const row = document.createElement('tr');
-                const cells = [];
-                for (let i = 0; i < 7; i++) {
-                    const cell = document.createElement('td');
-                    cells.push(cell);
-                    row.appendChild(cell);
+                if (matrixNotesEl) {
+                    const concVal = record.config?.matrixConcurrencyLadder || record.config?.concurrency || '1, 2, 4, 8';
+                    const timeoutSec = record.config?.timeout ? (record.config.timeout / 1000) : 120;
+                    matrixNotesEl.textContent = `${t.labelNotesPrefix}${record.notes || ''} | ${t.labelConcurrencyPrefix} ${concVal} | ${t.labelTimeoutPrefix} ${timeoutSec}s`;
+                    matrixNotesEl.style.display = 'block';
                 }
 
-                cells[0].textContent = resultEntry.promptLength;
-                cells[1].textContent = resultEntry.avgTtftMs || 'N/A';
-                cells[2].textContent = resultEntry.avgItlMean || 'N/A';
-                cells[3].textContent = resultEntry.prefillSpeed;
-                cells[4].textContent = resultEntry.outputSpeed;
-                cells[5].textContent = resultEntry.status;
+                const thead = document.getElementById('matrixHeatmapThead');
+                const tbody = document.getElementById('matrixHeatmapTbody');
+                const statsDiv = document.getElementById('matrixSummaryStats');
+                if (thead && tbody) {
+                    thead.innerHTML = '';
+                    tbody.innerHTML = '';
 
-                // 添加详情按钮（如果有详情数据）
-                if (resultEntry.promptText || resultEntry.outputText) {
-                    const detailButton = document.createElement('button');
-                    detailButton.className = 'detail-button';
-                    detailButton.textContent = t.detailBtnView;
-                    detailButton.onclick = () => showTestDetail(resultEntry);
-                    cells[6].appendChild(detailButton);
-                } else {
-                    cells[6].textContent = '-';
+                    const concurrencies = Array.from(new Set(testResultsData.map(r => Number(r.concurrency)).filter(n => Number.isFinite(n) && n > 0))).sort((a,b) => a-b);
+                    const contexts = Array.from(new Set(testResultsData.map(r => Number(r.promptLength)).filter(n => Number.isFinite(n) && n > 0))).sort((a,b) => a-b);
+
+                    let peakTps = 0;
+                    let peakPoint = null;
+                    let saturationPoint = null;
+                    testResultsData.forEach(r => {
+                        const tps = parseFloat(r.outputSpeed) || 0;
+                        if (tps > peakTps) {
+                            peakTps = tps;
+                            peakPoint = { concurrency: r.concurrency, context: r.promptLength, tps: tps };
+                        }
+                        if ((r.isSaturationDetected || (typeof r.effectiveConcurrency === 'string' && r.effectiveConcurrency.includes('*')) || (typeof r.status === 'string' && r.status.includes('*'))) && !saturationPoint) {
+                            saturationPoint = { concurrency: r.concurrency, ratio: r.effectiveConcurrency || r.status };
+                        }
+                    });
+
+                    const headerRow = document.createElement('tr');
+                    const cornerTh = document.createElement('th');
+                    cornerTh.textContent = '并发 \\ 上下文';
+                    headerRow.appendChild(cornerTh);
+                    contexts.forEach(ctx => {
+                        const th = document.createElement('th');
+                        th.textContent = `${ctx} ctx`;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+
+                    concurrencies.forEach(c => {
+                        const tr = document.createElement('tr');
+                        const rowTh = document.createElement('th');
+                        rowTh.textContent = `${c}x`;
+                        tr.appendChild(rowTh);
+
+                        contexts.forEach(ctx => {
+                            const td = document.createElement('td');
+                            td.id = `matrix-cell-${c}-${ctx}`;
+                            td.className = 'heatmap-cell';
+                            const cellRecord = testResultsData.find(r => Number(r.concurrency) === c && Number(r.promptLength) === ctx);
+                            if (!cellRecord) {
+                                td.innerHTML = '<span style="color:#666;">--</span>';
+                            } else {
+                                if (cellRecord.status === 'SKIP_KV_LIMIT' || cellRecord.skipped || (cellRecord.decode_tps === -1)) {
+                                    td.innerHTML = `<span class="badge-capacity">KV LIMIT</span>`;
+                                    td.style.background = 'rgba(255, 255, 255, 0.04)';
+                                } else if (cellRecord.hasConfirmedLoop || cellRecord.loop_detected || String(cellRecord.status).includes('loop')) {
+                                    td.innerHTML = `<span class="badge-loop">ERROR: loop</span><div class="cell-sub" style="font-size:10px; color:#e06c75;">4-cycle abort</div>`;
+                                    td.style.background = 'rgba(198, 120, 221, 0.3)';
+                                } else if (parseFloat(cellRecord.outputSpeed) <= 0 && String(cellRecord.status).includes('ERROR')) {
+                                    td.innerHTML = `<span style="color:#e06c75; font-size:11px;">ERROR</span>`;
+                                    td.style.background = 'rgba(224, 108, 117, 0.2)';
+                                } else {
+                                    const decodeTps = parseFloat(cellRecord.outputSpeed || cellRecord.decode_tps || 0) || 0;
+                                    const ttftAvg = parseFloat(cellRecord.avgTtftMs || cellRecord.prefillTimeMs || cellRecord.ttft_ms || 0) || 0;
+                                    const p50Itl = parseFloat(cellRecord.avgItlMean || cellRecord.p50_itl || cellRecord.itl_stats?.avg || 0) || 0;
+                                    let satBadge = (cellRecord.isSaturationDetected || (typeof cellRecord.effectiveConcurrency === 'string' && cellRecord.effectiveConcurrency.includes('*')) || (typeof cellRecord.status === 'string' && cellRecord.status.includes('*')))
+                                        ? `<span class="badge-saturated" style="margin-left:4px;">${cellRecord.effectiveConcurrency || cellRecord.status}</span>`
+                                        : '';
+                                    td.innerHTML = `
+                                        <div class="cell-tps" style="font-weight:bold; font-size:14px; color:#fff;">${decodeTps.toFixed(1)} <span style="font-size:10px; font-weight:normal; color:#8b949e;">t/s</span> ${satBadge}</div>
+                                        <div class="cell-sub" style="font-size:10px; color:#8b949e; margin-top:2px;">TTFT: ${ttftAvg.toFixed(0)}ms | ITL: ${p50Itl.toFixed(1)}ms</div>
+                                    `;
+                                    td.style.background = getHeatmapCellColor(decodeTps, peakTps || 100);
+                                }
+                                td.onclick = function() { showCellDetailModal(cellRecord, this); };
+                            }
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+
+                    if (statsDiv) {
+                        statsDiv.innerHTML = `
+                            <div style="display:flex; flex-wrap:wrap; gap:16px; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:6px; margin-top:10px;">
+                                <div>⚡ <strong>峰值解码吞吐 (Peak Decode):</strong> <span style="color:#10b981; font-weight:bold;">${peakTps.toFixed(1)} t/s</span> ${peakPoint ? `(${peakPoint.concurrency}x @ ${peakPoint.context} ctx)` : ''}</div>
+                                <div>🚨 <strong>排队饱和拐点 (Saturation Onset):</strong> <span style="color:#f59e0b;">${saturationPoint ? `${saturationPoint.concurrency}x (${saturationPoint.ratio})` : '未触发排队饱和'}</span></div>
+                                <div>📊 <strong>测试单元格:</strong> 完成 ${testResultsData.length}</div>
+                            </div>
+                        `;
+                    }
                 }
 
-                // 根据状态设置行样式
-                if (hasSuccessfulResult(resultEntry)) {
-                    row.classList.add('success');
-                } else {
-                    row.classList.add('error');
-                }
-                if (Array.isArray(resultEntry.tokenWarnings) && resultEntry.tokenWarnings.length > 0) {
-                    row.classList.add('token-warning-row');
-                }
+                screenshotComparisonBtn.style.display = 'block';
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshot2dMatrix || (currentLang === 'zh' ? '📸 截图2D矩阵热力图' : '📸 Screenshot 2D Matrix');
+                exportCombinedChartBtn.style.display = 'none';
 
-                tbody.appendChild(row);
-            });
+            } else if (recMode === 'sustained_decode') {
+                resultsDiv.style.display = 'block';
+                const chartContainer = document.getElementById('chartContainer');
+                if (chartContainer) chartContainer.style.display = 'none';
+                const heatmapContainer = document.getElementById('matrixHeatmapContainer');
+                if (heatmapContainer) heatmapContainer.style.display = 'none';
+                if (matrixNotesEl) matrixNotesEl.style.display = 'none';
+                const comparisonSec = document.getElementById('comparisonSection');
+                if (comparisonSec) comparisonSec.style.display = 'none';
+                const comparisonChartContainer = document.getElementById('comparisonChartContainer');
+                if (comparisonChartContainer) comparisonChartContainer.style.display = 'none';
+                const sustainedDash = document.getElementById('sustainedDashboard');
+                if (sustainedDash) sustainedDash.style.display = 'none';
 
-            // 更新图表
-            generateCharts();
+                const item = testResultsData[0] || {};
+                const durationSec = parseFloat(item.outputTimeMs) / 1000 || parseFloat(record.config?.sustainedDuration) || 30;
+                const sustainedTps = parseFloat(item.outputSpeed) || 0;
+                const totalTokens = item.outputTokens || 0;
+                const completedStreams = item.successful || item.completedStreams || 0;
+                const conc = item.concurrency || record.config.concurrency || 1;
+                const ttftP50 = item.ttft_stats?.p50 ?? item.avgTtftMs ?? '-';
+                const ttftP90 = item.ttft_stats?.p90 ?? '-';
+                const ttftP99 = item.ttft_stats?.p99 ?? '-';
+                const itlP50 = item.itl_stats?.p50 ?? item.avgItlMean ?? '-';
+                const itlP90 = item.itl_stats?.p90 ?? '-';
+                const itlStd = item.itl_stats?.std ?? item.avgItlStd ?? '-';
+                const effConc = item.effectiveConcurrency || (typeof item.status === 'string' && item.status.includes('/') ? item.status : `${conc}/${conc}`);
 
-            // 显示截图按钮（加载历史记录后）
-            screenshotComparisonBtn.style.display = 'block';
+                const sustainedContainer = document.createElement('div');
+                sustainedContainer.className = 'sustained-live-dashboard';
+                sustainedContainer.style.cssText = 'background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;';
+                sustainedContainer.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0; color:#61afef;">⏱️ 稳态持续解码历史回显 (Sustained Decode History)</h3>
+                        <div style="font-family:monospace; font-size:14px; color:#8b949e;">${durationSec.toFixed(1)}s 实测窗口</div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
+                        <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px;">
+                            <div style="font-size:11px; color:#8b949e;">稳态吞吐</div>
+                            <div style="font-size:24px; font-weight:bold; color:#10b981; margin-top:4px;">${sustainedTps.toFixed(1)} <span style="font-size:12px;">t/s</span></div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px;">
+                            <div style="font-size:11px; color:#8b949e;">已产出总 Token</div>
+                            <div style="font-size:24px; font-weight:bold; color:#61afef; margin-top:4px;">${totalTokens}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px;">
+                            <div style="font-size:11px; color:#8b949e;">完成流数量</div>
+                            <div style="font-size:24px; font-weight:bold; color:#d19a66; margin-top:4px;">${completedStreams}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px;">
+                            <div style="font-size:11px; color:#8b949e;">并发流池规模</div>
+                            <div style="font-size:24px; font-weight:bold; color:#c678dd; margin-top:4px;">${conc}x</div>
+                        </div>
+                    </div>
+                `;
+                resultsDiv.appendChild(sustainedContainer);
+
+                const reportDiv = document.createElement('div');
+                reportDiv.style.cssText = 'background:#0d2b1e; border:1px solid #10b981; border-radius:8px; padding:15px; margin-top:15px; color:#fff;';
+                const e2eSpeedEcho = (item.e2e_throughput_tps ? Number(item.e2e_throughput_tps) : (durationSec > 0 ? totalTokens / durationSec : 0)).toFixed(2);
+                reportDiv.innerHTML = `
+                    <h4 style="margin:0 0 10px 0; color:#10b981;">🎉 稳态持续解码评测回显</h4>
+                    <div style="font-size:14px; line-height:1.6;">
+                        • 持续窗口实测时长: <strong>${durationSec.toFixed(2)} 秒</strong><br>
+                        • 稳态纯解码吞吐 (Sustained Decode TPS): <strong style="color:#10b981; font-size:16px;">${sustainedTps.toFixed(2)} tokens/s</strong> <span style="font-size:12px; color:#8b949e;">(纯解码阶段，已排除Prefill)</span><br>
+                        • 端到端总生成吞吐 (End-to-End Generation TPS): <strong style="color:#61afef;">${e2eSpeedEcho} tokens/s</strong> <span style="font-size:12px; color:#8b949e;">(含首字预填充与排队调度)</span><br>
+                        • 首字时延分位数: <strong>P50: ${ttftP50}ms | P90: ${ttftP90}ms | P99: ${ttftP99}ms</strong><br>
+                        • 单字抖动 (ITL Jitter): <strong>P50: ${itlP50}ms | P90: ${itlP90}ms (σ: ${itlStd}ms)</strong><br>
+                        • 有效并发: <strong>${effConc}</strong> (池规模: ${conc}x)<br>
+                        • 总计完成并发流: <strong>${completedStreams} 个</strong>, 产出 Token: <strong>${totalTokens} 个</strong>
+                    </div>
+                `;
+                resultsDiv.appendChild(reportDiv);
+
+                screenshotComparisonBtn.style.display = 'block';
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotSustained || (currentLang === 'zh' ? '📸 截图稳态测试看板' : '📸 Screenshot Sustained Dashboard');
+                exportCombinedChartBtn.style.display = 'none';
+
+            } else {
+                // 1d_sweep 模式
+                resultsDiv.style.display = 'block';
+                const comparisonSec = document.getElementById('comparisonSection');
+                if (comparisonSec) comparisonSec.style.display = 'block';
+                const heatmapContainer = document.getElementById('matrixHeatmapContainer');
+                if (heatmapContainer) heatmapContainer.style.display = 'none';
+                if (matrixNotesEl) matrixNotesEl.style.display = 'none';
+                const sustainedDash = document.getElementById('sustainedDashboard');
+                if (sustainedDash) sustainedDash.style.display = 'none';
+
+                // 创建表格（限制最大宽度与图表一致）
+                const table = document.createElement('table');
+                table.style.maxWidth = '800px';
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                resultsDiv.appendChild(table);
+
+                // 创建表头
+                const headerRow = document.createElement('tr');
+                [
+                    t.tableHeaderPromptLen,
+                    t.tableHeaderTTFT,
+                    t.tableHeaderITL,
+                    t.tableHeaderPrefillSpeed,
+                    t.tableHeaderOutputSpeed,
+                    t.tableHeaderStatus,
+                    t.tableHeaderDetail
+                ].forEach(text => {
+                    const th = document.createElement('th');
+                    th.innerHTML = text;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+
+                // 渲染每一行数据
+                testResultsData.forEach(resultEntry => {
+                    const row = document.createElement('tr');
+                    const cells = [];
+                    for (let i = 0; i < 7; i++) {
+                        const cell = document.createElement('td');
+                        cells.push(cell);
+                        row.appendChild(cell);
+                    }
+
+                    cells[0].textContent = resultEntry.promptLength;
+                    cells[1].textContent = resultEntry.avgTtftMs ?? resultEntry.prefillTimeMs ?? 'N/A';
+                    cells[2].textContent = resultEntry.avgItlMean ?? resultEntry.outputTimeMs ?? 'N/A';
+                    cells[3].textContent = resultEntry.prefillSpeed;
+                    cells[4].textContent = resultEntry.outputSpeed;
+                    cells[5].textContent = resultEntry.status;
+
+                    // 添加详情按钮（如果有详情数据）
+                    if (resultEntry.promptText || resultEntry.outputText) {
+                        const detailButton = document.createElement('button');
+                        detailButton.className = 'detail-button';
+                        detailButton.textContent = t.detailBtnView;
+                        detailButton.onclick = () => showTestDetail(resultEntry);
+                        cells[6].appendChild(detailButton);
+                    } else {
+                        cells[6].textContent = '-';
+                    }
+
+                    // 根据状态设置行样式
+                    if (hasSuccessfulResult(resultEntry)) {
+                        row.classList.add('success');
+                    } else {
+                        row.classList.add('error');
+                    }
+                    if (Array.isArray(resultEntry.tokenWarnings) && resultEntry.tokenWarnings.length > 0) {
+                        row.classList.add('token-warning-row');
+                    }
+
+                    tbody.appendChild(row);
+                });
+
+                chartContainer.style.display = 'block';
+                generateCharts();
+
+                // 显示截图按钮（加载历史记录后）
+                screenshotComparisonBtn.style.display = 'block';
+                screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
+                exportCombinedChartBtn.style.display = 'block';
+            }
 
             // 关闭历史记录面板
             closeHistoryModal();
 
             // 滚动到结果区域
-            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (recMode === '2d_matrix') {
+                const heatmap = document.getElementById('matrixHeatmapContainer');
+                if (heatmap) heatmap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         /**
@@ -6995,6 +8890,33 @@ async function processOllamaResponse(response, promptLength) {
             document.getElementById('topPInput').value = d_top_p;
             document.getElementById('presencePenaltyInput').value = d_presence_penalty;
             document.getElementById('frequencyPenaltyInput').value = d_frequency_penalty;
+
+            // 清理 localStorage 中缓存的测试参数
+            try {
+                localStorage.removeItem('llmPerfTestMinLength');
+                localStorage.removeItem('llmPerfTestMaxLength');
+                localStorage.removeItem('llmPerfTestStep');
+                localStorage.removeItem('llmPerfTestStepMultiplier');
+                localStorage.removeItem('llmPerfTestOutputLength');
+                localStorage.removeItem('llmPerfTestConcurrency');
+                localStorage.removeItem('llmPerfTestTimeout');
+                localStorage.removeItem('llmPerfTestTemperature');
+                localStorage.removeItem('llmPerfTestTopP');
+                localStorage.removeItem('llmPerfTestPresencePenalty');
+                localStorage.removeItem('llmPerfTestFrequencyPenalty');
+                localStorage.removeItem('llmPerfTestTaskType');
+                const taskTypeSelect = document.getElementById('taskTypeSelect');
+                if (taskTypeSelect) taskTypeSelect.value = 'general';
+            } catch (e) {
+                console.warn("无法重置 localStorage 测试参数:", e);
+            }
+
+            // 按钮反馈提示
+            const originalText = resetParamsBtn.textContent;
+            resetParamsBtn.textContent = (currentLang === 'zh') ? '✓ 参数已重置' : '✓ Parameters Reset';
+            setTimeout(() => {
+                resetParamsBtn.textContent = originalText;
+            }, 1200);
         });
         document.getElementById('generateHistoryComparison').addEventListener('click', generateHistoryComparisonCharts);
 
@@ -7690,6 +9612,20 @@ async function processOllamaResponse(response, promptLength) {
                     };
                 })
             };
+            if (currentBenchmarkMode === '2d_matrix') {
+                payload.benchmark_mode = '2d_matrix';
+                payload.matrix_grid = window.matrixGridData || null;
+                payload.matrix_summary = window.matrixSummaryData || null;
+                recordTags.push('mode:2d_matrix');
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                payload.benchmark_mode = 'sustained_decode';
+                payload.sustained_summary = window.sustainedSummaryData || null;
+                recordTags.push('mode:sustained_decode');
+            } else {
+                payload.benchmark_mode = '1d_sweep';
+                recordTags.push('mode:1d_sweep');
+            }
+            payload.record_tags = Array.from(new Set(recordTags));
             if (runCommand) payload.run_command = runCommand;
             return payload;
         }

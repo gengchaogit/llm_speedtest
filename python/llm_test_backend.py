@@ -9,7 +9,13 @@ import json
 import random
 import re
 import hashlib
-from typing import List, Dict, Any, Optional
+import os
+import sys
+import platform
+import argparse
+import subprocess
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Union, Callable, Awaitable, Tuple
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -221,6 +227,12 @@ class ResultPoint(BaseModel):
     successful: Optional[int] = None
     boundary_source: Optional[str] = None
     concurrent_details: Optional[List[Dict]] = None
+    effective_concurrency: Optional[str] = None
+    verification_hash: Optional[str] = None
+    loop_detected: Optional[bool] = False
+    ttft_stats: Optional[Dict[str, Any]] = None
+    itl_stats: Optional[Dict[str, Any]] = None
+    telemetry: Optional[Dict[str, Any]] = None
 
 class UploadPayload(BaseModel):
     user_code: str
@@ -238,14 +250,21 @@ class UploadPayload(BaseModel):
     max_decode_speed: Optional[float] = None
     source: Optional[str] = "python_backend"
     record_tags: Optional[List[str]] = None
-    results: List[ResultPoint]
+    verification_hash: Optional[str] = None
+    is_anomaly: Optional[bool] = False
+    anomaly_reason: Optional[str] = None
+    benchmark_mode: Optional[str] = "1d_sweep"
+    matrix_grid: Optional[Dict[str, Any]] = None
+    matrix_summary: Optional[Dict[str, Any]] = None
+    sustained_summary: Optional[Dict[str, Any]] = None
+    results: Optional[List[ResultPoint]] = None
 
     @field_validator('user_code')
     @classmethod
     def validate_user_code(cls, v):
         v = v.strip().upper()
-        if len(v) != 8 or not v.isalnum():
-            raise ValueError('user_code 必须是8位字母数字')
+        if len(v) < 8 or len(v) > 16 or not v.isalnum():
+            raise ValueError('user_code 必须是8-16位字母数字')
         return v
 
     @field_validator('model_name')
@@ -334,42 +353,273 @@ async def _supabase_request(method: str, path: str, extra_headers: dict = None, 
     return resp
 
 
+def compute_verification_hash(
+    model_name: str,
+    hardware: str,
+    framework: Optional[str] = "",
+    quantization: Optional[str] = "",
+    concurrency: int = 1,
+    max_decode_speed: float = 0.0,
+    timestamp: Optional[int] = None,
+) -> str:
+    """
+    Computes client verification hash matching PROJECT.md & spec_report.md contract:
+    - Base: Platform/Hardware environmental signature
+    - Payload: Canonical model, hardware, framework, concurrency, max_decode_speed, timestamp
+    - Output: vh_ + SHA-256(fingerprint + payload)[:16]
+    """
+    if timestamp is None:
+        timestamp = int(time.time())
+    env_fp = f"{platform.platform()}|{platform.machine()}|{platform.processor()}|{os.cpu_count() or 0}"
+    canon_payload = (
+        f"model={model_name.strip()}|hw={hardware.strip()}|"
+        f"fw={(framework or '').strip()}|qt={(quantization or '').strip()}|"
+        f"c={concurrency}|decode={max_decode_speed:.2f}|t={timestamp}"
+    )
+    raw_hash = hashlib.sha256((env_fp + canon_payload).encode("utf-8")).hexdigest()
+    return f"vh_{raw_hash[:16]}"
+
+
+async def upload_benchmark_to_supabase(
+    user_code: str,
+    model_name: str,
+    hardware: str,
+    concurrency: int,
+    avg_prefill_speed: float,
+    avg_decode_speed: float,
+    max_prefill_speed: Optional[float] = None,
+    max_decode_speed: Optional[float] = None,
+    framework: Optional[str] = None,
+    quantization: Optional[str] = None,
+    notes: Optional[str] = None,
+    nickname: Optional[str] = None,
+    run_command: Optional[str] = None,
+    record_tags: Optional[List[str]] = None,
+    results_json: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+    verification_hash: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Upload benchmark results directly to Supabase speed_results table via REST."""
+    ts = int(time.time())
+    max_dec = max_decode_speed if max_decode_speed is not None else avg_decode_speed
+    max_pref = max_prefill_speed if max_prefill_speed is not None else avg_prefill_speed
+
+    if not verification_hash:
+        verification_hash = compute_verification_hash(
+            model_name=model_name,
+            hardware=hardware,
+            framework=framework,
+            quantization=quantization,
+            concurrency=concurrency,
+            max_decode_speed=max_dec,
+            timestamp=ts,
+        )
+
+    tags = list(record_tags or [])
+    if "source:python_v3" not in tags and "source:python_backend" not in tags:
+        tags.insert(0, "source:python_v3")
+    if "verified" not in tags:
+        tags.append("verified")
+    tags = list(dict.fromkeys(tags))
+
+    # Ensure verification_hash and metadata are safely embedded inside results_json
+    final_results_json = results_json if results_json is not None else []
+    if isinstance(final_results_json, dict):
+        if verification_hash:
+            if "verification" not in final_results_json:
+                final_results_json["verification"] = {
+                    "hash": verification_hash,
+                    "status": "verified",
+                    "timestamp": ts,
+                }
+            elif isinstance(final_results_json.get("verification"), dict):
+                final_results_json["verification"].setdefault("hash", verification_hash)
+    elif isinstance(final_results_json, list):
+        final_results_json = {
+            "benchmark_mode": "1d_sweep",
+            "verification": {
+                "hash": verification_hash,
+                "status": "verified",
+                "timestamp": ts,
+            },
+            "points": final_results_json,
+        }
+
+    payload = {
+        "user_code": user_code.strip().upper(),
+        "nickname": nickname.strip() if nickname else None,
+        "model_name": model_name.strip(),
+        "hardware": hardware.strip(),
+        "framework": framework.strip() if framework else None,
+        "quantization": quantization.strip() if quantization else None,
+        "notes": notes.strip() if notes else None,
+        "run_command": run_command.strip() if run_command else None,
+        "concurrency": concurrency,
+        "avg_prefill_speed": round(avg_prefill_speed, 2),
+        "avg_decode_speed": round(avg_decode_speed, 2),
+        "max_prefill_speed": round(max_pref, 2),
+        "max_decode_speed": round(max_dec, 2),
+        "source": "python_v3",
+        "record_tags": tags,
+        "results_json": final_results_json,
+    }
+
+    headers = {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+    url = f"{SUPABASE_URL}/rest/v1/{SUPABASE_TABLE}"
+    async with httpx.AsyncClient(timeout=20, verify=False) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            record_id = data[0]["id"] if isinstance(data, list) else data.get("id")
+            share_url = f"{SUPABASE_URL}/leaderboard/{record_id}"
+            return {
+                "success": True,
+                "id": record_id,
+                "share_url": share_url,
+                "verification_hash": verification_hash,
+            }
+        else:
+            return {
+                "success": False,
+                "status_code": resp.status_code,
+                "error": resp.text,
+            }
+
+
 @app.post("/api/upload")
 @limiter.limit("10/hour")
 async def upload_result(request: Request, payload: UploadPayload):
     """上传测试结果到云端，返回分享链接"""
-    # 构造存储数据
-    results_json = [
-        {
-            "prompt_length": r.prompt_length,
-            "prefill_speed": r.prefill_speed,
-            "output_speed": r.output_speed,
-            "prefill_time_ms": r.prefill_time_ms,
-            "output_time_ms": r.output_time_ms,
-            "avg_ttft_ms": r.avg_ttft_ms,
-            "avg_itl_mean": r.avg_itl_mean,
-            "avg_itl_std": r.avg_itl_std,
-            "concurrency": r.concurrency,
-            "successful": r.successful,
-            "boundary_source": r.boundary_source,
-            "concurrent_details": [
-                {
-                    "prefill_speed": d.get("prefill_speed"),
-                    "output_speed": d.get("output_speed"),
-                    "boundary_source": d.get("boundary_source")
-                }
-                for d in (r.concurrent_details or [])
-            ]
-        }
-        for r in payload.results
-    ]
-
     max_prefill_value = payload.max_prefill_speed if payload.max_prefill_speed is not None else payload.avg_prefill_speed
     max_decode_value = payload.max_decode_speed if payload.max_decode_speed is not None else payload.avg_decode_speed
     source_value = payload.source or "python_backend"
+
+    vh = payload.verification_hash or compute_verification_hash(
+        model_name=payload.model_name,
+        hardware=payload.hardware,
+        framework=payload.framework,
+        quantization=payload.quantization,
+        concurrency=payload.concurrency,
+        max_decode_speed=max_decode_value,
+    )
+
+    # 构造存储数据
+    mode = payload.benchmark_mode or "1d_sweep"
+    if mode in ("2d_matrix", "sustained_decode"):
+        points_data = []
+        if payload.results:
+            points_data = [
+                {
+                    "prompt_length": r.prompt_length,
+                    "concurrency": r.concurrency,
+                    "decode_tps": r.output_speed,
+                    "output_speed": r.output_speed,
+                    "prefill_speed": r.prefill_speed,
+                    "avg_ttft_ms": r.avg_ttft_ms,
+                    "avg_itl_mean": r.avg_itl_mean,
+                    "avg_itl_std": r.avg_itl_std,
+                    "status": "成功",
+                }
+                for r in payload.results
+            ]
+        results_json = {
+            "benchmark_mode": mode,
+            "matrix": payload.matrix_grid or {},
+            "matrix_summary": payload.matrix_summary or {},
+            "sustained_summary": payload.sustained_summary or {},
+            "points": points_data,
+            "verification": {
+                "hash": vh,
+                "status": "verified",
+                "timestamp": int(time.time()),
+            },
+            "quantiles": {
+                "ttft": {"avg": 0.0},
+                "itl": {"avg": 0.0},
+            },
+            "watchdog": {
+                "loop_detected": any(r.loop_detected for r in (payload.results or [])),
+            }
+        }
+    else:
+        raw_points = payload.results or []
+        all_ttft = [r.avg_ttft_ms for r in raw_points if r.avg_ttft_ms]
+        all_itl = [r.avg_itl_mean for r in raw_points if r.avg_itl_mean]
+        results_json = {
+            "benchmark_mode": "1d_sweep",
+            "matrix": [],
+            "verification": {
+                "hash": vh,
+                "status": "verified",
+                "timestamp": int(time.time()),
+            },
+            "quantiles": {
+                "ttft": {
+                    "p50": compute_percentile(all_ttft, 50),
+                    "p90": compute_percentile(all_ttft, 90),
+                    "p99": compute_percentile(all_ttft, 99),
+                },
+                "itl": {
+                    "p50": compute_percentile(all_itl, 50),
+                    "p90": compute_percentile(all_itl, 90),
+                    "p99": compute_percentile(all_itl, 99),
+                },
+            },
+            "watchdog": {
+                "loop_detected": any(r.loop_detected for r in raw_points),
+            },
+            "points": [
+                {
+                    "prompt_length": r.prompt_length,
+                    "prefill_speed": r.prefill_speed,
+                    "output_speed": r.output_speed,
+                    "prefill_time_ms": r.prefill_time_ms,
+                    "output_time_ms": r.output_time_ms,
+                    "avg_ttft_ms": r.avg_ttft_ms,
+                    "avg_itl_mean": r.avg_itl_mean,
+                    "avg_itl_std": r.avg_itl_std,
+                    "concurrency": r.concurrency,
+                    "effective_concurrency": r.effective_concurrency or f"{r.concurrency}/{r.concurrency}",
+                    "successful": r.successful,
+                    "boundary_source": r.boundary_source,
+                    "verification_hash": r.verification_hash or vh,
+                    "loop_detected": bool(r.loop_detected),
+                    "ttft_stats": r.ttft_stats or {"avg": r.avg_ttft_ms},
+                    "itl_stats": r.itl_stats or {"avg": r.avg_itl_mean, "std": r.avg_itl_std},
+                    "concurrent_details": [
+                        {
+                            "prefill_speed": d.get("prefill_speed"),
+                            "output_speed": d.get("output_speed"),
+                            "boundary_source": d.get("boundary_source"),
+                        }
+                        for d in (r.concurrent_details or [])
+                    ],
+                }
+                for r in raw_points
+            ],
+        }
+
+    if payload.is_anomaly and isinstance(results_json, dict):
+        results_json["anomaly"] = {
+            "is_anomaly": True,
+            "reason": payload.anomaly_reason or "Unspecified anomaly",
+        }
+
     record_tags = [tag.strip() for tag in (payload.record_tags or []) if isinstance(tag, str) and tag.strip()]
     if not any(tag.startswith("source:") for tag in record_tags):
         record_tags.insert(0, f"source:{source_value}")
+    if "verified" not in record_tags:
+        record_tags.append("verified")
+    if not any(t.startswith("mode:") for t in record_tags):
+        record_tags.append(f"mode:{mode}")
+    if payload.is_anomaly:
+        record_tags.append("time_anomaly")
+        if payload.anomaly_reason:
+            record_tags.append(f"anomaly:{payload.anomaly_reason}")
     record_tags = list(dict.fromkeys(record_tags))
 
     # v3: 速率限制升级，每天每 user_code/ip 100次
@@ -419,8 +669,7 @@ async def upload_result(request: Request, payload: UploadPayload):
     data = resp.json()
     record_id = data[0]["id"] if isinstance(data, list) else data.get("id")
     share_url = f"{SUPABASE_URL.replace('supabase.co', 'supabase.co')}/leaderboard/{record_id}"
-    # 实际分享链接指向排行榜，由用户复制 record_id 分享
-    return {"success": True, "id": record_id, "share_id": record_id}
+    return {"success": True, "id": record_id, "share_id": record_id, "verification_hash": vh}
 
 
 @app.get("/api/results")
@@ -696,17 +945,69 @@ class TestConfig(BaseModel):
     model_name: str
     api_key: str = ""
     api_type: str = "openai"
-    min_length: int
-    max_length: int
-    step: int
-    test_lengths: list = None  # 可选的测试点列表，如果提供则忽略min/max/step
-    output_length: int
-    concurrency: int
-    timeout: int
+    benchmark_mode: str = "1d_sweep"  # "1d_sweep" | "2d_matrix" | "sustained_decode"
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    step: Optional[int] = None
+    step_multiplier: Optional[int] = 1
+    test_lengths: Optional[list] = None  # 可选的测试点列表，如果提供则忽略min/max/step
+    matrix_concurrency_ladder: Optional[List[int]] = None
+    matrix_context_ladder: Optional[List[int]] = None
+    matrix_max_kv_tokens: int = 32768
+    sustained_duration: float = 30.0
+    sustained_prompt_length: int = 128
+    output_length: int = 128
+    concurrency: int = 1
+    timeout: int = 120000
     temperature: float = 0.7
     top_p: float = 0.9
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
+    metrics_url: Optional[str] = None
+    enable_watchdog: bool = True
+    task_type: str = "general"
+
+
+def should_skip_matrix_cell(concurrency: int, context: int, max_tokens: int, max_kv_tokens: int) -> bool:
+    """Return True if running this cell would exceed the server's KV cache budget."""
+    if max_kv_tokens <= 0:
+        return False
+    tokens_needed = concurrency * (context + max_tokens)
+    return tokens_needed > max_kv_tokens
+
+
+def get_matrix_traversal_order(concurrency_ladder: List[int], context_ladder: List[int]) -> List[Tuple[int, int]]:
+    """
+    Generate scout traversal order for 2D matrix:
+    1. Scout phase: C=1 (or lowest concurrency) across all context lengths
+    2. Decode baseline: First context across remaining concurrencies
+    3. Progressive grid: Remaining cells
+    """
+    order = []
+    seen = set()
+
+    c_scout = 1 if 1 in concurrency_ladder else min(concurrency_ladder)
+    for ctx in context_ladder:
+        cell = (c_scout, ctx)
+        if cell not in seen:
+            order.append(cell)
+            seen.add(cell)
+
+    ctx_scout = context_ladder[0]
+    for c in concurrency_ladder:
+        cell = (c, ctx_scout)
+        if cell not in seen:
+            order.append(cell)
+            seen.add(cell)
+
+    for c in concurrency_ladder:
+        for ctx in context_ladder:
+            cell = (c, ctx)
+            if cell not in seen:
+                order.append(cell)
+                seen.add(cell)
+
+    return order
 
 
 def _is_cjk_char(char: str) -> bool:
@@ -716,6 +1017,471 @@ def _is_cjk_char(char: str) -> bool:
         or "\u3040" <= char <= "\u30ff"
         or "\uac00" <= char <= "\ud7af"
     )
+
+
+def compute_percentile(data: List[float], p: float) -> float:
+    """Calculate percentile using linear interpolation (matching numpy/standard formula)."""
+    if not data:
+        return 0.0
+    valid = sorted([float(x) for x in data if x is not None and not math.isnan(x)])
+    if not valid:
+        return 0.0
+    k = (len(valid) - 1) * (p / 100.0)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return valid[int(k)]
+    d0 = valid[f] * (c - k)
+    d1 = valid[c] * (k - f)
+    return round(d0 + d1, 3)
+
+
+# ============================================================
+# Streaming Repetition Watchdog (Loop Guard)
+# Exact periodic tail detector with suffix anchor matching
+# ============================================================
+LOOP_CELL_TPS = -3.0
+LOOP_CHECK_CHARS = 256
+LOOP_MAX_PERIOD_CHARS = 32768
+LOOP_WINDOW_CHARS = 4 * LOOP_MAX_PERIOD_CHARS  # 131072 (128 KiB)
+LOOP_CONFIRMED_CHARS = 4096
+LOOP_CONFIRMED_CYCLES = 4
+LOOP_SUSPECTED_CHARS = 1024
+LOOP_SUSPECTED_CYCLES = 3
+
+
+def exact_periodic_tail(
+    text: str,
+    min_cycle_chars: int = 64,
+    min_cycles: int = 3,
+    min_chars: int = 1024,
+) -> Optional[Dict[str, Any]]:
+    """
+    Find a character-exact periodic suffix with bounded candidate search.
+    Follows reference benchmark StreamingLoopDetector algorithm:
+    - 64-char anchor matching scanned backwards
+    - Fast binary search over repeat length
+    - Rejects pure whitespace repetitions
+    """
+    n = len(text)
+    if n < min_chars:
+        return None
+    anchor_size = min_cycle_chars
+    if n < anchor_size:
+        return None
+    anchor_start = n - anchor_size
+    anchor = text[anchor_start:]
+    left = max(0, anchor_start - LOOP_MAX_PERIOD_CHARS)
+    end = n - 1
+
+    for _ in range(64):
+        previous = text.rfind(anchor, left, end)
+        if previous < 0:
+            break
+        period = anchor_start - previous
+        end = previous + anchor_size - 1
+        minimum = max(min_chars, min_cycles * period)
+        if minimum > n or text[n - minimum : n - period] != text[n - minimum + period :]:
+            continue
+        if not text[-period:].strip():
+            continue
+
+        lo, hi = minimum, n
+        while lo < hi:
+            length = (lo + hi + 1) // 2
+            if text[n - length : n - period] == text[n - length + period :]:
+                lo = length
+            else:
+                hi = length - 1
+
+        complete_cycles = lo // period
+        return {
+            "observed_start_char": n - lo,
+            "period_chars": period,
+            "repeated_chars": lo,
+            "complete_cycles": complete_cycles,
+        }
+    return None
+
+
+class StreamingLoopDetector:
+    """
+    Bounded exact-repetition evidence for one request text channel.
+    Reblocks stream fragments into 256-character pieces and scans periodic tail.
+    """
+    def __init__(
+        self,
+        channel: str = "content",
+        chunk_reblock_chars: int = LOOP_CHECK_CHARS,
+        min_cycle_chars: int = 64,
+        min_cycles: int = 4,
+    ):
+        self.channel = channel
+        self.chunk_reblock_chars = chunk_reblock_chars
+        self.min_cycle_chars = min_cycle_chars
+        self.min_cycles = min_cycles
+        self.text = ""
+        self.pending: List[str] = []
+        self.pending_chars = 0
+        self.total_chars = 0
+        self.reported_level = 0
+
+    def _check(self) -> Optional[Dict[str, Any]]:
+        if self.pending:
+            self.text = (self.text + "".join(self.pending))[-LOOP_WINDOW_CHARS:]
+            self.pending = []
+            self.pending_chars = 0
+        evidence = exact_periodic_tail(self.text)
+        if evidence is None:
+            return None
+        confirmed = (
+            evidence["complete_cycles"] >= LOOP_CONFIRMED_CYCLES
+            and evidence["repeated_chars"] >= LOOP_CONFIRMED_CHARS
+        )
+        level = 2 if confirmed else 1
+        if level <= self.reported_level:
+            return None
+        self.reported_level = level
+        offset = self.total_chars - len(self.text)
+        start = evidence["observed_start_char"]
+        period = evidence["period_chars"]
+        cycle = self.text[start : start + period]
+        return {
+            **evidence,
+            "channel": self.channel,
+            "status": "confirmed" if confirmed else "suspected",
+            "observed_start_char": offset + start,
+            "detected_at_char": self.total_chars,
+            "coordinate_unit": "unicode_code_points_in_channel",
+            "period_sha256": hashlib.sha256(cycle.encode("utf-8")).hexdigest(),
+            "cycle_excerpt": cycle[:512],
+            "context_excerpt": self.text[max(0, start - 128) : start + min(period, 512)],
+            "tail_excerpt": self.text[-1024:],
+        }
+
+    def feed(self, fragment: str) -> Optional[Dict[str, Any]]:
+        finding = None
+        offset = 0
+        while offset < len(fragment):
+            count = min(LOOP_CHECK_CHARS - self.pending_chars, len(fragment) - offset)
+            self.pending.append(fragment[offset : offset + count])
+            self.pending_chars += count
+            self.total_chars += count
+            offset += count
+            if self.pending_chars == LOOP_CHECK_CHARS:
+                finding = self._check() or finding
+                if finding and finding["status"] == "confirmed":
+                    break
+        return finding
+
+    def finish(self) -> Optional[Dict[str, Any]]:
+        return self._check()
+
+
+# ============================================================
+# Prometheus Telemetry Scraper & Server Runtime Monitor
+# Supports vLLM and SGLang /metrics endpoints
+# ============================================================
+PROMETHEUS_METRIC_LINE = re.compile(
+    r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+0-9.eEinfNa]+)"
+)
+
+
+def parse_prometheus_text(text: str) -> List[tuple[str, Dict[str, str], float]]:
+    """Parse Prometheus exposition format into (metric_name, labels, float_value) tuples."""
+    samples = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = PROMETHEUS_METRIC_LINE.match(line)
+        if not match:
+            continue
+        metric_name = match.group(1)
+        raw_labels = match.group(2) or ""
+        raw_val = match.group(3)
+        labels = {}
+        if raw_labels.startswith("{") and raw_labels.endswith("}"):
+            for k, v in re.findall(r'(\w+)="((?:[^"\\]|\\.)*)"', raw_labels):
+                labels[k] = v
+        # Multi-GPU / Tensor Parallelism deduplication: only take rank 0 or unranked
+        if "tp_rank" in labels and labels["tp_rank"] != "0":
+            continue
+        try:
+            samples.append((metric_name, labels, float(raw_val)))
+        except ValueError:
+            continue
+    return samples
+
+
+def parse_prometheus_metrics(text: str) -> Dict[str, Any]:
+    """Parse Prometheus metrics text and return structured metrics dictionary."""
+    parsed = parse_prometheus_text(text)
+    res = {
+        "engine": "unknown",
+        "running_requests": 0.0,
+        "waiting_requests": 0.0,
+        "kv_cache_usage_pct": 0.0,
+        "server_generation_tps": 0.0,
+    }
+    for name, labels, val in parsed:
+        if name in ("vllm:num_requests_running", "sglang:num_running_reqs", "sglang:num_requests_running"):
+            res["running_requests"] += val
+            if "vllm" in name:
+                res["engine"] = "vLLM"
+            elif "sglang" in name:
+                res["engine"] = "SGLang"
+        elif name in ("vllm:num_requests_waiting", "sglang:num_queue_reqs", "sglang:num_requests_waiting"):
+            res["waiting_requests"] += val
+            if "vllm" in name and res["engine"] == "unknown":
+                res["engine"] = "vLLM"
+            elif "sglang" in name and res["engine"] == "unknown":
+                res["engine"] = "SGLang"
+        elif name in ("vllm:gpu_cache_usage_factor", "vllm:kv_cache_usage_perc", "sglang:utilization", "sglang:token_usage"):
+            if name == "vllm:gpu_cache_usage_factor":
+                res["kv_cache_usage_pct"] = max(res["kv_cache_usage_pct"], val * 100.0)
+                res["engine"] = "vLLM"
+            elif name == "vllm:kv_cache_usage_perc":
+                res["kv_cache_usage_pct"] = max(res["kv_cache_usage_pct"], val)
+                res["engine"] = "vLLM"
+            elif name in ("sglang:utilization", "sglang:token_usage"):
+                res["kv_cache_usage_pct"] = max(res["kv_cache_usage_pct"], val * 100.0 if val <= 1.0 else val)
+                res["engine"] = "SGLang"
+        elif name in ("vllm:avg_generation_throughput_tok_per_s", "vllm:avg_generation_throughput_toks_per_s", "sglang:gen_throughput"):
+            res["server_generation_tps"] = max(res["server_generation_tps"], val)
+    return res
+
+
+class PrometheusTelemetryScraper:
+    """
+    Background Prometheus /metrics scraper for vLLM & SGLang.
+    Extracts KV cache usage, queue sizes, scheduler saturation, and throughput.
+    """
+    def __init__(self, base_or_api_url: Optional[str] = None, explicit_metrics_url: Optional[str] = None):
+        if explicit_metrics_url:
+            self.metrics_url = explicit_metrics_url
+        elif base_or_api_url:
+            if base_or_api_url.endswith("/metrics"):
+                self.metrics_url = base_or_api_url
+            else:
+                parsed = urlparse(base_or_api_url)
+                base = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_or_api_url.rstrip("/")
+                self.metrics_url = f"{base}/metrics"
+        else:
+            self.metrics_url = None
+
+        self.samples: List[Dict[str, Any]] = []
+        self._sampling_task: Optional[asyncio.Task] = None
+        self._stop_event = asyncio.Event()
+        self.available: Optional[bool] = None
+        self.server_engine: Optional[str] = None
+
+    async def start(self, interval: float = 0.5):
+        """Async convenience alias for start_sampling."""
+        self.start_sampling(interval)
+
+    async def stop(self) -> Dict[str, Any]:
+        """Async convenience alias for stop_sampling."""
+        return await self.stop_sampling()
+
+    async def scrape_once(self, timeout: float = 3.0) -> Optional[Dict[str, Any]]:
+        """Scrape /metrics once and parse KV cache, queue sizes, and running requests."""
+        if not self.metrics_url:
+            self.available = False
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+                resp = await client.get(self.metrics_url)
+                if resp.status_code != 200:
+                    self.available = False
+                    return None
+                text = resp.text
+        except Exception:
+            self.available = False
+            return None
+
+        parsed = parse_prometheus_text(text)
+        if not parsed:
+            self.available = False
+            return None
+
+        self.available = True
+        sample: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "running_reqs": 0.0,
+            "queue_reqs": 0.0,
+            "kv_cache_usage_pct": 0.0,
+            "server_throughput": 0.0,
+            "gpu_cache_factor": None,
+        }
+
+        for name, labels, val in parsed:
+            # Running requests
+            if name in ("vllm:num_requests_running", "sglang:num_running_reqs", "sglang:num_requests_running"):
+                sample["running_reqs"] += val
+                if "vllm" in name:
+                    self.server_engine = "vllm"
+                elif "sglang" in name:
+                    self.server_engine = "sglang"
+            # Queue waiting requests
+            elif name in ("vllm:num_requests_waiting", "sglang:num_queue_reqs", "sglang:num_requests_waiting"):
+                sample["queue_reqs"] += val
+            # KV cache usage
+            elif name in ("vllm:gpu_cache_usage_factor", "vllm:kv_cache_usage_perc", "sglang:utilization", "sglang:token_usage"):
+                if name == "vllm:gpu_cache_usage_factor":
+                    sample["gpu_cache_factor"] = val
+                    sample["kv_cache_usage_pct"] = max(sample["kv_cache_usage_pct"], val * 100.0)
+                elif name == "vllm:kv_cache_usage_perc":
+                    sample["kv_cache_usage_pct"] = max(sample["kv_cache_usage_pct"], val)
+                elif name in ("sglang:utilization", "sglang:token_usage"):
+                    sample["kv_cache_usage_pct"] = max(sample["kv_cache_usage_pct"], val * 100.0 if val <= 1.0 else val)
+            # Server throughput
+            elif name in ("vllm:avg_generation_throughput_toks_per_s", "vllm:avg_generation_throughput_tok_per_s", "sglang:gen_throughput"):
+                sample["server_throughput"] = max(sample["server_throughput"], val)
+
+        return sample
+
+    async def _sample_loop(self, interval: float):
+        while not self._stop_event.is_set():
+            sample = await self.scrape_once(timeout=max(1.5, interval))
+            if sample:
+                self.samples.append(sample)
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass
+
+    def start_sampling(self, interval: float = 0.5):
+        """Start background sampling task."""
+        self.samples.clear()
+        self._stop_event.clear()
+        self._sampling_task = asyncio.create_task(self._sample_loop(interval))
+
+    async def stop_sampling(self) -> Dict[str, Any]:
+        """Stop background sampling and compute summary statistics."""
+        self._stop_event.set()
+        if self._sampling_task:
+            try:
+                await self._sampling_task
+            except Exception:
+                pass
+            self._sampling_task = None
+
+        if not self.samples:
+            return {
+                "available": bool(self.available),
+                "engine": self.server_engine or "unknown",
+                "sample_count": 0,
+                "mean_running": 0.0,
+                "max_running": 0.0,
+                "mean_queue": 0.0,
+                "max_queue": 0.0,
+                "mean_kv_cache_pct": 0.0,
+                "max_kv_cache_pct": 0.0,
+                "server_reported_throughput": 0.0,
+            }
+
+        running = [s["running_reqs"] for s in self.samples]
+        queue = [s["queue_reqs"] for s in self.samples]
+        kv = [s["kv_cache_usage_pct"] for s in self.samples]
+        throughput = [s["server_throughput"] for s in self.samples]
+
+        return {
+            "available": True,
+            "engine": self.server_engine or "detected",
+            "sample_count": len(self.samples),
+            "mean_running": round(sum(running) / len(running), 2),
+            "max_running": round(max(running), 2),
+            "mean_queue": round(sum(queue) / len(queue), 2),
+            "max_queue": round(max(queue), 2),
+            "mean_kv_cache_pct": round(sum(kv) / len(kv), 2),
+            "max_kv_cache_pct": round(max(kv), 2),
+            "server_reported_throughput": round(max(throughput), 2),
+        }
+
+
+def calculate_effective_concurrency(
+    concurrency: int,
+    telemetry_summary: Optional[Dict[str, Any]] = None,
+    client_inferred_parallelism: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Calculates effective concurrency ratio (X/Y)* detecting server queue saturation.
+    Uses Prometheus telemetry when available; gracefully falls back to client timing inference.
+    """
+    if concurrency <= 1:
+        return {
+            "label": "1/1",
+            "effective_concurrency": 1.0,
+            "effective_ratio": 1.0,
+            "is_capacity_limited": False,
+            "source": "single_request",
+        }
+
+    # 1. Prometheus Telemetry Path
+    if telemetry_summary and telemetry_summary.get("available") and telemetry_summary.get("sample_count", 0) > 0:
+        mean_r = telemetry_summary.get("mean_running", 0.0)
+        max_r = telemetry_summary.get("max_running", 0.0)
+        mean_q = telemetry_summary.get("mean_queue", 0.0)
+        max_q = telemetry_summary.get("max_queue", 0.0)
+
+        is_limited = (
+            max_r < concurrency
+            or mean_r < concurrency * 0.95
+            or mean_q > 0.05
+            or max_q > 0
+        )
+        if is_limited:
+            effective_x = max(1, int(round(mean_r)))
+            return {
+                "label": f"({effective_x}/{concurrency})*",
+                "effective_concurrency": float(effective_x),
+                "effective_ratio": round(mean_r / concurrency, 3),
+                "is_capacity_limited": True,
+                "source": "prometheus_telemetry",
+                "mean_running": mean_r,
+                "mean_queue": mean_q,
+            }
+        return {
+            "label": f"{concurrency}/{concurrency}",
+            "effective_concurrency": float(concurrency),
+            "effective_ratio": 1.0,
+            "is_capacity_limited": False,
+            "source": "prometheus_telemetry",
+            "mean_running": mean_r,
+            "mean_queue": mean_q,
+        }
+
+    # 2. Client Timing Inferred Fallback Path
+    if client_inferred_parallelism is not None and client_inferred_parallelism > 0:
+        if client_inferred_parallelism < concurrency * 0.80:
+            effective_x = max(1, int(round(client_inferred_parallelism)))
+            return {
+                "label": f"({effective_x}/{concurrency})*",
+                "effective_concurrency": float(effective_x),
+                "effective_ratio": round(client_inferred_parallelism / concurrency, 3),
+                "is_capacity_limited": True,
+                "source": "client_inferred_fallback",
+                "inferred_parallelism": round(client_inferred_parallelism, 2),
+            }
+        return {
+            "label": f"{concurrency}/{concurrency}",
+            "effective_concurrency": float(concurrency),
+            "effective_ratio": 1.0,
+            "is_capacity_limited": False,
+            "source": "client_inferred_fallback",
+            "inferred_parallelism": round(client_inferred_parallelism, 2),
+        }
+
+    # 3. Default nominal
+    return {
+        "label": f"{concurrency}/{concurrency}",
+        "effective_concurrency": float(concurrency),
+        "effective_ratio": 1.0,
+        "is_capacity_limited": False,
+        "source": "nominal",
+    }
 
 
 def _is_ascii_word_char(char: str) -> bool:
@@ -906,6 +1672,177 @@ DEFAULT_BENCHMARK_SUFFIX = (
     "place in the universe. Use clear, coherent sentences."
 )
 
+TASK_TYPES = ["general", "code", "structured", "prose", "prefill_16k", "reasoning"]
+
+TASK_SYSTEM_PROMPTS = {
+    "general": DEFAULT_SYSTEM_PROMPT,
+    "code": (
+        "You are an expert systems programmer and computer scientist. "
+        "Write clean, idiomatic, high-performance, and syntactically complete code "
+        "with thorough edge-case handling, full type annotations, and proper indentation. "
+        "Avoid placeholder comments or unfinished stubs."
+    ),
+    "structured": (
+        "You are an automated backend service that strictly outputs valid, parseable JSON conforming to RFC 8259. "
+        "Do NOT wrap output in markdown fences. Output ONLY the raw JSON object with complete fields and valid types."
+    ),
+    "prose": (
+        "You are a distinguished essayist, historian, and philosopher. "
+        "Compose deep, eloquent, coherent essays with historical nuance, conceptual depth, and lucid argumentation."
+    ),
+    "prefill_16k": (
+        "You are an expert technical documentation analyst. "
+        "Read the long technical specification below carefully and provide a rigorous, comprehensive response "
+        "to the verification questions at the end."
+    ),
+    "reasoning": (
+        "You are an expert mathematician and logic theorist. "
+        "You must think step by step, explicitly detailing every deduction, intermediate lemma, verification step, "
+        "and edge case analysis before reaching your final conclusion."
+    ),
+}
+
+TASK_PROMPT_POOLS = {
+    "code": [
+        (
+            "Implement a high-concurrency LRU Cache with TTL (Time-To-Live) expiration in Python "
+            "using a doubly linked list, hash map, and threading.RLock. Provide full get, put, evict, "
+            "and cleanup methods along with unit test assertions and comprehensive docstrings."
+        ),
+        (
+            "Write a complete recursive descent Abstract Syntax Tree (AST) parser and expression evaluator "
+            "in Python. Support binary operators (+, -, *, /, ^), unary negation, parenthesis grouping, "
+            "operator precedence, and variable symbol tables with detailed syntax error reporting."
+        ),
+        (
+            "Implement a Red-Black Tree in Python from scratch with complete node color balance invariants, "
+            "insertion rebalancing with left and right rotations, search, and in-order traversal generator "
+            "with ASCII tree visualization helper methods."
+        ),
+        (
+            "Implement an asynchronous worker pool with token bucket rate limiting and exponential backoff retry "
+            "in Python asyncio. Include graceful shutdown, task cancellation handling, and queue backpressure."
+        ),
+    ],
+    "structured": [
+        (
+            "Generate a detailed cloud Kubernetes cluster telemetry status report in valid JSON. The object must "
+            "contain cluster_id, region, node_count, nodes array (each with node_id, status, cpu_metrics "
+            "{usage_pct, load_avg}, memory_metrics {total_gb, used_gb}, pods array with pod_name, status, "
+            "restart_count, latency_ms {p50, p90, p99}) and overall health_score."
+        ),
+        (
+            "Output a comprehensive enterprise supply chain purchase order fulfillment record in valid JSON. "
+            "Include order_id, customer_info {id, tier, billing_address}, line_items array (sku, description, "
+            "quantity, unit_price, tax_pct, fulfillment_status), payment_audit {gateway, transaction_id, "
+            "status, fee}, and timeline events with timestamps."
+        ),
+        (
+            "Create an AI inference benchmark experiment record in valid JSON with fields: benchmark_id, "
+            "model_metadata {name, architecture, parameter_count_b, quantization}, hardware {gpu_model, "
+            "vram_gb, driver_version}, performance_matrix array containing concurrency, prompt_tokens, "
+            "output_tokens, ttft_ms, decode_tps, and memory_bandwidth_pct."
+        ),
+    ],
+    "prose": [
+        (
+            "Examine the intellectual and epistemological shifts brought about by the invention of the "
+            "movable type printing press in Renaissance Europe, comparing its historical trajectory to the "
+            "societal ramifications of modern generative artificial intelligence."
+        ),
+        (
+            "Discuss the metaphysical and physical implications of thermodynamic entropy, the arrow of time, "
+            "and information theory according to Ludwig Boltzmann and Claude Shannon. Analyze whether "
+            "biological evolution and computation represent localized entropy reversals."
+        ),
+        (
+            "Analyze Thomas Kuhn's theory of scientific revolutions and paradigm shifts. Explore how anomalous "
+            "empirical observations accumulate within 'normal science' to precipitate crises, incommensurability, "
+            "and eventual scientific paradigm replacement."
+        ),
+    ],
+    "reasoning": [
+        (
+            "Solve the following mathematical puzzle with complete step-by-step reasoning: A sequence of positive "
+            "integers a_1, a_2, ..., a_n satisfies a_1 = 1, and for all k >= 1, a_{k+1} is the smallest integer "
+            "greater than a_k such that the sum of any non-empty subset of {a_1, ..., a_{k+1}} is never equal to a "
+            "product of any subset. Determine whether such an infinite sequence exists, prove your assertion, and "
+            "derive the asymptotic growth rate of a_n."
+        ),
+        (
+            "Consider an impartial combinatorial game played on a directed acyclic graph where two players alternate "
+            "moving a token along edges. A player unable to move loses. Analyze the Sprague-Grundy theorem application, "
+            "compute the nim-values (g-values) for each node, and prove the necessary and sufficient winning conditions."
+        ),
+        (
+            "Prove that in any group of 6 people, there are either at least 3 mutual friends or at least 3 mutual strangers "
+            "(Ramsey's Theorem R(3,3)=6). Then extend your step-by-step combinatorial proof to find the lower and upper bounds "
+            "for R(4,4) using the probabilistic method."
+        ),
+    ],
+}
+
+TASK_PADDING_TOKENS = {
+    "code": [
+        "class", "def", "self", "return", "import", "async", "await", "try", "except", "int", "str",
+        "float", "bool", "dict", "list", "Optional", "Union", "Tuple", "None", "True", "False", "raise",
+        "pass", "yield", "for", "in", "while", "if", "elif", "else", "with", "as", "assert", "lambda"
+    ],
+    "structured": [
+        "id", "key", "value", "type", "name", "status", "count", "items", "data", "metadata",
+        "config", "timestamp", "metrics", "enabled", "total", "score", "index", "record", "payload",
+        "result", "code", "message", "level", "tag", "user", "group", "role", "scope", "target", "schema"
+    ],
+    "prose": [
+        "history", "philosophy", "thought", "knowledge", "society", "culture", "nature", "humanity",
+        "universe", "concept", "theory", "meaning", "reality", "mind", "language", "discourse",
+        "paradigm", "reason", "virtue", "truth", "dialectic", "context", "episteme", "aesthetic"
+    ],
+    "reasoning": [
+        "assume", "suppose", "lemma", "theorem", "proof", "deduction", "implies", "therefore",
+        "contradiction", "invariant", "sequence", "subset", "partition", "induction", "basis",
+        "hypothesis", "equation", "inequality", "optimal", "equilibrium", "strategy", "bound"
+    ],
+}
+
+PREFILL_16K_DOC_SECTIONS = [
+    (
+        "Chapter 1: Distributed Vector Consensus and Raft State Machine Invariants\n"
+        "In a distributed replicated state machine architecture, consensus safety is maintained through strict term monotonicity and election restrictions. "
+        "Each replica maintains a persistent log where log entries consist of an integer index, the election term in which the entry was proposed, and the state machine transition command. "
+        "A leader is elected only when it receives affirmative votes from a strict majority quorum of servers. A candidate's log must be at least as up-to-date as any other server in the quorum, "
+        "defined by lexicographical comparison of the last log term followed by the last log index. If a network partition occurs, the partitioned minority cannot elect a leader or commit entries, "
+        "guaranteeing linearizability. Upon partition healing, heartbeat intervals and append entry RPCs enforce the leader's log authority, overwriting uncommitted conflicting entries."
+    ),
+    (
+        "Chapter 2: Log-Structured Merge Tree (LSM) Engine and Leveled Compaction Dynamics\n"
+        "High-throughput write workloads utilize Log-Structured Merge (LSM) trees that transform random writes into sequential disk operations. "
+        "Incoming writes are initially recorded into an append-only write-ahead log (WAL) and buffered in an active in-memory MemTable implemented as a concurrent SkipList. "
+        "When the MemTable reaches its capacity threshold, it becomes immutable and is flushed to persistent storage as a Level 0 (L0) Sorted String Table (SSTable). "
+        "Because L0 SSTables contain overlapping key ranges, read operations may inspect multiple files, leading to read amplification. "
+        "To bound read latency and reclaim space from tombstone markers and superseded versions, background compaction merges files across hierarchical levels (L1 through LN). "
+        "Leveled compaction enforces strictly non-overlapping key ranges within each level above L0, maintaining exponential size multipliers between adjacent tiers."
+    ),
+    (
+        "Chapter 3: Zero-Copy RDMA Transport Fabric and Kernel-Bypass Memory Subsystems\n"
+        "Modern hyper-scale data planes bypass the traditional operating system TCP/IP stack using Remote Direct Memory Access (RDMA) over Converged Ethernet (RoCE v2). "
+        "Network interface cards (NICs) interact directly with registered user-space memory buffers, completely eliminating kernel context switches and intermediate CPU buffer copies. "
+        "Connection state is maintained via Reliable Connected (RC) queue pairs (QPs). Priority Flow Control (PFC) provides hop-by-hop link-level flow control to prevent packet drop "
+        "in loss-intolerant fabrics, while Explicit Congestion Notification (ECN) coupled with Data Center Quantized Congestion Notification (DCQCN) throttles transmission rates at the source NIC "
+        "prior to switch buffer overflow, achieving microsecond-tier tail latencies at multi-hundred-gigabit line rates."
+    ),
+    (
+        "Chapter 4: Byzantine Fault Detection, Split-Brain Fencing, and Dynamic Reconfiguration\n"
+        "Enterprise resilience demands robust fault isolation against asymmetric network partitions, clock drift, and Byzantine corruptions. "
+        "Split-brain scenarios are mitigated via epoch-based fencing tokens issued by distributed lease coordinators. Storage targets reject any I/O request bearing an epoch token lower than "
+        "the current cluster generation. Membership changes undergo joint consensus transitions wherein configuration changes require dual quorums (both the prior configuration C_old "
+        "and the proposed configuration C_new) before committing, ensuring seamless zero-downtime node addition, decommissioning, and storage tier expansion."
+    ),
+]
+
+def get_system_prompt_for_task(task_type: str = "general") -> str:
+    """Return the optimized system prompt for the specified benchmark task type."""
+    return TASK_SYSTEM_PROMPTS.get(task_type, DEFAULT_SYSTEM_PROMPT)
 
 ASCII_FILLER_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789"
 PROMPT_TOKEN_WORDS = [
@@ -950,26 +1887,111 @@ def build_token_word_sequence(token_count: int, seed: int = 0) -> str:
     return " ".join(words)
 
 
+def build_task_padding_sequence(task_type: str, token_count: int, seed: int = 0) -> str:
+    """Build domain-specific filler text matching token_count for the task."""
+    target_count = max(int(token_count), 0)
+    if target_count <= 0:
+        return ""
+    words_pool = TASK_PADDING_TOKENS.get(task_type, PROMPT_TOKEN_WORDS)
+    rng = random.Random(time.time_ns() ^ (seed * 1_000_003))
+    words = [
+        words_pool[rng.randrange(len(words_pool))]
+        for _ in range(target_count)
+    ]
+    return " ".join(words)
+
+
+def generate_prefill_16k_prompt(target_length: int, seed: int = 0) -> str:
+    """Generate long technical architecture specification document targeting 16k context."""
+    verification_suffix = (
+        "\n\n[Architectural Verification Questions based on the document above]:\n"
+        "1. Explain how the consensus engine guarantees safety during network partitions when split-brain fencing is triggered.\n"
+        "2. Analyze how the leveled compaction strategy balances write amplification versus read amplification in the storage engine.\n"
+        "3. Detail the zero-copy RDMA queue-pair lifecycle and congestion notification mechanisms.\n"
+        "Provide a thorough, precise architectural analysis citing the sections above."
+    )
+    suffix_tokens = estimate_token_count(verification_suffix)
+    needed_body_tokens = max(target_length - suffix_tokens, 64)
+
+    sections = PREFILL_16K_DOC_SECTIONS
+    body_parts = []
+    current_tokens = 0
+    cycle = 0
+    while current_tokens < needed_body_tokens:
+        for idx, sec in enumerate(sections):
+            header = f"\n\n--- Module Cluster {cycle + 1}.{idx + 1} ---\n" if cycle > 0 else "\n\n"
+            part = header + sec
+            part_tokens = estimate_token_count(part)
+            if current_tokens + part_tokens > needed_body_tokens:
+                remaining = needed_body_tokens - current_tokens
+                padding = build_token_word_sequence(remaining, seed + cycle * 100 + idx)
+                if padding:
+                    body_parts.append("\n" + padding)
+                current_tokens = needed_body_tokens
+                break
+            body_parts.append(part)
+            current_tokens += part_tokens
+        cycle += 1
+
+    return "".join(body_parts).strip() + verification_suffix
+
+
+def generate_task_prompt(task_type: str, length: int, seed: int = 0) -> str:
+    """Generate prompt from the curated task library."""
+    if task_type == "prefill_16k":
+        target_len = max(length, 1024) if length <= SHORT_PROMPT_MAX_LENGTH else length
+        return generate_prefill_16k_prompt(target_len, seed)
+
+    pool = TASK_PROMPT_POOLS.get(task_type, [])
+    if not pool:
+        return generate_prompt(length, seed, task_type="general")
+
+    base_prompt = pool[abs(seed) % len(pool)]
+    base_tokens = estimate_token_count(base_prompt)
+
+    if length <= SHORT_PROMPT_MAX_LENGTH:
+        if task_type == "code":
+            return f"Write a complete Python implementation: {base_prompt[:60]}..."
+        elif task_type == "structured":
+            return f"Generate pure JSON matching: {base_prompt[:60]}..."
+        elif task_type == "reasoning":
+            return f"Solve step by step with proof: {base_prompt[:60]}..."
+        else:
+            return base_prompt[:100]
+
+    if length <= base_tokens:
+        return base_prompt
+
+    prefix_token_count = max(length - base_tokens, 0)
+    prefix_text = build_task_padding_sequence(task_type, prefix_token_count, seed)
+    if prefix_text:
+        return prefix_text + "\n\n" + base_prompt
+    return base_prompt
+
+
 def generate_short_prompt(length: int, seed: int = 0) -> str:
     """Generate a short prompt without the benchmark essay suffix."""
     target_prompt_length = get_resolved_prompt_length(length)
     return build_token_word_sequence(target_prompt_length, seed)
 
 
-def generate_prompt(length: int, seed: int = 0) -> str:
+def generate_prompt(length: int, seed: int = 0, task_type: str = "general") -> str:
     """Generate a randomized prompt whose final estimated length matches the target semantics."""
     target_prompt_length = get_resolved_prompt_length(length)
-    if target_prompt_length <= SHORT_PROMPT_MAX_LENGTH:
-        return generate_short_prompt(target_prompt_length, seed)
+    if task_type == "general" or task_type not in TASK_SYSTEM_PROMPTS:
+        if target_prompt_length <= SHORT_PROMPT_MAX_LENGTH:
+            return generate_short_prompt(target_prompt_length, seed)
 
-    suffix_text = DEFAULT_BENCHMARK_SUFFIX.strip()
-    suffix_tokens = estimate_token_count(suffix_text)
-    prefix_token_count = max(target_prompt_length - suffix_tokens, 0)
-    prefix_text = build_token_word_sequence(prefix_token_count, seed)
+        suffix_text = DEFAULT_BENCHMARK_SUFFIX.strip()
+        suffix_tokens = estimate_token_count(suffix_text)
+        prefix_token_count = max(target_prompt_length - suffix_tokens, 0)
+        prefix_text = build_token_word_sequence(prefix_token_count, seed)
 
-    if prefix_text:
-        return prefix_text + "\n" + suffix_text
-    return suffix_text
+        if prefix_text:
+            return prefix_text + "\n" + suffix_text
+        return suffix_text
+
+    return generate_task_prompt(task_type, target_prompt_length, seed)
 
 
 def estimate_prompt_tokens_for_messages(prompt_text: str, system_prompt: str = DEFAULT_SYSTEM_PROMPT) -> int:
@@ -1436,32 +2458,34 @@ async def execute_single_request(
     network_latency_ms: float = 0.0,
     network_latency_sample_count: int = 0,
     prompt_calibration: Optional[Dict[str, Any]] = None,
+    client: Optional[httpx.AsyncClient] = None,
+    enable_watchdog: bool = True,
+    task_type: str = "general",
 ) -> Dict[str, Any]:
-    """执行单个测试请求"""
+    """执行单个测试请求（支持共享连接池、流式死循环守卫与多场景题库）"""
     
     resolved_prompt_length = get_resolved_prompt_length(prompt_length)
     generation_prompt_length = get_calibrated_generation_prompt_length(prompt_length, prompt_calibration)
     print(
-        f"[Request] 开始请求 - Prompt长度: {prompt_length}, "
+        f"[Request] 开始请求 - 任务: {task_type}, Prompt长度: {prompt_length}, "
         f"目标长度: {resolved_prompt_length}, 输出长度: {output_length}, Seed: {seed}"
     )
 
-    # 使用随机单词生成prompt，避免cache
-    prompt_text = generate_prompt(generation_prompt_length, seed)
-    local_estimated_prompt_tokens = estimate_prompt_tokens_for_messages(prompt_text)
+    system_prompt = get_system_prompt_for_task(task_type)
+    prompt_text = generate_prompt(generation_prompt_length, seed, task_type=task_type)
+    local_estimated_prompt_tokens = estimate_prompt_tokens_for_messages(prompt_text, system_prompt=system_prompt)
     estimated_prompt_tokens = apply_prompt_calibration(local_estimated_prompt_tokens, prompt_calibration)
     
     if api_type == "openai":
         headers = {
             "Content-Type": "application/json",
         }
-        # 只有当api_key非空时才添加Authorization头
         if api_key and api_key.strip():
             headers["Authorization"] = f"Bearer {api_key}"
         payload = {
             "model": model_name,
             "messages": [
-                {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt_text}
             ],
             "max_tokens": output_length,
@@ -1470,14 +2494,14 @@ async def execute_single_request(
             "presence_penalty": presence_penalty,
             "frequency_penalty": frequency_penalty,
             "stream": True,
-            "stream_options": {"include_usage": True}  # 请求返回usage信息
+            "stream_options": {"include_usage": True}
         }
     else:  # ollama
         headers = {"Content-Type": "application/json"}
         payload = {
             "model": model_name,
             "messages": [
-                {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt_text}
             ],
             "options": {
@@ -1489,8 +2513,8 @@ async def execute_single_request(
         }
     
     start_time = time.perf_counter()
-    first_chunk_time = None  # 第一个chunk到达时间（prefill结束）
-    first_token_time = None  # 第一个有内容token的时间（用于ITL）
+    first_chunk_time = None
+    first_token_time = None
     output_content = ""
     reasoning_content = ""
     actual_output_tokens = None
@@ -1501,28 +2525,28 @@ async def execute_single_request(
     server_decode_time_ms = None
     usage_info = None
 
+    # Watchdogs
+    content_watchdog = StreamingLoopDetector(channel="content") if enable_watchdog else None
+    reasoning_watchdog = StreamingLoopDetector(channel="reasoning") if enable_watchdog else None
+    loop_detected = False
+    loop_finding: Optional[Dict[str, Any]] = None
+
     # ITL (Inter-Token Latency) tracking
-    token_timestamps = []  # 记录每个token的时间戳
-    last_token_time = None  # 上一个token的时间戳
+    token_timestamps = []
+    last_token_time = None
     
+    timeout_seconds = timeout / 1000.0
+    timeout_obj = httpx.Timeout(timeout_seconds, connect=15.0)
+
+    should_close_client = False
+    http_client = client
+    if http_client is None:
+        http_client = httpx.AsyncClient(timeout=timeout_obj, verify=False, http2=True)
+        should_close_client = True
+
     try:
-        print(f"[Request] 发送请求到 {api_url}", flush=True)
-        print(f"[Request] Payload大小预估: {len(json.dumps(payload))} 字节", flush=True)
-        print(f"[Request] Headers: {redact_sensitive_headers(headers)}", flush=True)
-
-        # 配置httpx以支持大payload和长时间请求
-        # httpx 0.13.x 使用不同的Timeout API
-        # 使用简单的超时值，httpx会自动应用到各个阶段
-        timeout_seconds = timeout / 1000.0  # 转换为秒
-
-        print(f"[Request] 创建httpx客户端 (超时: {timeout_seconds}秒)...", flush=True)
-        async with httpx.AsyncClient(
-            timeout=timeout_seconds,
-            verify=False
-        ) as client:
-            print(f"[Request] 开始发送POST请求...", flush=True)
-            async with client.stream("POST", api_url, headers=headers, json=payload) as response:
-                print(f"[Response] 收到响应，状态码: {response.status_code}", flush=True)
+        try:
+            async with http_client.stream("POST", api_url, headers=headers, json=payload, timeout=timeout_obj) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
                     error_msg = build_http_error_message(api_url, model_name, response.status_code, error_text)
@@ -1532,157 +2556,108 @@ async def execute_single_request(
                         "error": error_msg
                     }
                 
-                print(f"[Response] 开始接收流式数据...")
-                
                 chunk_count = 0
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue
 
-                    # Log raw streamed line for debugging
-                    # print(f"[RawLine] {line.strip()}")
-
                     # 处理OpenAI SSE格式
                     if line.startswith("data: "):
                         if "[DONE]" in line:
-                            print(f"[Stream] 收到 [DONE]，共处理 {chunk_count} 个chunk")
                             break
                         json_line = line.replace("data: ", "")
                     else:
-                        # Ollama直接返回JSON，不需要处理SSE格式
                         json_line = line.strip()
 
                     try:
                         data = json.loads(json_line)
                         chunk_count += 1
 
-                        # 检查ollama的done字段
                         if data.get("done") is True:
-                            print(f"[Stream] Ollama返回done=true，共处理 {chunk_count} 个chunk")
-                            # 继续处理这个chunk（包含最终的timing信息），不要break
+                            # Ollama final timing chunk
+                            pass
 
-                        # 记录第一个chunk到达时间（prefill结束时间）
                         if first_chunk_time is None:
                             first_chunk_time = time.perf_counter()
                             ttft_ms = (first_chunk_time - start_time) * 1000
-                            print(f"[FirstChunk] 接收到首个chunk（prefill完成），耗时: {ttft_ms:.2f}ms")
 
                         # 提取usage信息（OpenAI格式）
                         if data.get("usage"):
                             usage = data["usage"]
                             usage_stats = extract_usage_token_stats(usage)
-                            completion = usage_stats["completion_tokens"] or 0
-                            reasoning = usage_stats["reasoning_tokens"] or 0
-                            prompt = usage_stats["prompt_tokens"] or 0
-
-                            print(f"[Usage] 找到usage字段！prompt_tokens: {prompt}, completion_tokens: {completion}, reasoning_tokens: {reasoning}")
-                            print(f"[Debug] 完整usage字段: {json.dumps(usage, indent=2)}")
-
                             actual_output_tokens = usage_stats["output_tokens"]
                             if _has_positive_number(usage_stats["prompt_tokens"]):
                                 actual_prompt_tokens = usage_stats["prompt_tokens"]
                             usage_info = usage.copy()
 
-                            # 提取服务器timing (多种可能的字段名)
-                            # llama.cpp/Ollama格式：纳秒
                             if usage.get("prompt_eval_duration"):
                                 server_prefill_time_ms = usage["prompt_eval_duration"] / 1_000_000
-                                print(f"[Usage] 找到 prompt_eval_duration: {server_prefill_time_ms:.2f}ms")
                             elif usage.get("prompt_eval_time"):
                                 server_prefill_time_ms = usage["prompt_eval_time"]
-                                print(f"[Usage] 找到 prompt_eval_time: {server_prefill_time_ms:.2f}ms")
                             elif usage.get("prompt_time"):
-                                server_prefill_time_ms = usage["prompt_time"] * 1000  # 秒转毫秒
-                                print(f"[Usage] 找到 prompt_time: {server_prefill_time_ms:.2f}ms")
+                                server_prefill_time_ms = usage["prompt_time"] * 1000
 
                             if usage.get("eval_duration"):
                                 server_decode_time_ms = usage["eval_duration"] / 1_000_000
-                                print(f"[Usage] 找到 eval_duration: {server_decode_time_ms:.2f}ms")
                             elif usage.get("eval_time"):
                                 server_decode_time_ms = usage["eval_time"]
-                                print(f"[Usage] 找到 eval_time: {server_decode_time_ms:.2f}ms")
                             elif usage.get("completion_time"):
-                                server_decode_time_ms = usage["completion_time"] * 1000  # 秒转毫秒
-                                print(f"[Usage] 找到 completion_time: {server_decode_time_ms:.2f}ms")
+                                server_decode_time_ms = usage["completion_time"] * 1000
 
                             if data.get("timings"):
                                 usage_info["timings"] = data["timings"]
-                                print(f"[Debug] 完整timings字段: {json.dumps(data['timings'], indent=2)}")
 
-                        # 提取usage信息（Ollama格式 - 直接在顶层）
+                        # 提取usage信息（Ollama格式）
                         if data.get("prompt_eval_count") is not None:
                             prompt = data.get("prompt_eval_count", 0)
                             completion = data.get("eval_count", 0)
-
-                            print(f"[Usage-Ollama] 找到ollama格式！prompt_eval_count: {prompt}, eval_count: {completion}")
-
                             actual_output_tokens = completion
                             if _has_positive_number(prompt):
                                 actual_prompt_tokens = prompt
 
-                            # 构造usage_info
                             usage_info = {
                                 "prompt_tokens": prompt,
                                 "completion_tokens": completion,
                                 "total_tokens": prompt + completion
                             }
-
-                            # 提取ollama的timing信息（纳秒）
                             if data.get("prompt_eval_duration"):
                                 server_prefill_time_ms = data["prompt_eval_duration"] / 1_000_000
-                                print(f"[Usage-Ollama] 找到 prompt_eval_duration: {server_prefill_time_ms:.2f}ms")
                                 usage_info["prompt_eval_duration_ns"] = data["prompt_eval_duration"]
-
                             if data.get("eval_duration"):
                                 server_decode_time_ms = data["eval_duration"] / 1_000_000
-                                print(f"[Usage-Ollama] 找到 eval_duration: {server_decode_time_ms:.2f}ms")
                                 usage_info["eval_duration_ns"] = data["eval_duration"]
-
                             if data.get("total_duration"):
                                 usage_info["total_duration_ns"] = data["total_duration"]
-                                print(f"[Usage-Ollama] total_duration: {data['total_duration'] / 1_000_000:.2f}ms")
-
                             if data.get("load_duration"):
                                 usage_info["load_duration_ns"] = data["load_duration"]
-                                print(f"[Usage-Ollama] load_duration: {data['load_duration'] / 1_000_000:.2f}ms")
                         
-                        # 提取timings（顶层，某些API实现可能放在这里）
+                        # 提取timings
                         if data.get("timings") and not (server_prefill_time_ms and server_decode_time_ms):
                             timings = data["timings"]
-                            print(f"[Timings] 检查顶层timings字段...")
-                            
                             if not server_prefill_time_ms:
                                 if timings.get("prompt_eval_duration"):
                                     server_prefill_time_ms = timings["prompt_eval_duration"] / 1_000_000
-                                    print(f"[Timings] 找到 prompt_eval_duration: {server_prefill_time_ms:.2f}ms")
                                 elif timings.get("prompt_ms"):
                                     server_prefill_time_ms = timings["prompt_ms"]
-                                    print(f"[Timings] 找到 prompt_ms: {server_prefill_time_ms:.2f}ms")
-                            
                             if not server_decode_time_ms:
                                 if timings.get("eval_duration"):
                                     server_decode_time_ms = timings["eval_duration"] / 1_000_000
-                                    print(f"[Timings] 找到 eval_duration: {server_decode_time_ms:.2f}ms")
                                 elif timings.get("predicted_ms"):
                                     server_decode_time_ms = timings["predicted_ms"]
-                                    print(f"[Timings] 找到 predicted_ms: {server_decode_time_ms:.2f}ms")
-                        
-                        # 提取内容
+
+                        # 提取文本内容
                         content_text = None
                         is_reasoning = False
-                        # Handle Ollama streaming response field
                         if data.get("response") is not None:
                             content_text = data["response"]
                             content_chunk_count += 1
                         
                         if data.get("choices") and len(data["choices"]) > 0:
                             choice = data["choices"][0]
-                            
                             if choice.get("delta", {}).get("reasoning_content"):
                                 content_text = choice["delta"]["reasoning_content"]
                                 is_reasoning = True
                                 reasoning_chunk_count += 1
-                            # 思考模型格式：delta.reasoning（思考过程）
                             elif choice.get("delta", {}).get("reasoning"):
                                 content_text = choice["delta"]["reasoning"]
                                 is_reasoning = True
@@ -1707,71 +2682,94 @@ async def execute_single_request(
                                 content_chunk_count += 1
                         
                         if content_text:
-                                current_token_time = time.perf_counter()
+                            current_token_time = time.perf_counter()
 
-                                if first_token_time is None:
-                                    first_token_time = current_token_time
-                                    token_latency_ms = (first_token_time - start_time) * 1000
-                                    print(f"[FirstToken] 接收到首个内容token，耗时: {token_latency_ms:.2f}ms")
+                            if first_token_time is None:
+                                first_token_time = current_token_time
 
-                                # 记录token时间戳和ITL
-                                token_timestamps.append({
-                                    "timestamp": current_token_time,
-                                    "time_from_start_ms": (current_token_time - start_time) * 1000,
-                                    "is_reasoning": is_reasoning
-                                })
+                            token_timestamps.append({
+                                "timestamp": current_token_time,
+                                "time_from_start_ms": (current_token_time - start_time) * 1000,
+                                "is_reasoning": is_reasoning
+                            })
 
-                                # 计算ITL（如果不是第一个token）
-                                if last_token_time is not None:
-                                    itl = (current_token_time - last_token_time) * 1000  # ms
-                                    token_timestamps[-1]["itl_ms"] = itl
-                                else:
-                                    token_timestamps[-1]["itl_ms"] = None  # 第一个token没有ITL
+                            if last_token_time is not None:
+                                itl = (current_token_time - last_token_time) * 1000
+                                token_timestamps[-1]["itl_ms"] = itl
+                            else:
+                                token_timestamps[-1]["itl_ms"] = None
 
-                                last_token_time = current_token_time
+                            last_token_time = current_token_time
 
-                                if is_reasoning:
-                                    reasoning_content += content_text
-                                else:
-                                    output_content += content_text
+                            # Watchdog checks
+                            if is_reasoning:
+                                reasoning_content += content_text
+                                if reasoning_watchdog:
+                                    wf = reasoning_watchdog.feed(content_text)
+                                    if wf and wf.get("status") == "confirmed":
+                                        loop_detected = True
+                                        loop_finding = wf
+                                        print(f"[Watchdog] 思考流死循环熔断触发! Period={wf['period_chars']}, Cycles={wf['complete_cycles']}. 立即中止流。")
+                                        break
+                            else:
+                                output_content += content_text
+                                if content_watchdog:
+                                    wf = content_watchdog.feed(content_text)
+                                    if wf and wf.get("status") == "confirmed":
+                                        loop_detected = True
+                                        loop_finding = wf
+                                        print(f"[Watchdog] 内容流死循环熔断触发! Period={wf['period_chars']}, Cycles={wf['complete_cycles']}. 立即中止流。")
+                                        break
 
-                        # 如果ollama标记done=true，处理完这个chunk后退出
+
+                        if loop_detected:
+                            break
+
                         if data.get("done") is True:
-                            print(f"[Stream] Ollama done=true，退出循环")
                             break
 
                     except json.JSONDecodeError:
                         continue
+        finally:
+            if should_close_client:
+                await http_client.aclose()
         
         end_time = time.perf_counter()
 
-        print(f"[Response] 接收完成 - 内容长度: {len(output_content)}, Reasoning: {len(reasoning_content)}")
+        # Final loop watchdog flush check
+        if not loop_detected:
+            if content_watchdog:
+                wf = content_watchdog.finish()
+                if wf and wf.get("status") == "confirmed":
+                    loop_detected = True
+                    loop_finding = wf
+                    print(f"[Watchdog] 流结束时发现死循环: {wf}")
+            if reasoning_watchdog and not loop_detected:
+                wf = reasoning_watchdog.finish()
+                if wf and wf.get("status") == "confirmed":
+                    loop_detected = True
+                    loop_finding = wf
+                    print(f"[Watchdog] 流结束时发现思考流死循环: {wf}")
 
-        # 计算指标 - 使用第一个chunk时间作为prefill结束标志
+        print(f"[Response] 接收完成 - 内容长度: {len(output_content)}, Reasoning: {len(reasoning_content)}, Loop: {loop_detected}")
+
         total_time_ms = (end_time - start_time) * 1000
 
-        # Use first content token as default prefill/decode boundary.
         boundary_source = "first_content_token"
         if first_token_time is not None:
             boundary_time = first_token_time
             ttft_ms = (boundary_time - start_time) * 1000
-            print(f"[Timing] Boundary=first_content_token, TTFT: {ttft_ms:.2f}ms, Total: {total_time_ms:.2f}ms")
         elif first_chunk_time is not None:
             boundary_source = "first_chunk_fallback"
             boundary_time = first_chunk_time
             ttft_ms = (boundary_time - start_time) * 1000
-            print(f"[Timing] Boundary fallback to first_chunk, TTFT: {ttft_ms:.2f}ms, Total: {total_time_ms:.2f}ms")
         else:
             boundary_source = "no_boundary_fallback"
             boundary_time = end_time
             ttft_ms = total_time_ms
-            print(f"[Timing] Warning: no token/chunk timestamp, fallback to end_time. Total: {total_time_ms:.2f}ms")
 
         decode_time_ms = max(total_time_ms - ttft_ms, 1)
 
-        print(f"[Timing] Server Prefill: {server_prefill_time_ms}ms, Server Decode: {server_decode_time_ms}ms")
-        
-        # Token sanity check: llama.cpp-like servers may return cumulative totals per concurrent response.
         token_warnings: List[Dict[str, Any]] = []
         api_prompt_tokens = actual_prompt_tokens
         api_output_tokens = actual_output_tokens
@@ -1789,18 +2787,6 @@ async def execute_single_request(
         actual_prompt_tokens = prompt_resolution["tokens"] or estimated_prompt_tokens
         if prompt_resolution["warning"]:
             token_warnings.append(prompt_resolution["warning"])
-            print(
-                "[TokenWarning] Prompt API stats look abnormal; "
-                f"api={prompt_resolution['warning']['api_tokens']}, "
-                f"local={prompt_resolution['warning']['estimated_tokens']}, "
-                f"diff={prompt_resolution['warning']['relative_diff'] * 100:.1f}%. "
-                "Using local estimate.",
-                flush=True,
-            )
-        elif prompt_resolution["source"] == "API":
-            print(f"[Token] Prompt from API usage: {actual_prompt_tokens}")
-        else:
-            print(f"[Token] Prompt local estimate: {actual_prompt_tokens}")
 
         output_resolution = resolve_token_count_with_sanity_check(
             "decode",
@@ -1810,18 +2796,6 @@ async def execute_single_request(
         actual_output_tokens = output_resolution["tokens"]
         if output_resolution["warning"]:
             token_warnings.append(output_resolution["warning"])
-            print(
-                "[TokenWarning] Decode API stats look abnormal; "
-                f"api={output_resolution['warning']['api_tokens']}, "
-                f"local={output_resolution['warning']['estimated_tokens']}, "
-                f"diff={output_resolution['warning']['relative_diff'] * 100:.1f}%. "
-                "Using local estimate.",
-                flush=True,
-            )
-        elif output_resolution["source"] == "API":
-            print(f"[Token] Output from API usage: {actual_output_tokens}")
-        else:
-            print(f"[Token] Output local estimate: {actual_output_tokens}")
 
         if token_warnings:
             token_source = "API Stats Anomaly"
@@ -1832,23 +2806,15 @@ async def execute_single_request(
         else:
             token_source = "Unknown"
 
-        # 计算时间和速度：优先使用服务器返回的timing，否则使用客户端测量
-
         # 优先使用服务器返回的timing
         if server_prefill_time_ms is not None and server_decode_time_ms is not None:
             prefill_time_ms = server_prefill_time_ms
             output_time_ms = server_decode_time_ms
             time_source = '服务器timing'
-            print(f"[TimeSource] 使用服务器timing - Prefill: {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms")
-            print(f"[TimeSource] 客户端测量（参考）- Prefill(TTFT): {ttft_ms:.2f}ms, Decode: {decode_time_ms:.2f}ms")
         else:
-            # 回退到客户端测量的时间
             prefill_time_ms = ttft_ms
             output_time_ms = decode_time_ms
             time_source = '端到端测量（基于chunk时序）'
-            print(f"[TimeSource] client timing fallback - Prefill(TTFT): {prefill_time_ms:.2f}ms, Decode: {output_time_ms:.2f}ms, Boundary: {boundary_source}")
-            if server_prefill_time_ms or server_decode_time_ms:
-                print(f"[TimeSource] 部分服务器timing可用 - Prefill: {server_prefill_time_ms}ms, Decode: {server_decode_time_ms}ms")
 
         has_server_prefill_timing = _has_positive_number(server_prefill_time_ms)
         has_server_decode_timing = _has_positive_number(server_decode_time_ms)
@@ -1860,10 +2826,6 @@ async def execute_single_request(
             output_time_ms = server_decode_time_ms if has_server_decode_timing else client_decode_time_ms
             prefill_time_source = "server" if has_server_prefill_timing else ("client_latency_adjusted" if latency_adjustment_ms > 0 else "client")
             output_time_source = "server" if has_server_decode_timing else "client"
-            print(
-                f"[TimeSource] Adjusted per-phase timing - Prefill={prefill_time_source} "
-                f"({prefill_time_ms:.2f}ms), Decode={output_time_source} ({output_time_ms:.2f}ms)"
-            )
         else:
             prefill_time_ms = client_prefill_time_ms
             output_time_ms = client_decode_time_ms
@@ -1871,7 +2833,6 @@ async def execute_single_request(
             output_time_source = "client"
 
         # 计算速度 (tokens/second)
-        # 使用usage中的token数量，即使没有收到实际内容也计算
         if prefill_time_ms > 0:
             prefill_speed = (actual_prompt_tokens / (prefill_time_ms / 1000))
         else:
@@ -1882,27 +2843,25 @@ async def execute_single_request(
         else:
             output_speed = 0
 
-        print(f"[Result] Prefill速度: {prefill_speed:.2f} t/s, Decode速度: {output_speed:.2f} t/s")
+        # 如果熔断器捕捉到死循环，设置哨兵速率 -3.0
+        if loop_detected:
+            output_speed = LOOP_CELL_TPS
 
-        # 添加数据质量警告
-        if actual_output_tokens > 0 and len(output_content) == 0 and len(reasoning_content) == 0:
-            print(f"[Warning] 速度基于usage ({actual_output_tokens} tokens)和timing计算，但未收到实际流式内容")
-            if output_speed > 10000:  # 超过10000 t/s通常不合理
-                print(f"[Warning] Decode速度异常高 ({output_speed:.2f} t/s)，可能表示服务器非真正流式生成")
-
-        # 计算ITL统计
+        # 计算ITL分位数及统计
         itl_stats = {}
         if len(token_timestamps) > 1:
             itl_values = [t["itl_ms"] for t in token_timestamps if t["itl_ms"] is not None]
             if itl_values:
                 itl_stats = {
                     "mean": round(sum(itl_values) / len(itl_values), 2),
+                    "p50": compute_percentile(itl_values, 50),
+                    "p90": compute_percentile(itl_values, 90),
+                    "p99": compute_percentile(itl_values, 99),
                     "min": round(min(itl_values), 2),
                     "max": round(max(itl_values), 2),
                     "std": round((sum((x - sum(itl_values)/len(itl_values))**2 for x in itl_values) / len(itl_values))**0.5, 2) if len(itl_values) > 1 else 0,
                     "count": len(itl_values)
                 }
-                print(f"[ITL] 平均: {itl_stats['mean']}ms, 最小: {itl_stats['min']}ms, 最大: {itl_stats['max']}ms, 标准差: {itl_stats['std']}ms")
 
         return {
             "success": True,
@@ -1921,7 +2880,7 @@ async def execute_single_request(
             "output_time_ms": round(output_time_ms, 2),
             "output_speed": round(output_speed, 2),
             "total_time_ms": round(total_time_ms, 2),
-            "prompt_text": prompt_text,  # 添加实际的提示词文本
+            "prompt_text": prompt_text,
             "output_content": output_content,
             "reasoning_content": reasoning_content,
             "usage_info": usage_info,
@@ -1936,20 +2895,21 @@ async def execute_single_request(
             "client_decode_time_ms": round(client_decode_time_ms, 2),
             "client_total_time_ms": round(max(total_time_ms - latency_adjustment_ms, 1), 2),
             "client_has_phase_boundary": boundary_source != "no_boundary_fallback",
-            "has_streaming_content": first_token_time is not None,  # 是否有实际内容token
-            "chunk_count": chunk_count,  # chunk数量
-            # 添加绝对时间戳用于并发总吞吐计算
+            "has_streaming_content": first_token_time is not None,
+            "chunk_count": chunk_count,
             "start_timestamp": start_time,
-            "first_chunk_timestamp": first_chunk_time,  # chunk到达时间
-            "first_token_timestamp": first_token_time,  # 内容token时间
+            "first_chunk_timestamp": first_chunk_time,
+            "first_token_timestamp": first_token_time,
             "boundary_timestamp": boundary_time,
             "boundary_source": boundary_source,
             "end_timestamp": end_time,
-            "token_source": token_source,  # 添加token来源
+            "token_source": token_source,
             "token_warnings": token_warnings,
-            # 新增ITL相关数据
-            "token_timestamps": token_timestamps,  # 所有token的时间戳数据
-            "itl_stats": itl_stats  # ITL统计信息
+            "token_timestamps": token_timestamps,
+            "itl_stats": itl_stats,
+            "loop_detected": loop_detected,
+            "loop_diagnostics": loop_finding,
+            "cjk_drift_detected": False,
         }
     
     except (httpx.ReadTimeout, httpx.WriteTimeout, httpx.ConnectTimeout, httpx.PoolTimeout) as e:
@@ -1990,6 +2950,658 @@ async def execute_single_request(
         }
 
 
+async def run_2d_matrix_benchmark(
+    api_url: str,
+    api_key: str,
+    api_type: str,
+    model_name: str,
+    concurrency_ladder: List[int],
+    context_ladder: List[int],
+    max_tokens: int = 128,
+    max_kv_tokens: int = 32768,
+    timeout: int = 120000,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    presence_penalty: float = 0.0,
+    frequency_penalty: float = 0.0,
+    metrics_url: Optional[str] = None,
+    hardware: Optional[str] = None,
+    framework: Optional[str] = None,
+    quantization: Optional[str] = None,
+    enable_watchdog: bool = True,
+    progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+    result_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+    task_type: str = "general",
+) -> Dict[str, Any]:
+    """Execute 2D Concurrency x Context Matrix Sweep with scout traversal, capacity skipping and cell error isolation."""
+    hardware = hardware or detect_hardware()
+    framework = framework or "vLLM"
+    quantization = quantization or "FP16"
+
+    # Normalize ladders
+    concurrency_ladder = [int(c) for c in concurrency_ladder if int(c) > 0]
+    context_ladder = [int(ctx) for ctx in context_ladder if int(ctx) > 0]
+    if not concurrency_ladder:
+        concurrency_ladder = [1, 2, 4, 8]
+    if not context_ladder:
+        context_ladder = [512, 1024, 2048]
+
+    cell_order = get_matrix_traversal_order(concurrency_ladder, context_ladder)
+    total_cells = len(cell_order)
+
+    matrix_grid: Dict[str, Dict[str, Any]] = {str(c): {} for c in concurrency_ladder}
+    all_cell_results: List[Dict[str, Any]] = []
+    all_successful_requests: List[Dict[str, Any]] = []
+
+    completed_cells = 0
+    skipped_cells = 0
+    errored_cells = 0
+    peak_decode_tps = 0.0
+    peak_point: Optional[Dict[str, Any]] = None
+    saturation_onset: str = "None"
+
+    print(f"\n[Matrix] Starting 2D Matrix Sweep ({len(concurrency_ladder)}x{len(context_ladder)} = {total_cells} cells)...")
+
+    for idx, (conc, ctx) in enumerate(cell_order):
+        tokens_needed = conc * (ctx + max_tokens)
+        if should_skip_matrix_cell(conc, ctx, max_tokens, max_kv_tokens):
+            skipped_cells += 1
+            print(f"[Matrix] Cell ({conc}x, {ctx}ctx): SKIP_KV_LIMIT ({tokens_needed} > {max_kv_tokens})")
+            cell_result = {
+                "concurrency": conc,
+                "context": ctx,
+                "prompt_length": ctx,
+                "requested_prompt_length": ctx,
+                "decode_tps": -1.0,
+                "avg_decode_speed": -1.0,
+                "avg_prefill_speed": 0.0,
+                "max_decode_speed": 0.0,
+                "max_prefill_speed": 0.0,
+                "ttft_ms": 0.0,
+                "avg_ttft_ms": 0.0,
+                "status": "SKIP_KV_LIMIT",
+                "skipped": True,
+                "skip_reason": f"KV limit exceeded: {tokens_needed} > {max_kv_tokens}",
+                "tokens_needed": tokens_needed,
+                "max_kv_tokens": max_kv_tokens,
+                "success_count": 0,
+                "failed_count": 0,
+                "effective_concurrency": f"{conc}/{conc}",
+            }
+            matrix_grid[str(conc)][str(ctx)] = cell_result
+            all_cell_results.append(cell_result)
+
+            if progress_callback:
+                await progress_callback({
+                    "type": "progress",
+                    "benchmark_mode": "2d_matrix",
+                    "cell_current": idx + 1,
+                    "cell_total": total_cells,
+                    "concurrency": conc,
+                    "context": ctx,
+                    "tokens_needed": tokens_needed,
+                    "status": "SKIP_KV_LIMIT",
+                })
+            if result_callback:
+                msg = dict(cell_result)
+                msg["type"] = "result"
+                msg["benchmark_mode"] = "2d_matrix"
+                await result_callback(msg)
+            continue
+
+        print(f"[Matrix] Cell ({conc}x, {ctx}ctx): Running {conc} streams ({idx + 1}/{total_cells})...")
+        if progress_callback:
+            await progress_callback({
+                "type": "progress",
+                "benchmark_mode": "2d_matrix",
+                "cell_current": idx + 1,
+                "cell_total": total_cells,
+                "concurrency": conc,
+                "context": ctx,
+                "tokens_needed": tokens_needed,
+                "status": "testing",
+            })
+
+        try:
+            client_limits = httpx.Limits(
+                max_connections=max(256, conc * 2),
+                max_keepalive_connections=max(128, conc),
+            )
+            async with httpx.AsyncClient(limits=client_limits, http2=True, timeout=timeout / 1000.0, verify=False) as http_client:
+                seeds = [random.randint(1000, 999999) for _ in range(conc)]
+                tasks = [
+                    execute_single_request(
+                        api_url=api_url,
+                        api_key=api_key,
+                        api_type=api_type,
+                        model_name=model_name,
+                        prompt_length=ctx,
+                        output_length=max_tokens,
+                        timeout=timeout,
+                        temperature=temperature,
+                        top_p=top_p,
+                        presence_penalty=presence_penalty,
+                        frequency_penalty=frequency_penalty,
+                        seed=s,
+                        client=http_client,
+                        enable_watchdog=enable_watchdog,
+                        task_type=task_type,
+                    )
+                    for s in seeds
+                ]
+                req_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            succ = [r for r in req_results if isinstance(r, dict) and r.get("success")]
+            failed_count = conc - len(succ)
+
+            if not succ:
+                errored_cells += 1
+                cell_result = {
+                    "concurrency": conc,
+                    "context": ctx,
+                    "prompt_length": ctx,
+                    "requested_prompt_length": ctx,
+                    "decode_tps": 0.0,
+                    "avg_decode_speed": 0.0,
+                    "avg_prefill_speed": 0.0,
+                    "max_decode_speed": 0.0,
+                    "max_prefill_speed": 0.0,
+                    "ttft_ms": 0.0,
+                    "avg_ttft_ms": 0.0,
+                    "status": "ERROR",
+                    "error": f"All {conc} requests failed",
+                    "skipped": False,
+                    "tokens_needed": tokens_needed,
+                    "failed_count": failed_count,
+                    "success_count": 0,
+                    "effective_concurrency": f"(0/{conc})*",
+                }
+            else:
+                completed_cells += 1
+                all_successful_requests.extend(succ)
+
+                avg_prefill = sum(r["prefill_speed"] for r in succ) / len(succ)
+                avg_decode = sum(r["output_speed"] for r in succ) / len(succ)
+                max_prefill = max(r["prefill_speed"] for r in succ)
+                max_decode = max(r["output_speed"] for r in succ)
+                avg_ttft = sum(r["ttft_ms"] for r in succ) / len(succ)
+
+                aggregate_metrics = calculate_aggregate_throughput_metrics(succ)
+                eff_conc = calculate_effective_concurrency(
+                    concurrency=conc,
+                    telemetry_summary={},
+                    client_inferred_parallelism=aggregate_metrics.get("client_inferred_parallelism"),
+                )
+
+                all_ttft = [r["ttft_ms"] for r in succ if r.get("ttft_ms")]
+                ttft_stats = {
+                    "avg": round(sum(all_ttft) / len(all_ttft), 2) if all_ttft else 0.0,
+                    "p50": compute_percentile(all_ttft, 50),
+                    "p90": compute_percentile(all_ttft, 90),
+                    "p99": compute_percentile(all_ttft, 99),
+                }
+
+                all_itl = [
+                    t["itl_ms"]
+                    for r in succ
+                    for t in r.get("token_timestamps", [])
+                    if t.get("itl_ms") is not None
+                ]
+                itl_stats = {
+                    "avg": round(sum(all_itl) / len(all_itl), 2) if all_itl else 0.0,
+                    "p50": compute_percentile(all_itl, 50),
+                    "p90": compute_percentile(all_itl, 90),
+                    "p99": compute_percentile(all_itl, 99),
+                }
+
+                loop_detected = any(r.get("loop_detected") for r in succ)
+                status_str = "成功" if not loop_detected else "ERROR: loop"
+
+                if avg_decode > peak_decode_tps:
+                    peak_decode_tps = round(avg_decode, 2)
+                    peak_point = {"concurrency": conc, "context": ctx, "decode_tps": peak_decode_tps}
+
+                if saturation_onset == "None" and eff_conc.get("is_saturated"):
+                    saturation_onset = eff_conc.get("label", f"{conc}x")
+
+                cell_vh = compute_verification_hash(
+                    model_name=model_name,
+                    hardware=hardware,
+                    framework=framework,
+                    quantization=quantization,
+                    concurrency=conc,
+                    max_decode_speed=max_decode,
+                )
+
+                cell_result = {
+                    "concurrency": conc,
+                    "context": ctx,
+                    "prompt_length": ctx,
+                    "requested_prompt_length": ctx,
+                    "decode_tps": round(avg_decode, 2),
+                    "avg_decode_speed": round(avg_decode, 2),
+                    "avg_prefill_speed": round(avg_prefill, 2),
+                    "max_decode_speed": round(max_decode, 2),
+                    "max_prefill_speed": round(max_prefill, 2),
+                    "ttft_ms": round(avg_ttft, 2),
+                    "avg_ttft_ms": round(avg_ttft, 2),
+                    "ttft_stats": ttft_stats,
+                    "itl_stats": itl_stats,
+                    "effective_concurrency": eff_conc.get("label", f"{conc}/{conc}"),
+                    "effective_concurrency_detail": eff_conc,
+                    "loop_detected": loop_detected,
+                    "skipped": False,
+                    "status": status_str,
+                    "tokens_needed": tokens_needed,
+                    "success_count": len(succ),
+                    "failed_count": failed_count,
+                    "verification_hash": cell_vh,
+                    "concurrent_details": succ,
+                }
+
+        except Exception as e:
+            errored_cells += 1
+            print(f"[Matrix] Cell ({conc}x, {ctx}ctx) exception: {e}")
+            cell_result = {
+                "concurrency": conc,
+                "context": ctx,
+                "prompt_length": ctx,
+                "requested_prompt_length": ctx,
+                "decode_tps": 0.0,
+                "avg_decode_speed": 0.0,
+                "avg_prefill_speed": 0.0,
+                "max_decode_speed": 0.0,
+                "max_prefill_speed": 0.0,
+                "ttft_ms": 0.0,
+                "avg_ttft_ms": 0.0,
+                "status": "ERROR",
+                "error": str(e),
+                "skipped": False,
+                "tokens_needed": tokens_needed,
+                "failed_count": conc,
+                "success_count": 0,
+                "effective_concurrency": f"(0/{conc})*",
+            }
+
+        matrix_grid[str(conc)][str(ctx)] = cell_result
+        all_cell_results.append(cell_result)
+
+        if result_callback:
+            msg = dict(cell_result)
+            msg["type"] = "result"
+            msg["benchmark_mode"] = "2d_matrix"
+            await result_callback(msg)
+
+        # Cooldown between cells
+        await asyncio.sleep(1.0)
+
+    peak_concurrency = max(concurrency_ladder) if concurrency_ladder else 1
+    valid_decodes = [c["avg_decode_speed"] for c in all_cell_results if not c.get("skipped") and c.get("avg_decode_speed", 0) > 0]
+    valid_prefills = [c["avg_prefill_speed"] for c in all_cell_results if not c.get("skipped") and c.get("avg_prefill_speed", 0) > 0]
+
+    overall_avg_decode = sum(valid_decodes) / len(valid_decodes) if valid_decodes else 0.0
+    overall_avg_prefill = sum(valid_prefills) / len(valid_prefills) if valid_prefills else 0.0
+    overall_max_decode = max((c.get("max_decode_speed", 0.0) for c in all_cell_results if not c.get("skipped")), default=0.0)
+    overall_max_prefill = max((c.get("max_prefill_speed", 0.0) for c in all_cell_results if not c.get("skipped")), default=0.0)
+
+    matrix_summary = {
+        "peak_decode_tps": peak_decode_tps,
+        "peak_point": peak_point or {},
+        "saturation_onset": saturation_onset,
+        "total_cells": total_cells,
+        "completed_cells": completed_cells,
+        "skipped_cells": skipped_cells,
+        "errored_cells": errored_cells,
+        "overall_avg_decode": round(overall_avg_decode, 2),
+        "overall_avg_prefill": round(overall_avg_prefill, 2),
+        "overall_max_decode": round(overall_max_decode, 2),
+        "overall_max_prefill": round(overall_max_prefill, 2),
+        "peak_concurrency": peak_concurrency,
+    }
+
+    points = [
+        {
+            "concurrency": c.get("concurrency"),
+            "context": c.get("context"),
+            "prompt_length": c.get("context"),
+            "decode_tps": c.get("decode_tps", 0.0),
+            "output_speed": c.get("decode_tps", 0.0),
+            "prefill_speed": c.get("avg_prefill_speed", 0.0),
+            "avg_ttft_ms": c.get("avg_ttft_ms", 0.0),
+            "ttft_p50_ms": c.get("ttft_stats", {}).get("p50", 0.0),
+            "itl_p50_ms": c.get("itl_stats", {}).get("p50", 0.0),
+            "effective_concurrency": c.get("effective_concurrency", ""),
+            "status": c.get("status", ""),
+            "skipped": c.get("skipped", False),
+        }
+        for c in all_cell_results
+    ]
+
+    all_ttft_values = [r["ttft_ms"] for r in all_successful_requests if r.get("ttft_ms")]
+    all_itl_values = [
+        t["itl_ms"]
+        for r in all_successful_requests
+        for t in r.get("token_timestamps", [])
+        if t.get("itl_ms") is not None
+    ]
+
+    quantiles = {
+        "ttft": {
+            "avg": round(sum(all_ttft_values) / len(all_ttft_values), 2) if all_ttft_values else 0.0,
+            "p50": compute_percentile(all_ttft_values, 50),
+            "p90": compute_percentile(all_ttft_values, 90),
+            "p99": compute_percentile(all_ttft_values, 99),
+        },
+        "itl": {
+            "avg": round(sum(all_itl_values) / len(all_itl_values), 2) if all_itl_values else 0.0,
+            "p50": compute_percentile(all_itl_values, 50),
+            "p90": compute_percentile(all_itl_values, 90),
+            "p99": compute_percentile(all_itl_values, 99),
+        }
+    }
+
+    overall_vh = compute_verification_hash(
+        model_name=model_name,
+        hardware=hardware,
+        framework=framework,
+        quantization=quantization,
+        concurrency=peak_concurrency,
+        max_decode_speed=overall_max_decode,
+    )
+
+    return {
+        "benchmark_mode": "2d_matrix",
+        "model_name": model_name,
+        "hardware": hardware,
+        "framework": framework,
+        "quantization": quantization,
+        "concurrency_ladder": concurrency_ladder,
+        "context_ladder": context_ladder,
+        "max_kv_tokens": max_kv_tokens,
+        "peak_concurrency": peak_concurrency,
+        "matrix_grid": matrix_grid,
+        "matrix_summary": matrix_summary,
+        "all_cell_results": all_cell_results,
+        "points": points,
+        "quantiles": quantiles,
+        "overall_avg_decode": round(overall_avg_decode, 2),
+        "overall_avg_prefill": round(overall_avg_prefill, 2),
+        "overall_max_decode": round(overall_max_decode, 2),
+        "overall_max_prefill": round(overall_max_prefill, 2),
+        "verification_hash": overall_vh,
+    }
+
+
+async def run_sustained_decode_benchmark(
+    api_url: str,
+    api_key: str,
+    api_type: str,
+    model_name: str,
+    concurrency: int = 1,
+    prompt_length: int = 128,
+    output_length: int = 128,
+    duration_seconds: float = 30.0,
+    timeout: int = 120000,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    presence_penalty: float = 0.0,
+    frequency_penalty: float = 0.0,
+    metrics_url: Optional[str] = None,
+    hardware: Optional[str] = None,
+    framework: Optional[str] = None,
+    quantization: Optional[str] = None,
+    enable_watchdog: bool = True,
+    progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+    task_type: str = "general",
+) -> Dict[str, Any]:
+    """Execute Sustained Steady-State Decode benchmark with worker pool replenishment and window enforcement."""
+    hardware = hardware or detect_hardware()
+    framework = framework or "vLLM"
+    quantization = quantization or "FP16"
+    concurrency = max(1, int(concurrency))
+    duration_seconds = max(1.0, float(duration_seconds))
+
+    window_start = time.monotonic()
+    window_deadline = window_start + duration_seconds
+    total_tokens_generated = 0
+    completed_requests: List[Dict[str, Any]] = []
+    active_stream_count = 0
+    lock = asyncio.Lock()
+    stop_event = asyncio.Event()
+
+    print(f"\n[Sustained] Starting Sustained Decode: Concurrency={concurrency}, Duration={duration_seconds}s, Prompt={prompt_length} tokens...")
+
+    client_limits = httpx.Limits(
+        max_connections=max(256, concurrency * 2),
+        max_keepalive_connections=max(128, concurrency),
+    )
+
+    async with httpx.AsyncClient(limits=client_limits, http2=True, timeout=timeout / 1000.0, verify=False) as http_client:
+        async def worker(worker_id: int):
+            nonlocal total_tokens_generated, active_stream_count
+            req_index = 0
+            while not stop_event.is_set() and time.monotonic() < window_deadline:
+                time_left = window_deadline - time.monotonic()
+                if time_left <= 0.2:
+                    break
+                req_timeout = min(timeout, int(time_left * 1000) + 2000)
+
+                async with lock:
+                    active_stream_count += 1
+                try:
+                    seed = worker_id * 10000 + req_index * 100 + random.randint(1, 99)
+                    req_index += 1
+                    res = await execute_single_request(
+                        api_url=api_url,
+                        api_key=api_key,
+                        api_type=api_type,
+                        model_name=model_name,
+                        prompt_length=prompt_length,
+                        output_length=output_length,
+                        timeout=req_timeout,
+                        temperature=temperature,
+                        top_p=top_p,
+                        presence_penalty=presence_penalty,
+                        frequency_penalty=frequency_penalty,
+                        seed=seed,
+                        client=http_client,
+                        enable_watchdog=enable_watchdog,
+                        task_type=task_type,
+                    )
+                    if res.get("success") and (res.get("output_tokens") or 0) > 0:
+                        async with lock:
+                            total_tokens_generated += res["output_tokens"]
+                            completed_requests.append(res)
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    print(f"[SustainedWorker {worker_id}] Request error: {e}")
+                finally:
+                    async with lock:
+                        active_stream_count -= 1
+
+                def compute_live_progress() -> Dict[str, Any]:
+                    elapsed = time.monotonic() - window_start
+                    total_decode_s = sum(max(r.get("output_time_ms", 0), 1) / 1000.0 for r in completed_requests)
+                    if total_decode_s > 0 and len(completed_requests) > 0:
+                        cur_stream_speed = total_tokens_generated / total_decode_s
+                        active_conc = min(float(concurrency), max(1.0, float(len(completed_requests))))
+                        live_tps = cur_stream_speed * active_conc
+                    else:
+                        live_tps = 0.0
+                    return {
+                        "elapsed_sec": round(elapsed, 2),
+                        "duration_sec": round(duration_seconds, 2),
+                        "total_tokens": total_tokens_generated,
+                        "completed_streams": len(completed_requests),
+                        "live_tps": round(live_tps, 2),
+                        "e2e_tps": round(total_tokens_generated / max(elapsed, 0.001), 2),
+                        "active_workers": active_stream_count,
+                    }
+
+                if progress_callback and not stop_event.is_set():
+                    await progress_callback(compute_live_progress())
+
+        async def ticker():
+            while not stop_event.is_set() and time.monotonic() < window_deadline:
+                await asyncio.sleep(0.5)
+                if progress_callback and not stop_event.is_set():
+                    elapsed = time.monotonic() - window_start
+                    total_decode_s = sum(max(r.get("output_time_ms", 0), 1) / 1000.0 for r in completed_requests)
+                    if total_decode_s > 0 and len(completed_requests) > 0:
+                        cur_stream_speed = total_tokens_generated / total_decode_s
+                        active_conc = min(float(concurrency), max(1.0, float(len(completed_requests))))
+                        live_tps = cur_stream_speed * active_conc
+                    else:
+                        live_tps = 0.0
+                    await progress_callback({
+                        "elapsed_sec": round(elapsed, 2),
+                        "duration_sec": round(duration_seconds, 2),
+                        "total_tokens": total_tokens_generated,
+                        "completed_streams": len(completed_requests),
+                        "live_tps": round(live_tps, 2),
+                        "e2e_tps": round(total_tokens_generated / max(elapsed, 0.001), 2),
+                        "active_workers": active_stream_count,
+                    })
+
+        ticker_task = asyncio.create_task(ticker())
+        workers = [asyncio.create_task(worker(w + 1)) for w in range(concurrency)]
+
+        sleep_duration = max(0.0, window_deadline - time.monotonic())
+        await asyncio.sleep(sleep_duration)
+        stop_event.set()
+        ticker_task.cancel()
+
+        done, pending = await asyncio.wait(workers, timeout=2.0)
+        for p in pending:
+            p.cancel()
+
+    actual_duration_sec = time.monotonic() - window_start
+    stream_durations = [r["output_time_ms"] / 1000.0 for r in completed_requests if r.get("output_time_ms")]
+    sum_stream_durations = sum(stream_durations)
+    avg_stream_decode_speed = (total_tokens_generated / sum_stream_durations) if sum_stream_durations > 0 else 0.0
+
+    all_ttft = [r["ttft_ms"] for r in completed_requests if r.get("ttft_ms")]
+    sum_ttft_s = sum(all_ttft) / 1000.0
+    total_prompt_tokens = sum(r.get("prompt_tokens") or prompt_length for r in completed_requests)
+    avg_prefill = round(total_prompt_tokens / sum_ttft_s, 2) if sum_ttft_s > 0 else 0.0
+
+    first_tokens = [
+        r.get("first_token_timestamp") or r.get("boundary_timestamp") or r.get("start_timestamp")
+        for r in completed_requests
+        if r.get("start_timestamp") is not None
+    ]
+    end_tokens = [r.get("end_timestamp") for r in completed_requests if r.get("end_timestamp") is not None]
+    if first_tokens and end_tokens and len(completed_requests) > 1:
+        active_decode_span_s = max(max(end_tokens) - min(first_tokens), 0.001)
+    else:
+        active_decode_span_s = sum_stream_durations if concurrency == 1 else actual_duration_sec
+
+    inferred_parallelism = min(float(concurrency), max(1.0, sum_stream_durations / active_decode_span_s)) if active_decode_span_s > 0 else float(concurrency)
+    is_saturated = concurrency > 1 and inferred_parallelism < (concurrency * 0.8)
+    p_effective = inferred_parallelism if is_saturated else float(concurrency)
+    eff_conc_label = f"({round(inferred_parallelism)}/{concurrency})*" if is_saturated else f"{concurrency}/{concurrency}"
+
+    # Pure steady-state decode throughput (deducting TTFT / prefill duration)
+    steady_decode_tps = avg_stream_decode_speed * p_effective
+    e2e_throughput_tps = total_tokens_generated / max(actual_duration_sec, 0.001)
+
+    all_itl = [
+        t["itl_ms"]
+        for r in completed_requests
+        for t in r.get("token_timestamps", [])
+        if t.get("itl_ms") is not None
+    ]
+
+    ttft_stats = {
+        "avg": round(sum(all_ttft) / len(all_ttft), 2) if all_ttft else 0.0,
+        "p50": compute_percentile(all_ttft, 50),
+        "p90": compute_percentile(all_ttft, 90),
+        "p99": compute_percentile(all_ttft, 99),
+        "std": round((sum((x - (sum(all_ttft)/len(all_ttft)))**2 for x in all_ttft) / len(all_ttft))**0.5, 2) if len(all_ttft) > 1 else 0.0
+    }
+
+    itl_stats = {
+        "avg": round(sum(all_itl) / len(all_itl), 2) if all_itl else 0.0,
+        "p50": compute_percentile(all_itl, 50),
+        "p90": compute_percentile(all_itl, 90),
+        "p99": compute_percentile(all_itl, 99),
+        "std": round((sum((x - (sum(all_itl)/len(all_itl)))**2 for x in all_itl) / len(all_itl))**0.5, 2) if len(all_itl) > 1 else 0.0
+    }
+
+    loop_detected = any(r.get("loop_detected") for r in completed_requests)
+
+    overall_vh = compute_verification_hash(
+        model_name=model_name,
+        hardware=hardware,
+        framework=framework,
+        quantization=quantization,
+        concurrency=concurrency,
+        max_decode_speed=steady_decode_tps,
+    )
+
+    sustained_summary = {
+        "benchmark_mode": "sustained_decode",
+        "task_type": task_type,
+        "concurrency": concurrency,
+        "prompt_length": prompt_length,
+        "target_duration_sec": duration_seconds,
+        "actual_duration_sec": round(actual_duration_sec, 2),
+        "pure_decode_time_s": round(sum_stream_durations, 2),
+        "total_tokens": total_tokens_generated,
+        "completed_streams": len(completed_requests),
+        "avg_decode_speed": round(steady_decode_tps, 2),
+        "steady_decode_tps": round(steady_decode_tps, 2),
+        "pure_decode_tps": round(steady_decode_tps, 2),
+        "e2e_throughput_tps": round(e2e_throughput_tps, 2),
+        "avg_stream_decode_tps": round(avg_stream_decode_speed, 2),
+        "max_decode_speed": round(steady_decode_tps, 2),
+        "avg_prefill_speed": avg_prefill,
+        "max_prefill_speed": avg_prefill,
+        "avg_ttft_ms": ttft_stats["avg"],
+        "ttft_stats": ttft_stats,
+        "itl_stats": itl_stats,
+        "effective_concurrency": eff_conc_label,
+        "inferred_parallelism": round(inferred_parallelism, 2),
+        "is_saturated": is_saturated,
+        "loop_detected": loop_detected,
+        "verification_hash": overall_vh,
+    }
+
+    points = [
+        {
+            "concurrency": concurrency,
+            "prompt_length": prompt_length,
+            "decode_tps": round(steady_decode_tps, 2),
+            "output_speed": round(steady_decode_tps, 2),
+            "prefill_speed": avg_prefill,
+            "avg_ttft_ms": ttft_stats["avg"],
+            "ttft_p50_ms": ttft_stats["p50"],
+            "itl_p50_ms": itl_stats["p50"],
+            "effective_concurrency": eff_conc_label,
+            "status": "成功" if not loop_detected else "ERROR: loop",
+            "skipped": False,
+        }
+    ]
+
+    quantiles = {
+        "ttft": ttft_stats,
+        "itl": itl_stats,
+    }
+
+    return {
+        **sustained_summary,
+        "model_name": model_name,
+        "hardware": hardware,
+        "framework": framework,
+        "quantization": quantization,
+        "sustained_summary": sustained_summary,
+        "points": points,
+        "quantiles": quantiles,
+        "completed_requests": completed_requests,
+    }
+
+
 @app.websocket("/ws/test")
 async def websocket_test_endpoint(websocket: WebSocket):
     """WebSocket端点，用于实时测试进度推送"""
@@ -2001,20 +3613,132 @@ async def websocket_test_endpoint(websocket: WebSocket):
         print(f"[WebSocket] 收到原始数据: {config_data}")
         config = TestConfig(**config_data)
         
-        print(f"[Config] 接收配置 - API: {config.api_type}, 模型: {config.model_name}, 并发: {config.concurrency}")
-        
+        mode = getattr(config, "benchmark_mode", "1d_sweep") or "1d_sweep"
+        task_type = getattr(config, "task_type", "general") or "general"
+        print(f"[Config] 接收配置 - 模式: {mode}, 任务: {task_type}, API: {config.api_type}, 模型: {config.model_name}, 并发: {config.concurrency}")
+
+        if mode == "2d_matrix":
+            concurrency_ladder = config.matrix_concurrency_ladder or [1, 2, 4, 8]
+            context_ladder = config.matrix_context_ladder or [512, 1024, 2048]
+            max_kv_tokens = config.matrix_max_kv_tokens if config.matrix_max_kv_tokens is not None else 32768
+
+            await websocket.send_json({
+                "type": "info",
+                "message": f"开始 2D 矩阵测试 ({task_type})，并发阶梯: {concurrency_ladder}, 上下文阶梯: {context_ladder}",
+                "benchmark_mode": "2d_matrix",
+                "task_type": task_type,
+            })
+
+            async def ws_matrix_progress(msg: Dict[str, Any]):
+                await websocket.send_json(msg)
+
+            async def ws_matrix_result(msg: Dict[str, Any]):
+                await websocket.send_json(msg)
+
+            matrix_res = await run_2d_matrix_benchmark(
+                api_url=config.api_url,
+                api_key=config.api_key,
+                api_type=config.api_type,
+                model_name=config.model_name,
+                concurrency_ladder=concurrency_ladder,
+                context_ladder=context_ladder,
+                max_tokens=config.output_length,
+                max_kv_tokens=max_kv_tokens,
+                timeout=config.timeout,
+                temperature=config.temperature,
+                top_p=config.top_p,
+                presence_penalty=config.presence_penalty,
+                frequency_penalty=config.frequency_penalty,
+                metrics_url=config.metrics_url,
+                enable_watchdog=config.enable_watchdog,
+                progress_callback=ws_matrix_progress,
+                result_callback=ws_matrix_result,
+                task_type=task_type,
+            )
+
+            await websocket.send_json({
+                "type": "complete",
+                "message": "2D 矩阵测试完成",
+                "benchmark_mode": "2d_matrix",
+                "task_type": task_type,
+                "all_results": matrix_res.get("all_cell_results", []),
+                "matrix_grid": matrix_res.get("matrix_grid", {}),
+                "matrix_summary": matrix_res.get("matrix_summary", {}),
+                "points": matrix_res.get("points", []),
+            })
+            return
+
+        elif mode == "sustained_decode":
+            concurrency = config.concurrency or 1
+            duration = config.sustained_duration if config.sustained_duration is not None else 30.0
+            prompt_length = config.sustained_prompt_length or 128
+
+            await websocket.send_json({
+                "type": "info",
+                "message": f"开始稳态持续解码测试 ({task_type})，并发流: {concurrency}, 时长: {duration}s, 提示词: {prompt_length} tokens",
+                "benchmark_mode": "sustained_decode",
+                "task_type": task_type,
+            })
+
+            async def ws_sustained_progress(data: Dict[str, Any]):
+                msg = dict(data)
+                msg["type"] = "progress"
+                msg["benchmark_mode"] = "sustained_decode"
+                msg["task_type"] = task_type
+                await websocket.send_json(msg)
+
+            sustained_res = await run_sustained_decode_benchmark(
+                api_url=config.api_url,
+                api_key=config.api_key,
+                api_type=config.api_type,
+                model_name=config.model_name,
+                concurrency=concurrency,
+                prompt_length=prompt_length,
+                output_length=config.output_length,
+                duration_seconds=duration,
+                timeout=config.timeout,
+                temperature=config.temperature,
+                top_p=config.top_p,
+                presence_penalty=config.presence_penalty,
+                frequency_penalty=config.frequency_penalty,
+                metrics_url=config.metrics_url,
+                enable_watchdog=config.enable_watchdog,
+                progress_callback=ws_sustained_progress,
+                task_type=task_type,
+            )
+
+            result_payload = dict(sustained_res)
+            result_payload["type"] = "result"
+            result_payload["benchmark_mode"] = "sustained_decode"
+            await websocket.send_json(result_payload)
+
+            await websocket.send_json({
+                "type": "complete",
+                "message": "稳态持续解码测试完成",
+                "benchmark_mode": "sustained_decode",
+                "all_results": [sustained_res],
+                "sustained_summary": sustained_res,
+                "points": sustained_res.get("points", []),
+            })
+            return
+
+        # 1D Sweep Mode (Default)
+        min_len = config.min_length if config.min_length is not None else 100
+        max_len = config.max_length if config.max_length is not None else 2000
+        step_val = config.step if config.step is not None else 500
         # 使用提供的测试点列表，或计算测试点
         if config.test_lengths:
             test_lengths = config.test_lengths
             print(f"[Config] 使用自定义测试点列表: {test_lengths}")
         else:
-            test_lengths = list(range(config.min_length, config.max_length + 1, config.step))
-            print(f"[Config] 提示词长度: {config.min_length}-{config.max_length} (步长{config.step})")
+            test_lengths = list(range(min_len, max_len + 1, step_val))
+            print(f"[Config] 提示词长度: {min_len}-{max_len} (步长{step_val})")
             print(f"[TestLengths] 计算的测试点列表: {test_lengths}")
         
         await websocket.send_json({
             "type": "info",
-            "message": f"开始测试，并发数: {config.concurrency}"
+            "message": f"开始测试，并发数: {config.concurrency}",
+            "benchmark_mode": "1d_sweep",
         })
         total_tests = len(test_lengths)
         completed = 0
@@ -2088,31 +3812,54 @@ async def websocket_test_endpoint(websocket: WebSocket):
             )
             dynamic_timeout = calculate_dynamic_timeout(estimated_prompt_tokens_for_timeout, config.timeout)
 
-            tasks = []
-            for i in range(config.concurrency):
-                task = execute_single_request(
-                    api_url=config.api_url,
-                    api_key=config.api_key,
-                    api_type=config.api_type,
-                    model_name=config.model_name,
-                    prompt_length=length,
-                    output_length=config.output_length,
-                    timeout=dynamic_timeout,  # 使用动态计算的超时
-                    temperature=config.temperature,
-                    top_p=config.top_p,
-                    presence_penalty=config.presence_penalty,
-                    frequency_penalty=config.frequency_penalty,
-                    network_latency_ms=network_latency_ms,
-                    network_latency_sample_count=len(latency_samples),
-                    prompt_calibration=prompt_calibration,
-                    seed=i + 1,  # 每个并发请求使用不同seed
-                )
-                tasks.append(task)
-            
-            # 并发执行
-            print(f"[Test] 启动 {config.concurrency} 个并发请求...")
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            print(f"[Test] 并发请求完成")
+            # 启动 Prometheus Telemetry 采样
+            metrics_url = getattr(config, "metrics_url", None)
+            scraper = PrometheusTelemetryScraper(config.api_url, metrics_url)
+            scraper.start_sampling(interval=0.5)
+
+            # 使用共享连接池运行高并发请求（突破连接限制，支持50+并发）
+            limits = httpx.Limits(
+                max_connections=max(250, config.concurrency * 2),
+                max_keepalive_connections=max(100, config.concurrency),
+            )
+            timeout_obj = httpx.Timeout(dynamic_timeout / 1000.0, connect=15.0)
+
+            async with httpx.AsyncClient(
+                limits=limits,
+                timeout=timeout_obj,
+                verify=False,
+                http2=True,
+            ) as shared_client:
+                tasks = []
+                for i in range(config.concurrency):
+                    task = execute_single_request(
+                        api_url=config.api_url,
+                        api_key=config.api_key,
+                        api_type=config.api_type,
+                        model_name=config.model_name,
+                        prompt_length=length,
+                        output_length=config.output_length,
+                        timeout=dynamic_timeout,
+                        temperature=config.temperature,
+                        top_p=config.top_p,
+                        presence_penalty=config.presence_penalty,
+                        frequency_penalty=config.frequency_penalty,
+                        network_latency_ms=network_latency_ms,
+                        network_latency_sample_count=len(latency_samples),
+                        prompt_calibration=prompt_calibration,
+                        seed=i + 1,
+                        client=shared_client,
+                        enable_watchdog=getattr(config, "enable_watchdog", True),
+                        task_type=task_type,
+                    )
+                    tasks.append(task)
+                
+                # 并发执行
+                print(f"[Test] 启动 {config.concurrency} 个并发请求 (连接池模式)...")
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                print(f"[Test] 并发请求完成")
+
+            telemetry_summary = await scraper.stop_sampling()
             
             # 处理结果
             successful_results = []
@@ -2146,7 +3893,64 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     sum(len(r.get("token_warnings") or []) for r in successful_results)
                     + len(aggregate_warnings)
                 )
-                record_tags = ["source:python_backend"]
+
+                # 计算分位数
+                all_ttft = [r["ttft_ms"] for r in successful_results if r.get("ttft_ms")]
+                ttft_p50 = compute_percentile(all_ttft, 50)
+                ttft_p90 = compute_percentile(all_ttft, 90)
+                ttft_p99 = compute_percentile(all_ttft, 99)
+                ttft_std = (
+                    (sum((x - avg_ttft) ** 2 for x in all_ttft) / len(all_ttft)) ** 0.5
+                    if len(all_ttft) > 1 else 0.0
+                )
+
+                all_itl = [
+                    t["itl_ms"]
+                    for r in successful_results
+                    for t in r.get("token_timestamps", [])
+                    if t.get("itl_ms") is not None
+                ]
+                itl_avg = sum(all_itl) / len(all_itl) if all_itl else 0.0
+                itl_p50 = compute_percentile(all_itl, 50)
+                itl_p90 = compute_percentile(all_itl, 90)
+                itl_p99 = compute_percentile(all_itl, 99)
+                itl_std = (
+                    (sum((x - itl_avg) ** 2 for x in all_itl) / len(all_itl)) ** 0.5
+                    if len(all_itl) > 1 else 0.0
+                )
+
+                ttft_stats = {
+                    "avg": round(avg_ttft, 2),
+                    "p50": round(ttft_p50, 2),
+                    "p90": round(ttft_p90, 2),
+                    "p99": round(ttft_p99, 2),
+                    "std": round(ttft_std, 2),
+                }
+                itl_stats = {
+                    "avg": round(itl_avg, 2),
+                    "p50": round(itl_p50, 2),
+                    "p90": round(itl_p90, 2),
+                    "p99": round(itl_p99, 2),
+                    "std": round(itl_std, 2),
+                }
+
+                client_inferred_parallelism = aggregate_metrics.get("client_inferred_parallelism")
+                eff_conc = calculate_effective_concurrency(
+                    concurrency=config.concurrency,
+                    telemetry_summary=telemetry_summary,
+                    client_inferred_parallelism=client_inferred_parallelism,
+                )
+
+                cell_vh = compute_verification_hash(
+                    model_name=config.model_name,
+                    hardware="Server/Local",
+                    framework=telemetry_summary.get("engine") or "api",
+                    concurrency=config.concurrency,
+                    max_decode_speed=max_output_speed,
+                )
+                loop_detected = any(r.get("loop_detected") for r in successful_results)
+
+                record_tags = ["source:python_backend", "verified"]
                 if boundary_fallback_count > 0:
                     record_tags.append("boundary_source:first_chunk_fallback")
                 if token_warning_count > 0:
@@ -2161,22 +3965,19 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     record_tags.append("decode_source:server")
                 elif aggregate_metrics["output_source"] == "client_llamacpp_timing_anomaly":
                     record_tags.append("decode_source:client_llamacpp_timing_anomaly")
+                if eff_conc.get("is_capacity_limited"):
+                    record_tags.append(f"effective_concurrency:{eff_conc['label']}")
+                if loop_detected:
+                    record_tags.append("status:loop_detected")
+                if telemetry_summary.get("available") and telemetry_summary.get("engine"):
+                    record_tags.append(f"engine:{telemetry_summary['engine']}")
+                record_tags = list(dict.fromkeys(record_tags))
                 
                 print(f"[Stats] 成功: {len(successful_results)}/{config.concurrency}")
-                print(f"[Stats] 平均 Prefill速度: {avg_prefill_speed:.2f} t/s")
-                print(f"[Stats] 平均 Decode速度: {avg_output_speed:.2f} t/s")
-                print(f"[Stats] Max Prefill speed: {max_prefill_speed:.2f} t/s")
-                print(f"[Stats] Max Decode speed: {max_output_speed:.2f} t/s")
-                print(f"[Stats] 平均 TTFT: {avg_ttft:.2f} ms")
-                
-                print(
-                    f"[Stats] Aggregate Prefill: {aggregate_metrics['prefill_speed']:.2f} t/s "
-                    f"({aggregate_metrics['prefill_time_ms']:.2f}ms, source={aggregate_metrics['prefill_source']})"
-                )
-                print(
-                    f"[Stats] Aggregate Decode: {aggregate_metrics['output_speed']:.2f} t/s "
-                    f"({aggregate_metrics['output_time_ms']:.2f}ms, source={aggregate_metrics['output_source']})"
-                )
+                print(f"[Stats] 平均 Prefill速度: {avg_prefill_speed:.2f} t/s, Decode速度: {avg_output_speed:.2f} t/s")
+                print(f"[Stats] 有效并发率: {eff_conc['label']}, TTFT P50: {ttft_p50:.2f}ms, ITL P50: {itl_p50:.2f}ms")
+                if telemetry_summary.get("available"):
+                    print(f"[Stats] Telemetry - KV Cache: {telemetry_summary['mean_kv_cache_pct']:.1f}%, Queue: {telemetry_summary['mean_queue']:.1f}")
 
                 result_summary = {
                     "type": "result",
@@ -2186,6 +3987,13 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "network_latency_sample_count": len(latency_samples),
                     "avg_prompt_tokens": round(avg_prompt_tokens, 2),
                     "concurrency": config.concurrency,
+                    "effective_concurrency": eff_conc["label"],
+                    "effective_concurrency_detail": eff_conc,
+                    "telemetry": telemetry_summary,
+                    "loop_detected": loop_detected,
+                    "verification_hash": cell_vh,
+                    "ttft_stats": ttft_stats,
+                    "itl_stats": itl_stats,
                     "successful": len(successful_results),
                     "failed": failed_count,
                     "avg_prefill_speed": round(avg_prefill_speed, 2),
@@ -2209,7 +4017,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "token_warning_count": token_warning_count,
                     "aggregate_warnings": aggregate_warnings,
                     "concurrent_details": successful_results,
-                    "status": "成功"
+                    "status": "成功" if not loop_detected else "ERROR: loop"
                 }
                 
                 all_results.append(result_summary)
@@ -2241,6 +4049,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
         await websocket.send_json({
             "type": "complete",
             "message": "测试完成",
+            "benchmark_mode": "1d_sweep",
             "all_results": all_results
         })
     
@@ -2275,30 +4084,884 @@ def find_free_port(preferred_port=18000):
     return port
 
 
-if __name__ == "__main__":
-    import uvicorn
-    import sys
-    
-    if len(sys.argv) > 1 and sys.argv[1].isdigit():
-        port = int(sys.argv[1])
-    else:
-        port = find_free_port()
-    
-    # 设置全局端口变量
+def detect_hardware() -> str:
+    """Auto-detect hardware platform (GPU or CPU) for telemetry and benchmark reports."""
+    # 1. Try nvidia-smi
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
+            if lines:
+                return lines[0]
+    except Exception:
+        pass
+
+    # 2. Try rocm-smi
+    try:
+        proc = subprocess.run(
+            ["rocm-smi", "--showproductname"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            for line in proc.stdout.strip().splitlines():
+                if "Card series:" in line or "Product Name" in line:
+                    return line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+
+    # 3. macOS Darwin
+    if platform.system() == "Darwin":
+        try:
+            proc = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                return f"Apple Silicon ({proc.stdout.strip()})"
+        except Exception:
+            pass
+        return f"Apple {platform.machine()}"
+
+    # 4. Linux /proc/cpuinfo or processor
+    try:
+        cpu_name = platform.processor()
+        if not cpu_name or cpu_name in ("x86_64", "aarch64"):
+            if os.path.exists("/proc/cpuinfo"):
+                with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if "model name" in line:
+                            cpu_name = line.split(":", 1)[1].strip()
+                            break
+        if cpu_name:
+            return f"{cpu_name} ({platform.machine()})"
+    except Exception:
+        pass
+
+    return f"{platform.system()} {platform.machine()}"
+
+
+def build_cli_parser() -> argparse.ArgumentParser:
+    """Build CLI argument parser supporting both Server and Benchmark CLI modes."""
+    parser = argparse.ArgumentParser(
+        description="LLM Speed Test — High-Concurrency AsyncIO Benchmark Suite & Telemetry Backend",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    # Server mode flags
+    parser.add_argument("--server", "--serve", action="store_true", help="Launch FastAPI / WebSocket server mode")
+    parser.add_argument("--port", type=int, default=None, help="Port to bind server (default: 18000 or next free)")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host address to bind server")
+
+    # Benchmark CLI flags
+    parser.add_argument("--benchmark", "--cli", action="store_true", help="Run in CLI benchmark mode")
+    parser.add_argument(
+        "--benchmark-mode", "--mode",
+        type=str,
+        choices=["1d_sweep", "2d_matrix", "sustained_decode"],
+        default="1d_sweep",
+        help="Benchmark execution mode (1d_sweep, 2d_matrix, sustained_decode)"
+    )
+    parser.add_argument(
+        "--task-type", "--task",
+        type=str,
+        choices=TASK_TYPES,
+        default="general",
+        help="Benchmark task workload type (general, code, structured, prose, prefill_16k, reasoning)"
+    )
+    parser.add_argument(
+        "--matrix-concurrency",
+        type=str,
+        default="1,2,4,8",
+        help="Comma-separated concurrency levels for 2D matrix sweep (e.g. '1,2,4,8')"
+    )
+    parser.add_argument(
+        "--matrix-context",
+        type=str,
+        default="512,1024,2048",
+        help="Comma-separated context token lengths for 2D matrix sweep (e.g. '512,1024,2048')"
+    )
+    parser.add_argument(
+        "--matrix-max-kv-tokens", "--max-kv-tokens",
+        type=int,
+        default=32768,
+        help="Maximum token budget for KV cache capacity skipping (0 for unlimited)"
+    )
+    parser.add_argument(
+        "--sustained-duration", "--duration",
+        type=float,
+        default=30.0,
+        help="Target measurement duration in seconds for sustained decode benchmark"
+    )
+    parser.add_argument(
+        "--sustained-prompt-length", "--sustained-context",
+        type=int,
+        default=128,
+        help="Prompt token length for sustained decode requests"
+    )
+    parser.add_argument("--model", type=str, default=None, help="Target LLM model name")
+    parser.add_argument("--api-url", type=str, default="http://localhost:8000/v1", help="Target API URL")
+    parser.add_argument("--api-key", type=str, default="EMPTY", help="API authentication key")
+    parser.add_argument("--api-type", type=str, choices=["openai", "ollama"], default="openai", help="API protocol type")
+    parser.add_argument("--concurrency", "-c", type=str, default="1", help="Concurrency level or comma-separated levels (e.g. '1,4,16,64' or '50')")
+    parser.add_argument("--contexts", "--prompt-lengths", "-l", type=str, default="100,500,2000", help="Comma-separated prompt token lengths")
+    parser.add_argument("--max-tokens", "-m", type=int, default=128, help="Max output tokens to generate per request")
+    parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature")
+    parser.add_argument("--top-p", type=float, default=0.9, help="Sampling top_p")
+    parser.add_argument("--metrics-url", type=str, default=None, help="Prometheus /metrics endpoint (e.g. http://localhost:8000/metrics)")
+    parser.add_argument("--hardware", type=str, default=None, help="Hardware description (auto-detected if omitted)")
+    parser.add_argument("--framework", type=str, default="vLLM", help="Serving framework (vLLM, SGLang, TGI, Ollama, etc.)")
+    parser.add_argument("--quantization", type=str, default="FP16", help="Model quantization (FP16, BF16, AWQ, FP8, etc.)")
+    parser.add_argument("--upload", action="store_true", help="Upload benchmark results directly to Supabase cloud leaderboard")
+    parser.add_argument("--user-code", type=str, default=None, help="User code (8-16 alphanumeric chars) for cloud upload")
+    parser.add_argument("--nickname", type=str, default=None, help="Nickname for cloud upload")
+    parser.add_argument("--notes", type=str, default=None, help="Notes or run configuration comments")
+    parser.add_argument("--run-command", type=str, default=None, help="Command used to launch server (e.g. vllm serve ...)")
+    parser.add_argument("--output", "-o", type=str, default=None, help="Path to write JSON benchmark report")
+    parser.add_argument("--no-watchdog", action="store_true", help="Disable repetition loop watchdog")
+    parser.add_argument("--timeout", type=int, default=120000, help="Per-request timeout in milliseconds")
+
+    return parser
+
+
+async def run_cli_benchmark(args: argparse.Namespace) -> int:
+    """Run full benchmark directly from CLI, print Rich-style tabular output, save JSON and upload."""
+    model_name = (args.model or "").strip()
+    if not model_name:
+        print("❌ Error: --model is required for CLI benchmark mode.", file=sys.stderr)
+        return 1
+
+    api_url = args.api_url.strip()
+    if args.api_type == "openai" and not api_url.endswith("/chat/completions"):
+        api_url = f"{api_url.rstrip('/')}/chat/completions"
+
+    api_key = args.api_key
+    api_type = args.api_type
+    try:
+        concurrency_list = [int(c.strip()) for c in str(args.concurrency).split(",") if c.strip()]
+    except ValueError:
+        print(f"❌ Error: Invalid --concurrency values '{args.concurrency}'", file=sys.stderr)
+        return 1
+
+    try:
+        context_list = [int(ctx.strip()) for ctx in str(args.contexts).split(",") if ctx.strip()]
+    except ValueError:
+        print(f"❌ Error: Invalid --contexts values '{args.contexts}'", file=sys.stderr)
+        return 1
+
+    max_tokens = args.max_tokens
+    temperature = args.temperature
+    top_p = args.top_p
+    metrics_url = args.metrics_url
+    hardware = args.hardware.strip() if args.hardware else detect_hardware()
+    framework = args.framework.strip() if args.framework else "vLLM"
+    quantization = args.quantization.strip() if args.quantization else "FP16"
+    timeout = args.timeout
+    enable_watchdog = not args.no_watchdog
+
+    # 1. Probe for metrics endpoint if not provided
+    if not metrics_url:
+        try:
+            parsed = urlparse(api_url)
+            candidate_metrics = f"{parsed.scheme}://{parsed.netloc}/metrics"
+            async with httpx.AsyncClient(timeout=2.0) as probe_client:
+                resp = await probe_client.get(candidate_metrics)
+                if resp.status_code == 200 and ("vllm:" in resp.text or "sglang:" in resp.text or "prompt_tokens" in resp.text):
+                    metrics_url = candidate_metrics
+                    print(f"[Telemetry] Auto-detected Prometheus metrics endpoint: {metrics_url}")
+        except Exception:
+            pass
+
+    benchmark_mode = getattr(args, "benchmark_mode", "1d_sweep") or "1d_sweep"
+    task_type = getattr(args, "task_type", "general") or "general"
+
+    if benchmark_mode == "2d_matrix":
+        matrix_conc_raw = getattr(args, "matrix_concurrency", None) or args.concurrency
+        try:
+            concurrency_ladder = [int(c.strip()) for c in str(matrix_conc_raw).split(",") if c.strip()]
+        except ValueError:
+            print(f"❌ Error: Invalid --matrix-concurrency values '{matrix_conc_raw}'", file=sys.stderr)
+            return 1
+
+        matrix_ctx_raw = getattr(args, "matrix_context", None) or args.contexts
+        try:
+            context_ladder = [int(ctx.strip()) for ctx in str(matrix_ctx_raw).split(",") if ctx.strip()]
+        except ValueError:
+            print(f"❌ Error: Invalid --matrix-context values '{matrix_ctx_raw}'", file=sys.stderr)
+            return 1
+
+        max_kv_tokens = getattr(args, "matrix_max_kv_tokens", 32768)
+
+        print("\n" + "=" * 84)
+        print("🚀 LLM 2D Matrix Inference Benchmark (Concurrency × Context Engine)")
+        print("=" * 84)
+        print(f"Target API     : {api_url}")
+        print(f"Model          : {model_name}")
+        print(f"Hardware       : {hardware}")
+        print(f"Framework      : {framework} ({quantization})")
+        print(f"Task Workload  : {task_type}")
+        print(f"Concurrencies  : {concurrency_ladder}")
+        print(f"Context Lengths: {context_ladder}")
+        print(f"Max KV Tokens  : {max_kv_tokens}")
+        print(f"Output Tokens  : {max_tokens}")
+        print(f"Watchdogs      : {'Loop: ON' if enable_watchdog else 'Loop: OFF'}")
+        print("=" * 84 + "\n")
+
+        matrix_res = await run_2d_matrix_benchmark(
+            api_url=api_url,
+            api_key=api_key,
+            api_type=api_type,
+            model_name=model_name,
+            concurrency_ladder=concurrency_ladder,
+            context_ladder=context_ladder,
+            max_tokens=max_tokens,
+            max_kv_tokens=max_kv_tokens,
+            timeout=timeout,
+            temperature=temperature,
+            top_p=top_p,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            metrics_url=metrics_url,
+            hardware=hardware,
+            framework=framework,
+            quantization=quantization,
+            enable_watchdog=enable_watchdog,
+            task_type=task_type,
+        )
+
+        print("\n" + "=" * 90)
+        print("📊 2D Concurrency × Context Matrix Results")
+        print("=" * 90)
+        print(f"{'Concurrency':>12} | {'Context':>8} | {'Tokens':>8} | {'TTFT P50':>10} | {'Decode TPS':>11} | {'Eff. Conc':>10} | {'Status'}")
+        print("-" * 90)
+        for cell in matrix_res["all_cell_results"]:
+            conc = cell["concurrency"]
+            ctx = cell["context"]
+            needed = cell.get("tokens_needed", conc * (ctx + max_tokens))
+            ttft = f"{cell.get('ttft_stats', {}).get('p50', cell.get('ttft_ms', 0.0)):.1f}ms" if not cell.get("skipped") else "N/A"
+            tps = f"{cell.get('decode_tps', 0.0):.1f}" if not cell.get("skipped") else "SKIP"
+            eff = cell.get("effective_concurrency", f"{conc}/{conc}")
+            st = cell.get("status", "")
+            print(f"{conc:>12} | {ctx:>8} | {needed:>8} | {ttft:>10} | {tps:>11} | {eff:>10} | {st}")
+        print("=" * 90)
+        print(f"Peak Concurrency    : {matrix_res['peak_concurrency']}")
+        print(f"Peak Decode TPS     : {matrix_res['matrix_summary'].get('peak_decode_tps', 0.0)} tokens/s")
+        print(f"Peak Point          : {matrix_res['matrix_summary'].get('peak_point', {})}")
+        print(f"Saturation Onset    : {matrix_res['matrix_summary'].get('saturation_onset', 'None')}")
+        print(f"Verification Hash   : {matrix_res['verification_hash']}")
+        print("=" * 90)
+
+        report_data = {
+            "benchmark_mode": "2d_matrix",
+            "task_type": task_type,
+            "model_name": model_name,
+            "hardware": hardware,
+            "framework": framework,
+            "quantization": quantization,
+            "notes": args.notes,
+            "run_command": args.run_command,
+            "concurrency": matrix_res["peak_concurrency"],
+            "avg_prefill_speed": matrix_res["overall_avg_prefill"],
+            "avg_decode_speed": matrix_res["overall_avg_decode"],
+            "max_prefill_speed": matrix_res["overall_max_prefill"],
+            "max_decode_speed": matrix_res["overall_max_decode"],
+            "verification_hash": matrix_res["verification_hash"],
+            "source": "python_v3",
+            "timestamp": int(time.time()),
+            "matrix_concurrency_ladder": concurrency_ladder,
+            "matrix_context_ladder": context_ladder,
+            "matrix_max_kv_tokens": max_kv_tokens,
+            "matrix_summary": matrix_res["matrix_summary"],
+            "matrix": matrix_res["matrix_grid"],
+            "points": matrix_res["points"],
+            "quantiles": matrix_res["quantiles"],
+            "results": matrix_res["all_cell_results"],
+        }
+
+        output_path = args.output
+        if not output_path:
+            ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_model = re.sub(r'[^a-zA-Z0-9_\-]', '_', model_name)[:30]
+            output_path = f"benchmark_matrix_{safe_model}_{ts_str}.json"
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+        print(f"\n📁 Local 2D matrix benchmark report saved to: {os.path.abspath(output_path)}")
+
+        if args.upload:
+            print("\n☁️ Uploading benchmark to Supabase Leaderboard...")
+            user_code = args.user_code
+            if not user_code or len(user_code.strip()) < 8:
+                user_code = "CLI" + hashlib.sha256(f"{hardware}{model_name}{time.time()}".encode()).hexdigest()[:5].upper()
+                print(f"ℹ️ Auto-generated User Code: {user_code}")
+            else:
+                user_code = user_code.strip().upper()
+
+            upload_res = await upload_benchmark_to_supabase(
+                user_code=user_code,
+                model_name=model_name,
+                hardware=hardware,
+                concurrency=matrix_res["peak_concurrency"],
+                avg_prefill_speed=matrix_res["overall_avg_prefill"],
+                avg_decode_speed=matrix_res["overall_avg_decode"],
+                max_prefill_speed=matrix_res["overall_max_prefill"],
+                max_decode_speed=matrix_res["overall_max_decode"],
+                framework=framework,
+                quantization=quantization,
+                notes=args.notes,
+                nickname=args.nickname,
+                run_command=args.run_command,
+                record_tags=["source:python_v3", "verified", "mode:2d_matrix", f"task:{task_type}"],
+                results_json={
+                    "benchmark_mode": "2d_matrix",
+                    "matrix": matrix_res["matrix_grid"],
+                    "matrix_summary": matrix_res["matrix_summary"],
+                    "points": matrix_res["points"],
+                    "quantiles": matrix_res["quantiles"],
+                    "watchdog": {
+                        "loop_detected": any(c.get("loop_detected") for c in matrix_res["all_cell_results"]),
+                    },
+                    "verification": {
+                        "hash": matrix_res["verification_hash"],
+                        "status": "verified",
+                        "timestamp": int(time.time()),
+                    }
+                },
+                verification_hash=matrix_res["verification_hash"],
+            )
+            if upload_res.get("success"):
+                share_id = upload_res.get("id")
+                print("✅ Cloud upload successful!")
+                print(f"  Record ID          : {share_id}")
+                print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
+                print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+            else:
+                print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
+
+        return 0
+
+    if benchmark_mode == "sustained_decode":
+        sustained_concurrency = concurrency_list[0] if concurrency_list else 1
+        sustained_duration = getattr(args, "sustained_duration", 30.0) or 30.0
+        sustained_prompt_len = getattr(args, "sustained_prompt_length", 128) or 128
+
+        print("\n" + "=" * 84)
+        print("⏱️ LLM Sustained Steady-State Decode Benchmark")
+        print("=" * 84)
+        print(f"Target API     : {api_url}")
+        print(f"Model          : {model_name}")
+        print(f"Hardware       : {hardware}")
+        print(f"Framework      : {framework} ({quantization})")
+        print(f"Task Workload  : {task_type}")
+        print(f"Concurrency    : {sustained_concurrency}")
+        print(f"Target Duration: {sustained_duration}s")
+        print(f"Prompt Length  : {sustained_prompt_len} tokens")
+        print(f"Output Tokens  : {max_tokens}")
+        print(f"Watchdogs      : {'Loop: ON' if enable_watchdog else 'Loop: OFF'}")
+        print("=" * 84 + "\n")
+
+        sustained_res = await run_sustained_decode_benchmark(
+            api_url=api_url,
+            api_key=api_key,
+            api_type=api_type,
+            model_name=model_name,
+            concurrency=sustained_concurrency,
+            prompt_length=sustained_prompt_len,
+            output_length=max_tokens,
+            duration_seconds=sustained_duration,
+            timeout=timeout,
+            temperature=temperature,
+            top_p=top_p,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            metrics_url=metrics_url,
+            hardware=hardware,
+            framework=framework,
+            quantization=quantization,
+            enable_watchdog=enable_watchdog,
+            task_type=task_type,
+        )
+
+        actual_dur = sustained_res.get('actual_duration_sec', sustained_duration)
+        pure_dec_s = sustained_res.get('pure_decode_time_s')
+        e2e_tps = sustained_res.get('e2e_throughput_tps')
+        if e2e_tps is None and actual_dur and actual_dur > 0:
+            e2e_tps = sustained_res.get('total_tokens', 0) / actual_dur
+        avg_stream_tps = sustained_res.get('avg_stream_decode_tps')
+        if avg_stream_tps is None and sustained_concurrency > 0:
+            avg_stream_tps = sustained_res.get('steady_decode_tps', 0) / sustained_concurrency
+
+        print("\n" + "=" * 84)
+        print("📊 Sustained Steady-State Decode Summary")
+        print("=" * 84)
+        print(f"Target Duration      : {sustained_duration}s")
+        if pure_dec_s is not None:
+            print(f"Actual Duration      : {actual_dur:.1f}s (Pure Decode Worker Time: {pure_dec_s:.2f}s)")
+        else:
+            print(f"Actual Duration      : {actual_dur:.1f}s")
+        print(f"Total Tokens         : {sustained_res['total_tokens']}")
+        print(f"Completed Streams    : {sustained_res['completed_streams']}")
+        print(f"Steady Decode TPS    : {sustained_res['steady_decode_tps']:.2f} tokens/s (Pure Decode, Prefill/TTFT Deducted)")
+        print(f"End-to-End TPS       : {e2e_tps:.2f} tokens/s (Wall-Clock, Incl. Prefill/Queueing)")
+        print(f"Single-Stream Decode : {avg_stream_tps:.2f} tokens/s (Avg Per-Stream Decode Rate)")
+        print(f"Avg TTFT             : {sustained_res['avg_ttft_ms']:.2f}ms (P50: {sustained_res['ttft_stats']['p50']:.1f}ms, P90: {sustained_res['ttft_stats']['p90']:.1f}ms, P99: {sustained_res['ttft_stats']['p99']:.1f}ms)")
+        print(f"ITL P50              : {sustained_res['itl_stats']['p50']:.2f}ms (P90: {sustained_res['itl_stats']['p90']:.1f}ms)")
+        print(f"Effective Concurrency: {sustained_res['effective_concurrency']}")
+        print(f"Verification Hash    : {sustained_res['verification_hash']}")
+        print("=" * 84)
+
+        report_data = {
+            "benchmark_mode": "sustained_decode",
+            "task_type": task_type,
+            "model_name": model_name,
+            "hardware": hardware,
+            "framework": framework,
+            "quantization": quantization,
+            "notes": args.notes,
+            "run_command": args.run_command,
+            "concurrency": sustained_concurrency,
+            "avg_prefill_speed": sustained_res["avg_prefill_speed"],
+            "avg_decode_speed": sustained_res["steady_decode_tps"],
+            "max_prefill_speed": sustained_res["max_prefill_speed"],
+            "max_decode_speed": sustained_res["steady_decode_tps"],
+            "verification_hash": sustained_res["verification_hash"],
+            "source": "python_v3",
+            "timestamp": int(time.time()),
+            "sustained_duration": sustained_duration,
+            "sustained_prompt_length": sustained_prompt_len,
+            "sustained_summary": sustained_res["sustained_summary"],
+            "points": sustained_res["points"],
+            "quantiles": sustained_res["quantiles"],
+            "results": sustained_res["points"],
+        }
+
+        output_path = args.output
+        if not output_path:
+            ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_model = re.sub(r'[^a-zA-Z0-9_\-]', '_', model_name)[:30]
+            output_path = f"benchmark_sustained_{safe_model}_{ts_str}.json"
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+        print(f"\n📁 Local sustained benchmark report saved to: {os.path.abspath(output_path)}")
+
+        if args.upload:
+            print("\n☁️ Uploading benchmark to Supabase Leaderboard...")
+            user_code = args.user_code
+            if not user_code or len(user_code.strip()) < 8:
+                user_code = "CLI" + hashlib.sha256(f"{hardware}{model_name}{time.time()}".encode()).hexdigest()[:5].upper()
+                print(f"ℹ️ Auto-generated User Code: {user_code}")
+            else:
+                user_code = user_code.strip().upper()
+
+            upload_res = await upload_benchmark_to_supabase(
+                user_code=user_code,
+                model_name=model_name,
+                hardware=hardware,
+                concurrency=sustained_concurrency,
+                avg_prefill_speed=sustained_res["avg_prefill_speed"],
+                avg_decode_speed=sustained_res["steady_decode_tps"],
+                max_prefill_speed=sustained_res["max_prefill_speed"],
+                max_decode_speed=sustained_res["steady_decode_tps"],
+                framework=framework,
+                quantization=quantization,
+                notes=args.notes,
+                nickname=args.nickname,
+                run_command=args.run_command,
+                record_tags=["source:python_v3", "verified", "mode:sustained_decode", f"task:{task_type}"],
+                results_json={
+                    "benchmark_mode": "sustained_decode",
+                    "sustained_summary": sustained_res["sustained_summary"],
+                    "points": sustained_res["points"],
+                    "quantiles": sustained_res["quantiles"],
+                    "watchdog": {
+                        "loop_detected": sustained_res.get("loop_detected", False),
+                    },
+                    "verification": {
+                        "hash": sustained_res["verification_hash"],
+                        "status": "verified",
+                        "timestamp": int(time.time()),
+                    }
+                },
+                verification_hash=sustained_res["verification_hash"],
+            )
+            if upload_res.get("success"):
+                share_id = upload_res.get("id")
+                print("✅ Cloud upload successful!")
+                print(f"  Record ID          : {share_id}")
+                print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
+                print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+            else:
+                print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
+
+        return 0
+
+    # 2. Warmup & network latency baseline (1D Sweep Mode)
+    print("\n[Init] Probing target API baseline & warming up...")
+    prompt_calibration = None
+    try:
+        prompt_calibration = await send_warmup_request(
+            api_url=api_url,
+            api_key=api_key,
+            api_type=api_type,
+            model_name=model_name,
+            timeout=timeout,
+            temperature=temperature,
+            top_p=top_p,
+        )
+    except Exception as e:
+        print(f"[Init] Warmup request note: {e}")
+
+    latency_samples: List[float] = []
+    for _ in range(2):
+        await collect_network_latency_sample(
+            latency_samples,
+            api_url=api_url,
+            api_key=api_key,
+            api_type=api_type,
+            model_name=model_name,
+            timeout=timeout,
+            temperature=temperature,
+            top_p=top_p,
+        )
+    network_latency_ms = get_average_network_latency_ms(latency_samples)
+
+    # 3. Display header
+    print("\n" + "=" * 84)
+    print("🚀 LLM High-Concurrency Inference Benchmark (AsyncIO HTTP/2 Engine)")
+    print("=" * 84)
+    print(f"Target API     : {api_url}")
+    print(f"Model          : {model_name}")
+    print(f"Hardware       : {hardware}")
+    print(f"Framework      : {framework} ({quantization})")
+    print(f"Concurrencies  : {concurrency_list}")
+    print(f"Context Lengths: {context_list}")
+    print(f"Output Tokens  : {max_tokens}")
+    print(f"Telemetry URL  : {metrics_url or 'Disabled / Not found'}")
+    print(f"Watchdogs      : {'Loop Watchdog: ON' if enable_watchdog else 'Loop: OFF'}")
+    print("=" * 84 + "\n")
+
+    all_cell_results: List[Dict[str, Any]] = []
+    all_succ_results: List[Dict[str, Any]] = []
+
+    for concurrency in concurrency_list:
+        print(f"\n====================== Concurrency Level: {concurrency} ======================")
+        client_limits = httpx.Limits(
+            max_connections=max(256, concurrency * 2),
+            max_keepalive_connections=max(128, concurrency),
+        )
+        async with httpx.AsyncClient(limits=client_limits, http2=True, timeout=timeout / 1000.0, verify=False) as http_client:
+            for length in context_list:
+                resolved_length = get_resolved_prompt_length(length)
+                print(f"[Run] Testing Concurrency={concurrency}, Context={resolved_length} tokens...")
+
+                network_latency_ms = await collect_network_latency_sample(
+                    latency_samples,
+                    api_url=api_url,
+                    api_key=api_key,
+                    api_type=api_type,
+                    model_name=model_name,
+                    timeout=timeout,
+                    temperature=temperature,
+                    top_p=top_p,
+                )
+
+                scraper = PrometheusTelemetryScraper(metrics_url)
+                await scraper.start()
+
+                seeds = [random.randint(1000, 999999) for _ in range(concurrency)]
+                tasks = [
+                    execute_single_request(
+                        api_url=api_url,
+                        api_key=api_key,
+                        api_type=api_type,
+                        model_name=model_name,
+                        prompt_length=length,
+                        output_length=max_tokens,
+                        timeout=timeout,
+                        temperature=temperature,
+                        top_p=top_p,
+                        presence_penalty=0.0,
+                        frequency_penalty=0.0,
+                        seed=s,
+                        network_latency_ms=network_latency_ms,
+                        network_latency_sample_count=len(latency_samples),
+                        prompt_calibration=prompt_calibration,
+                        client=http_client,
+                        enable_watchdog=enable_watchdog,
+                        task_type=task_type,
+                    )
+                    for s in seeds
+                ]
+
+                req_results = await asyncio.gather(*tasks, return_exceptions=True)
+                telemetry_summary = await scraper.stop()
+
+                successful_results: List[Dict[str, Any]] = []
+                failed_count = 0
+                for r in req_results:
+                    if isinstance(r, dict) and r.get("success"):
+                        successful_results.append(r)
+                    else:
+                        failed_count += 1
+                        if isinstance(r, dict) and r.get("error"):
+                            print(f"  [Failure] {r.get('error')[:120]}")
+                        elif isinstance(r, Exception):
+                            print(f"  [Exception] {type(r).__name__}: {r}")
+
+                if not successful_results:
+                    print(f"  ❌ All {concurrency} requests failed for Context={resolved_length}!")
+                    continue
+
+                all_succ_results.extend(successful_results)
+
+                avg_prefill = sum(r["prefill_speed"] for r in successful_results) / len(successful_results)
+                avg_decode = sum(r["output_speed"] for r in successful_results) / len(successful_results)
+                max_prefill = max(r["prefill_speed"] for r in successful_results)
+                max_decode = max(r["output_speed"] for r in successful_results)
+                avg_ttft = sum(r["ttft_ms"] for r in successful_results) / len(successful_results)
+
+                aggregate_metrics = calculate_aggregate_throughput_metrics(successful_results)
+                client_inferred_parallelism = aggregate_metrics.get("client_inferred_parallelism")
+                eff_conc = calculate_effective_concurrency(
+                    concurrency=concurrency,
+                    telemetry_summary=telemetry_summary,
+                    client_inferred_parallelism=client_inferred_parallelism,
+                )
+
+                all_ttft = [r["ttft_ms"] for r in successful_results if r.get("ttft_ms")]
+                ttft_p50 = compute_percentile(all_ttft, 50)
+                ttft_p90 = compute_percentile(all_ttft, 90)
+                ttft_p99 = compute_percentile(all_ttft, 99)
+
+                all_itl = [
+                    t["itl_ms"]
+                    for r in successful_results
+                    for t in r.get("token_timestamps", [])
+                    if t.get("itl_ms") is not None
+                ]
+                itl_p50 = compute_percentile(all_itl, 50)
+                itl_p90 = compute_percentile(all_itl, 90)
+                itl_p99 = compute_percentile(all_itl, 99)
+
+                loop_detected = any(r.get("loop_detected") for r in successful_results)
+
+                kv_cache_str = (
+                    f"{telemetry_summary['kv_cache_usage_pct']:.1f}%"
+                    if telemetry_summary.get("kv_cache_usage_pct") is not None
+                    else "N/A"
+                )
+
+                cell_vh = compute_verification_hash(
+                    model_name=model_name,
+                    hardware=hardware,
+                    framework=framework,
+                    quantization=quantization,
+                    concurrency=concurrency,
+                    max_decode_speed=max_decode,
+                )
+
+                cell_data = {
+                    "prompt_length": resolved_length,
+                    "requested_prompt_length": length,
+                    "concurrency": concurrency,
+                    "avg_ttft_ms": round(avg_ttft, 2),
+                    "ttft_p50_ms": round(ttft_p50, 2),
+                    "ttft_p90_ms": round(ttft_p90, 2),
+                    "ttft_p99_ms": round(ttft_p99, 2),
+                    "avg_prefill_speed": round(avg_prefill, 2),
+                    "avg_decode_speed": round(avg_decode, 2),
+                    "max_prefill_speed": round(max_prefill, 2),
+                    "max_decode_speed": round(max_decode, 2),
+                    "itl_p50_ms": round(itl_p50, 2),
+                    "itl_p90_ms": round(itl_p90, 2),
+                    "itl_p99_ms": round(itl_p99, 2),
+                    "effective_concurrency": eff_conc["effective_concurrency"],
+                    "effective_concurrency_label": eff_conc["label"],
+                    "verification_hash": cell_vh,
+                    "telemetry": telemetry_summary,
+                    "loop_detected": loop_detected,
+                    "success_count": len(successful_results),
+                    "failed_count": failed_count,
+                    "status": "成功" if not loop_detected else "ERROR: loop",
+                }
+                all_cell_results.append(cell_data)
+
+                status_str = "✅ PASS" if not loop_detected else "⚠️ LOOP DETECTED"
+                print(
+                    f"  -> C={concurrency:3d} | L={resolved_length:5d} | "
+                    f"TTFT P50={ttft_p50:6.1f}ms | Decode TPS={avg_decode:6.1f} | "
+                    f"ITL P50={itl_p50:5.1f}ms | KV Cache={kv_cache_str:>6} | "
+                    f"Eff. Conc={eff_conc['label']:>7} | {status_str}"
+                )
+                await asyncio.sleep(1.0)
+
+    if not all_succ_results:
+        print("\n❌ Benchmark finished with 0 successful requests.", file=sys.stderr)
+        return 1
+
+    overall_avg_prefill = sum(r["prefill_speed"] for r in all_succ_results) / len(all_succ_results)
+    overall_avg_decode = sum(r["output_speed"] for r in all_succ_results) / len(all_succ_results)
+    overall_max_prefill = max(r["prefill_speed"] for r in all_succ_results)
+    overall_max_decode = max(r["output_speed"] for r in all_succ_results)
+    max_concurrency = max(concurrency_list)
+
+    overall_vh = compute_verification_hash(
+        model_name=model_name,
+        hardware=hardware,
+        framework=framework,
+        quantization=quantization,
+        concurrency=max_concurrency,
+        max_decode_speed=overall_max_decode,
+    )
+
+    print("\n" + "=" * 84)
+    print("📊 Benchmark Summary")
+    print("=" * 84)
+    print(f"Model Name           : {model_name}")
+    print(f"Hardware             : {hardware}")
+    print(f"Framework            : {framework} ({quantization})")
+    print(f"Peak Concurrency     : {max_concurrency}")
+    print(f"Avg Prefill Speed    : {overall_avg_prefill:.2f} tokens/s")
+    print(f"Avg Decode Speed     : {overall_avg_decode:.2f} tokens/s")
+    print(f"Max Decode Speed     : {overall_max_decode:.2f} tokens/s")
+    print(f"Verification Hash    : {overall_vh}")
+    print("=" * 84)
+
+    # Save JSON report
+    report_data = {
+        "benchmark_mode": "1d_sweep",
+        "task_type": task_type,
+        "model_name": model_name,
+        "hardware": hardware,
+        "framework": framework,
+        "quantization": quantization,
+        "notes": args.notes,
+        "run_command": args.run_command,
+        "concurrency": max_concurrency,
+        "avg_prefill_speed": round(overall_avg_prefill, 2),
+        "avg_decode_speed": round(overall_avg_decode, 2),
+        "max_prefill_speed": round(overall_max_prefill, 2),
+        "max_decode_speed": round(overall_max_decode, 2),
+        "verification_hash": overall_vh,
+        "source": "python_v3",
+        "timestamp": int(time.time()),
+        "results": all_cell_results,
+    }
+
+    output_path = args.output
+    if not output_path:
+        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_model = re.sub(r'[^a-zA-Z0-9_\-]', '_', model_name)[:30]
+        output_path = f"benchmark_{safe_model}_{ts_str}.json"
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(report_data, f, indent=2, ensure_ascii=False)
+    print(f"\n📁 Local benchmark report saved to: {os.path.abspath(output_path)}")
+
+    # Cloud upload if requested
+    if args.upload:
+        print("\n☁️ Uploading benchmark to Supabase Leaderboard...")
+        user_code = args.user_code
+        if not user_code or len(user_code.strip()) < 8:
+            user_code = "CLI" + hashlib.sha256(f"{hardware}{model_name}{time.time()}".encode()).hexdigest()[:5].upper()
+            print(f"ℹ️ Auto-generated User Code: {user_code}")
+        else:
+            user_code = user_code.strip().upper()
+
+        upload_res = await upload_benchmark_to_supabase(
+            user_code=user_code,
+            model_name=model_name,
+            hardware=hardware,
+            concurrency=max_concurrency,
+            avg_prefill_speed=overall_avg_prefill,
+            avg_decode_speed=overall_avg_decode,
+            max_prefill_speed=overall_max_prefill,
+            max_decode_speed=overall_max_decode,
+            framework=framework,
+            quantization=quantization,
+            notes=args.notes,
+            nickname=args.nickname,
+            run_command=args.run_command,
+            record_tags=["source:python_v3", "verified", "mode:1d_sweep", f"task:{task_type}"],
+            results_json=all_cell_results,
+            verification_hash=overall_vh,
+        )
+
+        if upload_res.get("success"):
+            share_id = upload_res.get("id")
+            print("✅ Cloud upload successful!")
+            print(f"  Record ID          : {share_id}")
+            print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
+            print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+        else:
+            print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
+            print("  (Your local JSON report is safely saved above)")
+
+    return 0
+
+
+def run_server(port: int, host: str = "0.0.0.0"):
+    """Launch FastAPI / WebSocket server."""
+    global current_port
     current_port = port
-    
+
     print("LLM Speed Test Backend Server", flush=True)
-    print(f"WebSocket endpoint: ws://localhost:{port}/ws/test", flush=True)
-    print(f"Frontend page: http://localhost:{port}/", flush=True)
+    display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1") else host
+    print(f"WebSocket endpoint: ws://{display_host}:{port}/ws/test", flush=True)
+    print(f"Frontend page: http://{display_host}:{port}/", flush=True)
     print(f"PORT={port}", flush=True)
-    
-    # 将端口写入配置文件，供bat脚本读取
+
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         port_file = os.path.join(script_dir, '.backend_port')
         with open(port_file, 'w') as f:
             f.write(str(port))
-    except Exception as e:
+    except Exception:
         pass
-    
-    uvicorn.run(app, host="0.0.0.0", port=port)
+
+    import uvicorn
+    uvicorn.run(app, host=host, port=port)
+
+
+def main():
+    """Main CLI entrypoint supporting Server and Benchmark modes."""
+    # Fast path: single numeric argument (e.g. `python llm_test_backend.py 18000`)
+    if len(sys.argv) == 2 and sys.argv[1].isdigit():
+        port = int(sys.argv[1])
+        run_server(port)
+        return
+
+    parser = build_cli_parser()
+
+    # If help requested
+    if "-h" in sys.argv or "--help" in sys.argv:
+        parser.print_help()
+        return
+
+    # Check whether benchmark mode is specified
+    benchmark_flags = {"--benchmark", "--cli", "--model", "-m"}
+    is_benchmark = any(arg in benchmark_flags for arg in sys.argv)
+
+    if not is_benchmark or "--server" in sys.argv or "--serve" in sys.argv:
+        args, _ = parser.parse_known_args()
+        port = args.port or find_free_port()
+        run_server(port, host=args.host)
+        return
+
+    args = parser.parse_args()
+    if not args.model:
+        parser.error("--model is required for CLI benchmark mode")
+    sys.exit(asyncio.run(run_cli_benchmark(args)))
+
+
+if __name__ == "__main__":
+    main()
+

@@ -14,10 +14,25 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Check and activate virtual environment if present
+if [ -f "../.venv/bin/activate" ]; then
+    echo "[Info] Activating virtual environment (../.venv)..."
+    source "../.venv/bin/activate"
+elif [ -f ".venv/bin/activate" ]; then
+    echo "[Info] Activating virtual environment (.venv)..."
+    source ".venv/bin/activate"
+elif [ -f "../venv/bin/activate" ]; then
+    echo "[Info] Activating virtual environment (../venv)..."
+    source "../venv/bin/activate"
+elif [ -f "venv/bin/activate" ]; then
+    echo "[Info] Activating virtual environment (venv)..."
+    source "venv/bin/activate"
+fi
+
 echo "[1/3] Checking dependencies..."
 # Check all dependencies in requirements.txt
 MISSING_DEPS=0
-for pkg in fastapi uvicorn httpx websockets pydantic slowapi; do
+for pkg in fastapi uvicorn httpx websockets pydantic slowapi h2; do
     if ! python3 -c "import ${pkg/uvicorn/uvicorn}" &> /dev/null; then
         MISSING_DEPS=1
         break

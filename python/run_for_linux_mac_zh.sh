@@ -14,10 +14,25 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# 检查并激活虚拟环境（如果存在）
+if [ -f "../.venv/bin/activate" ]; then
+    echo "[提示] 激活虚拟环境 (../.venv)..."
+    source "../.venv/bin/activate"
+elif [ -f ".venv/bin/activate" ]; then
+    echo "[提示] 激活虚拟环境 (.venv)..."
+    source ".venv/bin/activate"
+elif [ -f "../venv/bin/activate" ]; then
+    echo "[提示] 激活虚拟环境 (../venv)..."
+    source "../venv/bin/activate"
+elif [ -f "venv/bin/activate" ]; then
+    echo "[提示] 激活虚拟环境 (venv)..."
+    source "venv/bin/activate"
+fi
+
 echo "[1/3] 检查依赖..."
 # 检查requirements.txt中的所有依赖
 MISSING_DEPS=0
-for pkg in fastapi uvicorn httpx websockets pydantic slowapi; do
+for pkg in fastapi uvicorn httpx websockets pydantic slowapi h2; do
     if ! python3 -c "import ${pkg/uvicorn/uvicorn}" &> /dev/null; then
         MISSING_DEPS=1
         break

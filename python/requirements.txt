@@ -4,3 +4,4 @@ httpx
 pydantic
 websockets
 slowapi
+h2

@@ -1,412 +1,401 @@
-# 🚀 本地大模型推理速度测试工具 v3 (chao魔改版)
+# 🚀 本地大模型推理速度测试与天梯榜平台 v3.5 (LLM Speed Test & Leaderboard)
 
-![Version](https://img.shields.io/badge/version-3.0-blue.svg)
-
----
-
-🇬🇧 [**View in English (查看英文版)**](README_en.md) | 🇨🇳 [**查看中文版**](#)
-
----
-
-✨ **在线体验最新纯前端版（无需下载/部署，点开即用）：**
-
-- 👉 **测速页面**: [**https://gengchaogit.github.io/llm_speedtest/**](https://gengchaogit.github.io/llm_speedtest/)
-- 👉 **全网排行榜**: [**https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html**](https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html)
----
-
-## 简介
-
-本项目是一个功能强大的本地大模型推理性能测试工具，旨在帮助用户快速、便捷地测试本地部署的各种大模型推理服务的 Prefill（预填充）和 Decode（解码/输出）性能。
-
-**提供两种版本：**
-- **纯前端版本** (v3最新)：通过浏览器本地离线运行，全新升级支持直接连接Supabase云端，实现测试数据上传、专属排行分享词、全网总榜与CSV批量上传，零部署成本！
-- **Python后端版本** (v3)：通过Python后端发起请求，突破浏览器6并发限制，支持真正的高并发测试（50+并发），同步支持天梯榜。
-
-本工具基于原作者纸鸢随风（B站）的作品进行魔改，增加了多项实用功能和优化，包括重试机制、图表自动显示、Prefill 和 Decode 速度分离、并发问题修复、请求超时控制、配置自动保存、并发吞吐修复、Token来源追踪等。
+[![GitHub Release](https://img.shields.io/badge/release-v3.5.0-blue.svg?style=flat-square)](https://github.com/gengchaogit/llm_speedtest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
+[![GitHub Pages](https://img.shields.io/badge/Deployment-GitHub%20Pages-brightgreen.svg?style=flat-square)](https://gengchaogit.github.io/llm_speedtest/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat-square)](https://www.python.org/)
+[![Database: Supabase](https://img.shields.io/badge/Backend-Supabase%20PostgREST-3ECF8E.svg?style=flat-square)](https://supabase.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg?style=flat-square)](https://github.com/gengchaogit/llm_speedtest/pulls)
 
 ---
 
-## 🔥 重要提示
-
-> ### 推荐使用 Python后端版本 🐍
->
-> **Python后端版本功能更完善，维护更及时！**
->
-> #### ✅ Python后端版本优势（v3最新）
-> - **🏆 独家天梯榜**: 将测试结果上传至全网排行榜，获取专属分享链接
-> - **🚀 真实高并发**：突破浏览器6并发限制，支持50+并发
-> - **📊 完整6图表体系**：Prefill/Decode吞吐 + TTFT/ITL延迟 + 百分位统计
-> - **🔍 TTFT与ITL测量**：首Token延迟 + Token间延迟（平均值+标准差/抖动）
-> - **📈 全维度对比**：历史记录对比支持6个图表，全方位性能分析
-> - **💾 增强导出**：CSV包含全部数据，支持Excel无乱码，一键导出所有图表
-> - **🎯 更准确的吞吐计算**：基于真实时间戳的并发总吞吐量
-> - **⚡ 积极维护**：新功能优先在Python版本实现
->
-> #### ⚠️ 浏览器版本限制
-> - 并发限制：最多6并发（浏览器限制）
-> - 测试准确性：最高并发下受浏览器网络调度限制较大
->
-> **📖 快速开始：** [Python后端版本完整文档](python/README_Backend.md)
->
-> **💡 推荐流程：**
-> 1. 双击 `python/启动测速工具.bat` （Windows）一键启动
-> 2. 自动安装依赖、启动后端、打开测试页面
-> 3. 享受完整功能和准确测试！
+🇨🇳 [**简体中文 (当前)**](#) | 🇬🇧 [**English Documentation (README_en.md)**](README_en.md)
 
 ---
 
-## 更新日志
-
-<!-- 请注意，以下更新日志从v1.7开始列出。 -->
-
-### v3 (纯前端与Python后端 全面云端化)
-*   **🏆 天梯榜系统 (Leaderboard)**: 纯前端版本与Python后端版现已同步支持将测试成绩直传云端数据库（Supabase）、生成专属分享词及专属图表连接
-*   **🌎 全网总榜与个人记录**: 快速查看大家在各显卡、各框架上的最新评测数据，纯前端无需部署Python环境即可使用！
-*   **📂 CSV 批量上传云端**: 支持将过往的历史评测 CSV 合并并在排行榜页面一次性批量上传记录
-*   **🛡️ 新版用户身份与防刷机制**: 基于 Supabase 提供的安全防护、速率限制与数据存储，前端即可安全同步！
-
-### v2.2 (Chao 魔改增强版 - 纯前端版功能同步)
-*   **🌐 图表标题国际化**：修复所有图表标题的翻译问题，支持中英文动态切换，Y轴标签完整翻译
-*   **📁 文件名优化**：全面优化导出文件名生成逻辑
-    *   兼容Windows/Linux/macOS文件名限制，移除特殊字符
-    *   添加时间戳避免文件覆盖（格式：YYYY-MM-DD_HH_MM_SS）
-    *   防止中文字符截断问题，文件名长度<200字符
-    *   影响范围：CSV导出、历史记录CSV、图表导出、对比图表导出
-*   **📊 步长倍数**：新增步长倍数输入框，支持指数级步长增长（倍数^n，如2则128→256→512→1024...）
-*   **📸 截图功能**：新增截图对比结果按钮
-    *   一键截取表格+Prefill+Decode图表
-    *   直接复制到剪贴板，方便分享
-    *   使用html2canvas库实现高质量截图
-*   **📚 按钮优化**：历史记录按钮文本改为“查看/对比历史记录”，强调对比功能
-
-### v2.1 (Chao 魔改增强版 - Python后端版与并发吞吐修复)
-*   **🐍 Python后端版本**：新增Python后端版本，通过后端发起HTTP请求，突破浏览器6并发限制，支持真正的高并发测试（50+并发）
-*   **🔍 Token来源追踪**：测试详情显示token统计来源（API/本地估算/未知），对本地估算值添加⚠标记提示
-*   **🔧 并发吞吐修复**：修复并发测试吞吐量计算错误 - 现使用真实墙上时间计算（总tokens/总耗时），而非错误的单请求吞吐求和
-*   **📊 百分位统计**：显示P50/P90/P95百分位统计，更准确评估性能分布和稳定性
-*   **💾 存储优化增强**：未勾选"保存测试详情"时不保存prompt和output文本内容，大幅减少存储占用（50并发约减少98%存储空间）
-*   **🚀 一键启动脚本**：Python版本提供启动脚本（中英文），自动启动后端服务器和打开前端页面
-*   **📖 Python版本文档**：添加Python后端版本专用README，详细说明安装、配置和使用方法
-
-### v2.0 (Chao 魔改增强版 - API统计增强与修复)
-*   **📊 API统计增强**：在测试详情中展示完整的usage统计信息（prompt_tokens、completion_tokens、reasoning_tokens等）
-*   **🔄 流式usage支持**：添加stream_options参数以获取流式响应中的usage信息
-*   **🧠 思考模型优化**：自动检测reasoning内容并估算reasoning_tokens（当API不提供时）
-*   **⏱️ timing信息**：支持显示llama.cpp/Ollama的详细timing统计（prompt_eval_duration、eval_duration等）
-*   **🎯 动态字段展示**：自动显示API返回的所有可用统计字段（timings、cached_tokens等）
-*   **💾 存储优化**：历史记录满时提供友好提示，引导用户清理旧记录
-*   **🔧 修复**：修复历史记录加载时并发数和超时显示undefined/NaN的问题
-*   **🔧 修复**：修复saveCurrentConfig未定义错误
-
-### v1.9.1 (Chao 魔改增强版 - 测速优化)
-*   **🔧 修复模型拒绝回答问题**：为所有请求添加 `system prompt`（"You are a helpful assistant."），避免模型拒绝执行用户提示词。
-*   **🎯 优化提示词生成**：
-    *   将词库从 48 个复杂英文词简化为 10 个简单数字词（one, two, three...），减少模型处理负担。
-    *   修改测试指令为哲学思考问题："思考宇宙存在的意义，以及人类的意识是否存在"，避免简单重复导致的测速不准。
-*   **⚙️ 修正采样参数**：
-    *   将 `presence_penalty` 和 `frequency_penalty` 从 `-1.0` 修正为 `0.0`。
-    *   负数 penalty 会鼓励模型重复输出同一词汇，导致模型"死机"，现已修复。
-
-### v1.9 (Chao 魔改增强版 - 历史记录与详情查看)
-*   **📚 历史记录自动保存**：测试完成后自动保存到浏览器 localStorage（最多保存 20 条）
-*   **🗂️ 历史记录管理面板**：全新的历史记录模态框，美观易用
-    *   测试时间、备注、配置、性能统计一目了然
-    *   支持查看完整测试详情（配置、统计数据、完整表格）
-    *   单个历史记录导出为 CSV
-    *   删除单条记录或清空全部
-*   **📊 历史记录对比功能**：勾选多条历史记录，一键生成对比图表
-    *   复选框快速选择多个测试记录
-    *   实时显示已选择数量
-    *   自动滚动到对比图表位置
-    *   与 CSV 导入功能完全兼容
-*   **🔍 测试详情查看**：每个测试结果行都有"查看详情"按钮
-    *   查看完整的提示词内容和模型输出
-    *   显示详细的请求配置（Temperature、Top P 等）
-    *   展示完整的性能指标（Prefill/Decode 时间和速度）
-    *   区分思考内容和答案内容（支持推理模型）
-    *   支持一键复制提示词和输出内容
-    *   美观的模态框界面，内容自动换行
-*   **💾 数据持久化**：所有历史记录保存在 localStorage，无需担心数据丢失
-*   **🎨 完整双语支持**：所有新增功能完全支持中英文切换
-
-### v1.8 (Chao 魔改增强版)
-*   **🌐 双语支持（中英文）**：新增完整的中英文双语支持，配备醒目的语言切换按钮。界面可在中英文之间自动切换，所选语言自动保存到localStorage。
-*   **📁 双语言文件版本**：
-    *   `本地大模型推理速度测试工具v1.9.html` - 中文版（默认中文界面）
-    *   `LLM_Speed_Test_Tool_v1.9_EN.html` - 英文版（默认英文界面）
-*   **图表导出按钮**：添加一键导出按钮，方便将当前 Prefill 和 Decode 图表导出为一张图片。
-*   **多个CSV结果导入对比**：新增功能，允许导入多个历史测试的 CSV 文件，在图表中进行对比分析。
-*   **合并图表导出**：将 Prefill 和 Decode 图表一键导出为一张图片，方便分享和记录。
-*   **对比标签**：导入 CSV 文件后，使用 CSV 文件名作为对比图表的图例标签，更易于区分不同测试结果。
-*   **对比导出**：为对比图表也增加一键导出功能，并自动生成包含参数的文件名，便于管理。
-*   **【重要修复】支持思考模型**：解析 usage 字段获取准确 token 统计（reasoning_tokens + completion_tokens）。
-*   **添加token估算fallback**：当API不返回usage时使用字符估算。
-*   **【关键修复】Prefill速度计算错误**：现在使用API返回的实际prompt_tokens而非估算值（修复了约10%误差）。
-*   **【兼容性修复】支持多种流式响应格式**：delta.reasoning_content（思考）/ delta.content / message.content / text。
-*   **自动保存/恢复所有配置参数**：API地址、模型、温度、并发数等所有参数，下次打开自动恢复。
-*   **【思考模型修复】正确计算reasoning+completion总tokens**：当usage不准时使用内容估算，确保decode速度准确。
-*   **【性能测量优化】优先使用服务器返回的真实GPU处理时间**：(prompt_eval_duration/eval_duration），消除网络延迟影响。
-*   **【前缀缓存修复】并发测试使用唯一提示词**：每个并发请求现在都获得唯一的提示词前缀，防止vLLM的前缀缓存虚增性能指标。
-
-### v1.7 (chao魔改版)
-
-*   为每个请求增加 3 次重试（间隔 1.5 秒），提高测试稳定性，过滤瞬时失败。
-*   自动显示图表，无需点击，提高使用便捷性。
-*   将 Prefill 和 Decode 速度分离到两张图表，更清晰地展示性能。
-*   修复高并发下 `Promise.all` 熔断问题，改用 `Promise.allSettled`，确保部分请求失败不影响整体并发流程。
-*   增加 `AbortController` 实现的请求超时。
-*   保存当前配置到 `localStorage`，下次打开自动加载。
-*   优化了 UI 样式和用户体验。
-
-
-## 特性
-
-*   **🌐 完整双语支持**：完整的中英文界面，支持即时语言切换。语言偏好自动保存。
-*   **浏览器本地运行**：完全离线，数据不出本地，保障隐私安全。
-*   **支持多种 API 类型**：
-    *   **OpenAI 兼容接口**：适用于所有兼容 OpenAI API 的大模型服务，如 vLLM、TGI、FastChat 等。
-    *   **Ollama 接口**：直接利用 Ollama 提供的性能指标，简化测试。
-*   **详细性能指标**：测量提示词长度、预填充耗时、预填充速度、输出 Token 数、输出耗时、输出速度，包括 P50/P90/P95 百分位统计。
-*   **并发测试**：支持设置并发请求数，模拟高负载场景。
-*   **请求重试机制**：每个请求增加 3 次重试（间隔 1.5 秒），有效过滤瞬时/偶发性网络或服务器失败。
-*   **请求超时控制**：通过 AbortController 实现请求超时，避免长时间无响应。
-*   **实时进度条与结果显示**：测试进度可视化，结果实时更新。
-*   **自动图表生成**：测试过程中自动生成并更新 Prefill 和 Decode 吞吐量图表，直观展示性能趋势。
-*   **📚 历史记录管理**（v1.9 新增）：
-    *   **自动保存**：测试完成后自动保存到 localStorage（最多 20 条）
-    *   **历史面板**：美观的模态框界面，查看所有历史测试
-    *   **详情查看**：查看历史记录的完整配置、统计数据和测试结果
-    *   **单个导出**：将历史记录导出为 CSV 文件
-    *   **记录管理**：删除单条记录或清空全部
-    *   **对比功能**：勾选多条历史记录，一键生成对比图表
-*   **🔍 测试详情查看**（v1.9 新增）：
-    *   **详情按钮**：每个测试结果行都有"查看详情"按钮
-    *   **完整内容**：查看完整的提示词和模型输出内容
-    *   **请求配置**：显示所有请求参数（API类型、模型、Temperature、Top P等）
-    *   **性能指标**：展示详细的Prefill/Decode时间和速度
-    *   **推理模型支持**：区分思考内容和答案内容
-    *   **复制功能**：一键复制提示词或输出内容到剪贴板
-    *   **优化排版**：文本自动换行，表格列宽优化，无需横向滚动
-*   **配置自动保存**：自动将当前的 API 地址、模型名称和 API 类型保存到浏览器 `localStorage`，下次打开自动加载。
-*   **结果导出**：支持将测试结果复制为 Markdown 表格或导出为 CSV 文件。
-*   **图表导出**：支持将生成的 Prefill 和 Decode 吞吐图表一键导出为图片。
-*   **CSV结果导入与对比**：支持导入多个历史CSV测试结果，并在图表中进行对比分析。
-*   **灵活的参数配置**：可自定义提示词长度范围、步长、输出长度、Temperature、Top P、Penalty 等。
-
-## 核心概念
-
-*   **OpenAI 兼容接口**：指符合 OpenAI `v1/chat/completions` 标准的大模型推理 API。本工具通过发送 `stream=true` 的请求，测量首字到达时间来计算 Prefill 速度，以及总输出完成时间来计算 Decode 速度。
-*   **Ollama 接口**：指 Ollama 提供的 `api/chat` 接口。本工具通过发送 `stream=false` 的请求，直接利用 Ollama 响应中返回的 `prompt_eval_duration` 和 `eval_duration` 等指标来计算性能。
-*   **Prefill (预填充) 吞吐**：衡量模型处理输入提示词的速度，通常以 **tokens/秒** 为单位。对于流式输出，从请求开始到第一个 token 到达的时间用于计算。
-*   **Decode (解码/输出) 吞吐**：衡量模型生成输出 token 的速度，通常以 **tokens/秒** 为单位。对于流式输出，从第一个 token 到达直到所有输出完成的时间用于计算。
-
-## 如何使用
-
-### 版本选择
-
-本工具提供两种版本，请根据需求选择：
-
-#### 浏览器版本（推荐简单测试）
-- **优点**：无需安装，双击HTML文件即可使用，完全离线运行
-- **限制**：受浏览器限制，最多支持6并发
-- **适用场景**：快速测试、低并发场景、无Python环境
-
-#### Python后端版本（推荐高并发测试）
-- **优点**：突破浏览器限制，支持50+真正高并发，测试结果更准确
-- **要求**：需要Python环境和依赖包
-- **适用场景**：高并发压测、性能极限测试、生产环境评估
-- **详细说明**：查看 [Python后端版本README](python/README_Backend.md)
+✨ **在线体验免安装纯前端版（零下载 / 零配置 / 点开即测）：**
+- ⚡ **矩阵测速引擎 (Matrix Benchmark)**: [**https://gengchaogit.github.io/llm_speedtest/**](https://gengchaogit.github.io/llm_speedtest/)
+- 🏆 **全网天梯榜 (Global Leaderboard)**: [**https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html**](https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html)
 
 ---
 
-### 1. 浏览器版本使用方法
+## 1. 项目简介 (Overview)
 
-1.  **选择你偏好的版本**：
-    *   默认英文界面：下载 `LLM_Speed_Test_Tool_v1.9_EN.html`
-    *   默认中文界面：下载 `本地大模型推理速度测试工具v1.9.html`
-2.  使用任何现代浏览器（如 Chrome, Firefox, Edge）打开HTML文件。无需额外的安装或服务器。
-3.  **语言切换**：点击右上角的语言切换按钮（紫色渐变）可随时在中英文之间切换。你的选择会自动保存。
+**本地大模型推理速度测试与天梯榜平台** 是一套面向开源大模型生态的工业级推理性能基准与天梯天梯排行榜系统。系统全面汲取了学术界与工业界顶级测试工具（如 `llm-inference-bench`、`vLLM benchmark_serving` 与 `AIPerf`）的核心精髓，建立起包括 **首字延迟 (TTFT)**、**Token 间延迟抖动 (ITL P50/P90/P99)**、**真实物理墙上时间吞吐 (Wall-clock TPS)**、**稳态持续解码 (Sustained Decode)**、**并发饱和度探测 `(X/Y)*`** 以及 **输出死循环熔断保护 (Repetition Watchdog)** 在内的严谨基准评测规范。
 
-### 1b. Python后端版本使用方法
-
-1.  **安装依赖**：
-    ```bash
-    cd python
-    pip install fastapi uvicorn httpx
-    ```
-
-2.  **一键启动**（推荐）：
-    *   Windows: 双击 `启动测速工具.bat` 或 `Start_LLM_Speed_Test.bat`
-    *   自动启动后端服务器并打开测试页面
-
-3.  **手动启动**：
-    ```bash
-    # 启动后端
-    python llm_test_backend.py
-
-    # 打开浏览器访问
-    # 打开 LLM_Speed_Test_v3_Python_Backend.html
-    ```
-
-4.  **详细文档**：查看 [python/README_Backend.md](python/README_Backend.md) 获取完整说明
+平台提供两种互补的运行形态：
+1. **纯前端免部署架构 (Web Client)**：100% 运行于浏览器沙箱内，无任何自建中间件依赖，通过高可用公共 CDN 载入可视化组件，直接通过 PostgREST 协议安全对接 Supabase 云端数据库，零成本托管于 GitHub Pages。
+2. **高并发 Python 压测套件 (Python Suite)**：基于 AsyncIO 与 HTTP/2 连接池构建，突破浏览器 6 并发限制，支持 50～256+ 真实极限并发压测，内置 Prometheus `/metrics` 服务端状态遥测与一键跨平台启动脚本。
 
 ---
 
-### 2. 配置参数
+## 2. 核心架构与设计哲学 (Architecture & Design Philosophy)
 
-在页面中填写或选择以下关键参数：
+### 2.1 高保真系统架构图 (ASCII)
 
-*   **API 类型选择**：选择 `OpenAI兼容接口` 或 `Ollama接口`。
-*   **API 地址**：你的大模型推理服务 API 的完整 URL。
-    *   OpenAI 兼容接口: 通常为 `http://your_ip:port/v1/chat/completions`
-    *   Ollama 接口: 通常为 `http://your_ip:port/api/chat`
-*   **模型名称**：你在 API 中使用的模型名称或 ID。
-*   **API-Key**：如果你的 API 需要认证，请填写。不需要则留空。
-*   **备注**：填写设备信息、模型信息、模型推理框架等，方便后续回顾。
-*   **最小提示词长度**：测试的起始提示词 token 数量。
-*   **最大提示词长度**：测试的结束提示词 token 数量。
-*   **步长**：每次测试提示词长度增加的量。
-*   **期望输出长度**：每次模型应生成的最大 token 数量。
-*   **并发数**：同时发送的请求数量，用于测试并发性能。
-*   **请求超时 (ms)**：单个请求的最大等待时间（毫秒）。
-*   **Temperature / Top P / Presence Penalty / Frequency Penalty**：生成参数，用于控制模型输出的随机性和多样性。
+```text
++---------------------------------------------------------------------------------------------------+
+|                                  CLIENT EXECUTION LAYER (客户端层)                                |
+|                                                                                                   |
+|  [ 纯前端静态客户端 (GitHub Pages) ]                [ 高并发 Python 压测套件 (CLI / 服务端) ]     |
+|  * index.html (2D 矩阵测速引擎)                     * llm_test_backend.py (AsyncIO / CLI / WebAPI) |
+|  * LLM_Speed_Test_v3_Leaderboard.html (天梯榜)      * LLM_Speed_Test_v3_Python_Backend.html        |
+|  * 100% 公共 CDN 载入 (Chart.js 4.4.1 / html2canvas)* 50~256+ HTTP/2 多路复用连接池 (h2 / httpx)   |
+|  * 双通道 Repetition Watchdog 死循环熔断器           * Prometheus /metrics 遥测抓取器 (KV Cache)    |
+|  * 客户端硬件 & Canvas 指纹引擎 (vh_xxxxxxxx)       * 真实墙上时间计算与 (X/Y)* 有效并发率判定     |
++---------------------------------------------------------------------------------------------------+
+             |                                                  |
+             | (OpenAI SSE Stream / Ollama API)                 | (高并发 HTTP/2 SSE 流式请求)
+             v                                                  v
++---------------------------------------------------------------------------------------------------+
+|                                    SERVING LAYER (被测推理引擎 SUT)                               |
+|                                                                                                   |
+|  * vLLM  (/v1/chat/completions + /metrics)          * SGLang (/v1/chat/completions + /metrics)    |
+|  * llama.cpp server (/v1/chat/completions)         * Ollama (/api/chat & /v1/chat/completions)    |
+|  * 商业 API: OpenAI / DeepSeek / Together / OpenRouter / 兼容 OpenAI 标准的第三方推理服务         |
++---------------------------------------------------------------------------------------------------+
+             |                                                  |
+             | 浏览器直接 REST POST (测试载荷 + 签名)            | CLI 直接 REST POST (自动化云端上榜)
+             v                                                  v
++---------------------------------------------------------------------------------------------------+
+|                              SERVERLESS CLOUD BACKEND (Supabase 云端服务)                         |
+|                                                                                                   |
+|  * PostgREST API 接口: https://cvezaerrczywfzqcaqmx.supabase.co/rest/v1/speed_results             |
+|  * PostgreSQL 关系型数据库 (public.speed_results 核心表, GIN/B-Tree 组合索引)                     |
+|  * RPC 存储过程: get_model_tags() 动态聚合热门模型标签                                             |
+|  * 行级安全策略 (RLS): 匿名只读 + 匿名带约束安全写入，无需自建任何后端中转服务器                  |
++---------------------------------------------------------------------------------------------------+
+```
 
-### 3. 启动测试
+### 2.2 模块数据流图 (Mermaid)
 
-点击 `开始测试` 按钮。测试将按照你设定的提示词长度范围和步长，逐次发送请求。
+```mermaid
+graph TB
+    subgraph ClientLayer ["客户端执行层 (Client Execution Layer)"]
+        subgraph WebClient ["纯静态前端 (GitHub Pages 零安装)"]
+            UI_Web["index.html<br/>(2D 矩阵测速引擎)"]
+            UI_Board["LLM_Speed_Test_v3_Leaderboard.html<br/>(全网天梯排行榜)"]
+            CDN_Assets["高可用公共 CDN<br/>(Chart.js, html2canvas)"]
+            Watchdog_JS["客户端死循环熔断器<br/>(Repetition Loop Guard)"]
+            Fingerprint_JS["硬件与 Canvas 指纹引擎<br/>(生成 vh_xxxxxxxx 认证哈希)"]
+        end
 
-### 4. 停止测试
+        subgraph PythonSuite ["Python 高并发压测套件 (本地 CLI / 服务端)"]
+            CLI_Py["llm_test_backend.py<br/>(AsyncIO 压测核心 / CLI / WebSockets)"]
+            UI_PyWeb["LLM_Speed_Test_v3_Python_Backend.html"]
+            Engine_Async["高并发异步连接池<br/>(50~256+ 并发 / HTTP/2 多路复用)"]
+            Watchdog_Py["StreamingLoopDetector 守卫"]
+            Scraper_Prom["Prometheus /metrics 抓取器<br/>(KV Cache 监控 / 队列遥测)"]
+        end
+    end
 
-点击 `停止测试` 按钮（测试开始后显示），可随时中断正在进行的测试。
+    subgraph ServingLayer ["被测大模型推理引擎 (Serving Layer / SUT)"]
+        vLLM["vLLM<br/>(/v1/chat/completions + /metrics)"]
+        SGLang["SGLang<br/>(/v1/chat/completions + /metrics)"]
+        LlamaCpp["llama.cpp / Ollama<br/>(/v1/chat/completions)"]
+        RemoteAPI["云端模型服务<br/>(DeepSeek, OpenAI, Together, OpenRouter)"]
+    end
 
-### 5. 查看结果
+    subgraph DataCloudLayer ["无服务器云端存储 (Supabase PostgREST)"]
+        Supa_REST["Supabase PostgREST API<br/>(/rest/v1/speed_results)"]
+        Supa_RPC["Supabase RPC 函数<br/>(get_model_tags)"]
+        Supa_DB[(PostgreSQL 核心数据库<br/>public.speed_results)]
+        Supa_RLS["行级安全策略 (RLS)<br/>(公开读 / 校验匿名写入)"]
+    end
 
-测试结果将实时显示在页面下方的表格中，包括：
-*   **提示词长度 (tokens)**
-*   **预填充耗时 (ms)**
-*   **预填充速度 (tokens/s)**
-*   **输出长度 (tokens)**
-*   **输出耗时 (ms)**
-*   **输出速度 (tokens/s)**
-*   **状态** (成功/失败)
-*   **并发统计**：测试完成后，将显示总体 Prefill 和 Decode 吞吐的最小、最大和平均值。
-
-同时，`预填充 (Prefill) 吞吐` 和 `输出 (Decode) 吞吐` 两张图表也会自动生成并实时更新，直观展示性能随提示词长度的变化趋势。
-
-### 6. 复制 Markdown 表格
-
-测试完成后，点击 `复制 Markdown 表格` 按钮，可以将测试数据以 Markdown 表格形式复制到剪贴板，方便粘贴到文档或 GitHub README 中。
-
-### 7. 导出 CSV 数据
-
-测试完成后，点击 `导出 CSV 数据` 按钮，可以将测试数据导出为 CSV 文件，方便在 Excel 或其他数据分析工具中进行进一步分析。
-为了方便进行版本对比，建议每次导出CSV时在文件名中带上当前的版本号或者测试时间。
-
-### 8. 导出图表
-
-测试完成后，点击图表区域上方的 `导出图表` 按钮，可将 Prefill 和 Decode 吞吐量图表合并导出为一张 PNG 图片。
-
-### 9. 导入 CSV 数据进行对比
-
-点击 `导入CSV文件` 按钮，选择一个或多个之前导出的 CSV 文件。程序将解析这些文件的数据，并在 Prefill 和 Decode 吞吐量图表中绘制多条曲线，方便你对比不同模型、不同配置或不同版本的性能。导入的 CSV 文件名将作为图例标签。
-
-### 10. 导出对比图表
-
-导入 CSV 文件并绘制对比图表后，点击图表上方的 `导出对比图表` 按钮，即可将包含所有对比数据的 Prefill 和 Decode 吞吐量图表合并导出为一张 PNG 图片，文件名会自动包含当前测试参数和导入的文件名，便于管理。
-
-### 11. 查看历史记录（v1.9 新增）
-
-点击 `📚 查看历史记录` 按钮，打开历史记录管理面板。历史记录会在每次测试完成后自动保存（最多保存 20 条）。
-
-在历史记录面板中，你可以：
-*   **查看列表**：浏览所有历史测试的摘要信息（时间、备注、模型、配置、性能统计）
-*   **查看详情**：点击 `查看详情` 按钮，查看某条记录的完整配置、统计数据和测试结果表格
-*   **导出 CSV**：点击 `导出CSV` 按钮，将该历史记录导出为 CSV 文件
-*   **删除记录**：点击 `删除` 按钮，删除不需要的历史记录
-*   **清空全部**：点击 `清空全部` 按钮，一键清除所有历史记录
-
-### 12. 历史记录对比（v1.9 新增）
-
-在历史记录面板中，你可以勾选多条历史记录进行对比：
-
-1.  在历史记录列表中，勾选你想对比的记录（左侧复选框）
-2.  顶部会实时显示 "已选择 X 条"
-3.  点击 `生成对比图表` 按钮
-4.  历史记录面板自动关闭，页面滚动到对比图表区域
-5.  查看多条历史记录的 Prefill 和 Decode 性能对比曲线
-
-**提示**：历史记录对比功能与 CSV 导入功能完全兼容，你可以同时使用两种方式进行对比分析。
-
-### 13. 查看测试详情（v1.9 新增）
-
-在测试结果表格中，每一行测试结果都有一个 `查看详情` 按钮。点击该按钮可以打开详情弹窗，查看该测试的完整信息：
-
-详情弹窗包含以下内容：
-*   **基本信息**：API类型、模型名称、提示词长度、输出长度、并发数、测试时间
-*   **性能指标**：预填充耗时/速度、输出耗时/速度、测试状态
-*   **请求配置**：Temperature、Top P、Max Tokens 等所有请求参数
-*   **提示词内容**：完整的提示词文本，支持一键复制
-*   **输出内容**：完整的模型输出文本，支持一键复制
-    *   对于推理模型（如 DeepSeek-R1），会区分显示思考内容和答案内容
-    *   所有文本自动换行，方便阅读
-
-**使用技巧**：
-*   点击详情弹窗外的遮罩层或"关闭"按钮可关闭弹窗
-*   点击"复制内容"按钮可快速复制提示词或输出内容
-*   详情弹窗内容可滚动查看，适合查看长文本
-
-## 配置说明
-
-以下是各配置项的详细说明：
-
-*   **API 地址 (`apiUrl`)**：
-    *   **OpenAI 兼容**：例如 `http://192.168.1.100:8000/v1/chat/completions`。请确保你的大模型推理框架（如 vLLM, TGI）以兼容 OpenAI API 的模式运行。
-    *   **Ollama**：例如 `http://localhost:11434/api/chat`。确保 Ollama 服务正在运行。
-*   **模型名称 (`modelName`)**：
-    *   **OpenAI 兼容**：你的服务所使用的模型 ID 或名称，例如 `qwen-7b-chat`，`mistral-7b-instruct`。
-    *   **Ollama**：你在 Ollama 中拉取的模型名称，例如 `llama2`，`qwen`。
-*   **API-Key (`apiKey`)**：如果你的大模型服务设置了 API Key 认证，请在此处填写。否则可以留空。
-*   **备注 (`notes`)：** 用于记录每次测试的环境信息，例如 `GeForce RTX 4090, vLLM 0.3.0, Qwen-7B-Chat-AWQ`。
-*   **启动命令 (`run_command`)：** 可选，用于记录启动推理框架的命令，例如 `vllm serve /data2/Qwen3.6-27B-FP8 --served-model vllm --max-num-seqs 64 --enable-chunked-prefill --max-model-len auto --gpu-memory-utilization=0.8 --port 8099 --host 0.0.0.0`。云端存储前请先执行 `supabase_add_run_command.sql` 中的数据库变更语句。
-*   **最小/最大提示词长度 (`minLength`, `maxLength`)**：定义测试的提示词 token 长度区间。
-*   **步长 (`step`)**：每次测试时提示词长度递增的数量。例如，`minLength=128, maxLength=1024, step=128` 会测试 128, 256, 384...1024 token 的提示词。
-*   **期望输出长度 (`outputLength`)**：模型每次请求预计生成的 token 数量。
-*   **并发数 (`concurrency`)**：同时发送的请求数。例如设置为 `4`，则每个提示词长度会同时进行 `4` 次请求，并计算它们的平均性能及总吞吐。
-*   **请求超时 (ms) (`timeout`)**：单个请求的最大等待时间（毫秒）。如果模型在此时间内未能完成响应，请求将被视为失败。
-*   **Temperature (`temperatureInput`)**：控制模型输出的随机性。数值越高，输出越随机。
-*   **Top P (`topPInput`)**：控制模型从高概率到低概率选择词汇的范围。例如，`0.9` 意味着模型将选择累积概率达到 90% 的词汇。
-*   **Presence Penalty (`presencePenaltyInput`) / Frequency Penalty (`frequencyPenaltyInput`)**：用于减少重复性。Presence Penalty 惩罚已出现过的 token，Frequency Penalty 惩罚出现频率高的 token。Ollama 接口通常合并为 `repeat_penalty`。
-
-## 故障排除
-
-*   **测试长时间无响应/失败**：
-    *   检查 `API 地址` 是否正确、网络是否可达。
-    *   检查 `模型名称` 是否与服务端配置一致。
-    *   检查 `API-Key` 是否正确。
-    *   增大 `请求超时 (ms)`。
-    *   对于 OpenAI 兼容接口，确保你的服务支持流式（`stream: true`）响应。
-*   **Ollama 接口测试失败，提示缺少 `duration` 字段**：
-    *   确保 Ollama 服务版本较新，并返回必要的性能指标。
-*   **图表不显示或数据异常**：
-    *   确认浏览器控制台（F12）是否有错误信息。
-    *   清理浏览器缓存后重试。
-*   **并发测试结果差异大**：
-    *   确保你的硬件资源（GPU 显存、CPU 线程）能够支撑高并发。
-    *   后台可能存在其他负载干扰测试结果。
-    *   模型的服务配置（如最大 batch size）可能会影响高并发下的表现。
-*   **CSV 导入图表不显示数据或显示错误**：
-    *   请确保导入的 CSV 文件是本工具导出的标准格式。
-    *   检查 CSV 文件中的列名是否与程序预期一致（如 "提示词长度 (tokens)", "预填充速度 (tokens/s)", "输出速度 (tokens/s)"）。
-
-## 贡献与反馈
-
-欢迎提交 issues 或 pull requests 来改进本工具或报告 bug。
+    UI_Web -->|OpenAI SSE 流式请求| ServingLayer
+    CLI_Py -->|高并发 HTTP/2 SSE 请求| ServingLayer
+    Scraper_Prom -->|定时拉取 /metrics| ServingLayer
+    UI_Web -->|PostgREST 直连提交| Supa_REST
+    CLI_Py -->|CLI 自动直连提交| Supa_REST
+    UI_Board -->|REST 复合检索 / 筛选 / 排序| Supa_REST
+    UI_Board -->|调用 RPC 获取模型标签| Supa_RPC
+    Supa_REST --> Supa_DB
+    Supa_RPC --> Supa_DB
+    CDN_Assets -.-> WebClient
+```
 
 ---
 
-**原作者：纸鸢随风（B站）、DeepSeek-R1-0528**
-**基于原始作者的最新版改动，可查看**
-**https://www.bilibili.com/opus/1078272739661316119**
+## 3. 特性对比矩阵 (Feature Comparison Matrix)
 
-**魔改版维护者：chao (QQ群: 1028429001)**
-**最新版获取地址：https://github.com/gengchaogit/llm_speedtest**
+下表从 12 个关键工程与基准维度，将本平台与业内主流测试工具进行了横向对比：
+
+| 评估维度 (#) | 本平台 (LLM Speed Test v3.5) | Ollama bench (原生) | vLLM benchmark_serving | llm-inference-bench (lil-bench) |
+|---|---|---|---|---|
+| **1. 架构部署形态** | **双模**：纯静态 GitHub Pages 免安装 + Python CLI | 本地 CLI 命令 | Python CLI 脚本 | Python CLI + Rich TUI |
+| **2. 零安装 Web 体验** | **✅ 支持**：点开网页即测，无任何前置依赖 | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 |
+| **3. 并发测试范围** | **1 ～ 256+** (前端 1-6，Python 1-256+) | 仅单请求并发 (c=1) | 高并发 (由请求速率驱动) | 高并发矩阵配置 |
+| **4. 2D 压测参数矩阵** | **✅ 完整支持** (并发阶梯 $\times$ 上下文阶梯二维扫描) | ❌ 仅单点测试 | ❌ 仅单批次测试 | ✅ 支持并发 $\times$ 上下文扫描 |
+| **5. 持续与突发基准模式** | **✅ 完整支持** (Sustained Decode 与 Burst 模式) | ❌ 不支持 | ❌ 仅请求排队突发 | ✅ 规范支持持续稳态与突发 |
+| **6. 毫秒级延迟分位数** | **✅ 完整采集** (TTFT 及 ITL P50/P90/P99) | 仅平均值与总时长 | 仅整体时延统计 | ✅ 采集各分位数与抖动标准差 |
+| **7. 物理真实墙上吞吐** | **✅ 真实墙上时间**跨度计算，杜绝单请求累加求和虚标 | 仅提供单请求单次数据 | 统计吞吐 (req/s, tok/s) | ✅ 严谨真实跨度时间算法 |
+| **8. 死循环熔断器 (Watchdog)** | **✅ 双通道支持**：周期模式熔断保护（Reasoning 与 Content 通道隔离） | ❌ 无保护 (模型死机耗尽 token) | ❌ 无保护 | ✅ 字符滑动窗口循环周期检测 |
+| **9. 服务端队列遥测** | **✅ 支持** Prometheus 抓取与有效并发率 `(X/Y)*` 标记 | ❌ 无 | ❌ 无动态端到端队列抓取 | ✅ Prometheus 遥测及有效并发标记 |
+| **10. 多引擎/模型兼容性** | **✅ 全兼容** (vLLM, SGLang, llama.cpp, Ollama, OpenAI) | 仅适配 Ollama 本地模型 | 深度绑定 vLLM 服务端 | 适配 vLLM, SGLang, Ollama |
+| **11. 公开天梯榜与社会化分享** | **✅ 全网天梯榜** (帕累托散点、雷达图、指纹认证、深链分享) | ❌ 无榜单平台 | ❌ 无榜单平台 | ❌ 无公开云端榜单系统 |
+| **12. 双语国际化支持** | **✅ 100% 静态中英双语**热切换，无外部翻译 API 依赖 | 仅英文 | 仅英文 | 仅英文 |
+
+---
+
+## 4. 评测方法论与数学公理 (Benchmarking Methodology & Mathematical Rigor)
+
+性能测试的公信力源于数学严谨性与物理真实性。本平台严格遵循以下公式和判定准则：
+
+### 4.1 首 Token 延迟 (TTFT - Time To First Token)
+
+**定义**：从客户端发出 HTTP 请求网络封包的瞬间，到接收到服务端流式返回的第一个有效 Token（含思考推理标签）之间经历的真实物理时间。
+
+对于测试单元内的第 $i$ 个并发请求（$i \in [1, C]$）：
+$$\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}$$
+
+单元平均首 Token 延迟与分位数计算：
+$$\text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i$$
+分位数通过**连续线性插值法**计算：对于升序排列样本序列 $Y = [y_1, y_2, \dots, y_N]$，其 $p$ 分位数对应秩索引：
+$$k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f$$
+$$\text{Quantile}(Y, p) = y_f + \Delta \times (y_{f+1} - y_f)$$
+由此严谨推导出 $\text{TTFT}_{P50}$、$\text{TTFT}_{P90}$ 与 $\text{TTFT}_{P99}$。
+
+### 4.2 Token 间延迟抖动 (ITL Jitter)
+
+**定义**：模型在解码（Decode）阶段生成相邻两个 Token 的到达时间差 $\Delta t_j = t_j - t_{j-1}$。ITL 抖动反映了流式阅读的流畅度以及推理显存调度的平稳性。
+
+对于包含 $M$ 个生成 Token 间隔的测试集：
+$$\mu_{\text{ITL}} = \frac{1}{M}\sum_{j=1}^M \Delta t_j, \quad \sigma_{\text{ITL}} = \sqrt{\frac{1}{M}\sum_{j=1}^M (\Delta t_j - \mu_{\text{ITL}})^2}$$
+$$\text{Jitter CV (变异系数)} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}} \times 100\%$$
+同时给出 $\text{ITL}_{P50}$、$\text{ITL}_{P90}$ 与 $\text{ITL}_{P99}$，精准捕捉垃圾回收（GC）、PagedAttention 换页或批调度引起的掉帧与偶发卡顿。
+
+### 4.3 真实物理墙上时间吞吐 (True Wall-Clock Throughput)
+
+> ⚠️ **严正杜绝求和虚标陷阱**：在并发测试中，绝不能将各子请求单独计算出的单流 TPS 直接简单相加（即 $\sum \text{TPS}_i$）。因为并发请求的开始与结束存在时差交错，直接求和会严重虚标总吞吐量达 30%～80%！
+
+本平台严格依据物理时间轴上的**跨度并集（Span Union）**计算系统级真实吞吐量：
+
+$$\Delta T_{\text{prefill, wall}} = \max_{i=1}^C(t_{\text{first}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
+$$\Delta T_{\text{decode, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{first}, i})$$
+$$\Delta T_{\text{e2e, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
+
+$$\text{真实首包吞吐 (Prefill TPS)} = \frac{\sum_{i=1}^C N_{\text{prompt}, i}}{\Delta T_{\text{prefill, wall}}}$$
+$$\text{真实解码吞吐 (Decode TPS)} = \frac{\sum_{i=1}^C N_{\text{output}, i}}{\Delta T_{\text{decode, wall}}}$$
+
+### 4.4 持续稳态解码 (Sustained Decode) 与突发解码 (Burst Decode)
+
+- **持续稳态解码 (Sustained Decode)**：设定固定的物理时间窗口 $T_{\text{duration}}$（如 30 秒或 60 秒），维持恒定的并发连接池。一旦某条连接完成输出，立即补充新请求，模拟生产环境下持续满载推理的真实稳态吞吐（Steady-State Saturation TPS）。
+- **突发解码 (Burst / E2E Decode)**：设定固定请求批次总量 $N = C \times K$（如突发 64 个请求），瞬间打满请求队列，专门测量突发瞬时负载下的调度排队时延、首字 P99 极值与尾部延迟表现。
+
+### 4.5 有效并发率判定 `(X/Y)*` (Effective Concurrency Ratio)
+
+当服务端内部调度槽位受限（例如 vLLM 的 `--max-num-seqs` 饱和或 llama.cpp 设置为单槽排队 `--parallel 1`）时，客户端发出的并发请求在服务端会被迫串行化排队。
+
+根据利特尔法则（Little's Law）推算实际有效重叠度：
+$$P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}$$
+- 若 $P_{\text{inferred}} < 0.80 \times C$ 且 $C > 1$：表明服务端未能真正并行处理该批请求，平台在报告与天梯榜中打上 **`(X/Y)*`** 警示标记（如 `(1/8)*` 表示配置了 8 并发，但服务端实际按 1 并发串行排队）。
+
+### 4.6 死循环熔断保护器 (Repetition Watchdog & Loop Guard)
+
+长思维链推理模型（如 DeepSeek-R1 系列）或经过低比特量化（如 INT4/GGUF-Q2）的模型，在遇到特定边界 Prompt 时，极易陷入无限循环输出（如连续输出几千个重复字符或符号），不仅导致显存打满，更会产生假的高 TPS 污染榜单。
+
+本平台设计了双通道实时守卫机制：
+* **周期性后缀匹配算法 (`exact_periodic_tail`)**：以 256 字符为增量重块（Reblock），在最近 128 KiB 文本滑动窗口内提取末尾 64 字符锚点（Anchor），逆向扫描可能存在的循环周期 $P \in [1, 32768]$。采用二分搜索寻找最大连续重复跨度 $L^*$。
+   - 当重复周期数 $C_{\text{cycles}} \ge 4$ 且重复总长度 $L^* \ge 4096$ 字符时，判定为 **`CONFIRMED_LOOP`**；
+   - 熔断动作：立即触发客户端 `reader.cancel()` 或 `AbortController.abort()` 强行终止流，将单元格标记为 `ERROR: loop`，并赋予哨兵吞吐值 `TPS = -3.0`，杜绝脏数据计入榜单统计；
+   - **双通道独立监测**：分别对思考过程（Reasoning 流）和可见答案（Content 流）进行独立缓冲监测，互不干扰。
+
+### 4.7 帕累托前沿 (Pareto Frontier) 与防伪指纹哈希 (`vh_...`)
+
+- **吞吐-延迟帕累托前沿图**：在多目标优化中，吞吐量 $T$（越大越好）与时延 $L$（越小越好）构成冲突关系。对于点集 $S$，若不存在任何其他点能在时延更低的同时保持更高吞吐，则该点属于帕累托前沿 $\mathcal{P}$。平台通过 $O(N \log N)$ 排序及单调栈线性扫描，在散点图上绘制阶梯状最优前沿包络线。
+- **客户端防伪指纹认证哈希 (`vh_xxxxxxxx`)**：采集客户端无损 Canvas 渲染特征、硬件并发核数、屏幕分辨率等环境指纹向量 $F_{\text{env}}$，与规范化测试成绩载荷拼接计算 SHA-256：
+  $$H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})$$
+  生成独一无二的十六进制验证标识符 `vh_xxxxxxxx`，并在天梯榜上展现 `🛡️ 认证` 徽章，保障天梯榜的公开公信力。
+
+---
+
+## 5. 快速开始 (Quickstart Guide)
+
+### 5.1 纯前端免安装运行 (GitHub Pages)
+
+无需安装 Node.js、Python 或任何数据库，直接访问即可：
+1. 在现代浏览器中打开 [**https://gengchaogit.github.io/llm_speedtest/**](https://gengchaogit.github.io/llm_speedtest/)；
+2. 填写被测推理服务地址（如本地 vLLM 的 `http://localhost:8000/v1` 或 Ollama 的 `http://localhost:11434/api/chat`）；
+3. 选择测试模式（单点测试、2D 矩阵测试、Sustained 稳态模式）；
+4. 点击 **“开始基准测速”**，测试结束后支持一键上传成绩至全网天梯榜并生成专属永久分享链接！
+
+### 5.2 Python 高并发 CLI 套件快速上手
+
+适用于需要突破浏览器 6 并发限制（进行 50+ 真实并发压测）或希望自动化流水线运行的用户：
+
+#### 步骤 1：安装依赖环境 (需 Python 3.10+)
+
+```bash
+cd python
+pip install -r requirements.txt
+```
+*(国内用户加速：`pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple`)*
+
+#### 步骤 2：发起 CLI 压测 (支持 1D 扫频、2D 矩阵与稳态解码)
+
+```bash
+# 模式 A: 标准 1D 阶梯并发压测 (采集 Prometheus 状态并输出 JSON 报告)
+python3 llm_test_backend.py --benchmark \
+  --benchmark-mode 1d_sweep \
+  --api-url http://localhost:8000/v1 \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --concurrency 1,4,16 \
+  --contexts 512,1024,2048 \
+  --max-tokens 128 \
+  --metrics-url http://localhost:8000/metrics \
+  --output benchmark_1d_report.json
+
+# 模式 B: 2D 并发 × 上下文矩阵扫频 (支持 KV Cache 显存容量跳过与探路顺序)
+python3 llm_test_backend.py --benchmark \
+  --benchmark-mode 2d_matrix \
+  --api-url http://localhost:8000/v1 \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --matrix-concurrency 1,2,4,8 \
+  --matrix-context 512,1024,2048 \
+  --matrix-max-kv-tokens 32768 \
+  --max-tokens 128 \
+  --output benchmark_matrix_report.json
+
+# 模式 C: 稳态持续解码压测 (固定 30 秒窗口，隔离单请求 TTFT 与持续稳态 TPS)
+python3 llm_test_backend.py --benchmark \
+  --benchmark-mode sustained_decode \
+  --api-url http://localhost:8000/v1 \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --concurrency 4 \
+  --sustained-duration 30.0 \
+  --sustained-prompt-length 128 \
+  --max-tokens 128 \
+  --output benchmark_sustained_report.json
+```
+
+#### 步骤 3：压测完成并直传全网天梯榜
+
+```bash
+python3 llm_test_backend.py --benchmark \
+  --api-url http://localhost:8000/v1 \
+  --model DeepSeek-R1-Distill-Qwen-14B \
+  --concurrency 16 \
+  --hardware "NVIDIA RTX 4090 24GB" \
+  --framework "vLLM 0.6.3" \
+  --quantization "AWQ-4bit" \
+  --upload \
+  --user-code "my_bench_9988" \
+  --nickname "Hacker-Lab"
+```
+
+### 5.3 跨平台一键启动脚本
+
+针对常用操作系统，在 `python/` 目录下提供了免配置一键启动脚本，自动激活虚拟环境、检查依赖并启动图形化测速界面：
+
+- **macOS / Linux 用户**：
+  ```bash
+  # 启动中文版
+  bash python/run_for_linux_mac_zh.sh
+  # 启动英文版
+  bash python/run_for_linux_mac_en.sh
+  ```
+- **Windows 用户**：
+  - 双击 `python/run_for_windows_zh.bat` (中文界面，UTF-8 控制台编码)
+  - 双击 `python/run_for_windows_en.bat` (英文界面)
+  - 双击 `python/run_for_windows_en_china_user.bat` (英文界面 + 国内 PyPI 镜像加速)
+
+---
+
+## 6. 命令行参考与配置参数 (CLI Reference & Configuration)
+
+`python3 python/llm_test_backend.py` 完整支持如下命令行参数：
+
+| 参数选项 | 类型 | 默认值 | 作用描述 |
+|---|---|---|---|
+| `--server`, `--serve` | Flag | `False` | 启动 FastAPI 与 WebSocket 本地后端服务模式 |
+| `--port PORT` | Int | `18000` | 本地服务绑定端口（若占用自动顺延至空闲端口） |
+| `--host HOST` | String | `0.0.0.0` | 本地服务监听地址 |
+| `--benchmark`, `--cli` | Flag | `False` | 启动无头 CLI 基准测试模式 |
+| `--benchmark-mode`, `--mode` | Choice | `1d_sweep` | 评测执行模式：`1d_sweep`、`2d_matrix`、`sustained_decode` |
+| `--task-type`, `--task` | Choice | `general` | 评测场景题库选择：`general`、`code`、`structured`、`prose`、`prefill_16k`、`reasoning` |
+| `--matrix-concurrency` | String | `'1,2,4,8'` | 2D 矩阵并发梯队，以逗号分隔 |
+| `--matrix-context` | String | `'512,1024,2048'` | 2D 矩阵上下文长度梯队，以逗号分隔 |
+| `--matrix-max-kv-tokens` | Int | `32768` | 2D 矩阵显存预算跳过阈值（0 表示不限制） |
+| `--sustained-duration`, `--duration` | Float | `30.0` | 稳态持续解码测试窗口时长（秒） |
+| `--sustained-prompt-length` | Int | `128` | 稳态持续解码单请求 Prompt Token 长度 |
+| `--api-url API_URL` | String | `http://localhost:8000/v1` | 目标大模型推理服务 API 根路径 |
+| `--api-key API_KEY` | String | `EMPTY` | API 鉴权令牌密钥（若需要） |
+| `--api-type {openai,ollama}` | Choice | `openai` | API 通信协议类型 |
+| `--model MODEL` | String | 必填项 | 待测试的推理模型名称或路径 ID |
+| `--concurrency -c` | String | `1` | 1D 模式并发数，支持单值或逗号分隔阶梯（如 `1,4,16,64`） |
+| `--contexts -l` | String | `100,500,2000` | 1D 模式输入 Prompt 长度阶梯，以逗号分隔 |
+| `--max-tokens -m` | Int | `128` | 每次请求模型生成的最大 Token 数量 |
+| `--temperature` | Float | `0.7` | 采样温度参数 |
+| `--top-p` | Float | `0.9` | 核采样 Top-P 参数 |
+| `--metrics-url` | String | `None` | 服务端 Prometheus 接口地址（如 `http://localhost:8000/metrics`） |
+| `--hardware` | String | 自动侦测 | 硬件设备标识（如未指定则自动通过 `nvidia-smi` / `sysctl` 侦测） |
+| `--framework` | String | `vLLM` | 推理后端框架（vLLM, SGLang, Ollama, llama.cpp 等） |
+| `--quantization` | String | `FP16` | 模型量化规格（FP16, BF16, AWQ, GPTQ, GGUF, FP8 等） |
+| `--upload` | Flag | `False` | 测试完成后是否自动直传 Supabase 全网天梯榜 |
+| `--user-code` | String | `None` | 用户身份唯一识别码（8-16 位字母数字） |
+| `--nickname` | String | `None` | 上榜昵称或团队名称 |
+| `--notes` | String | `None` | 运行备注或驱动版本信息 |
+| `--run-command` | String | `None` | 记录启动服务端的完整 Shell 命令 |
+| `--output -o` | String | `None` | 保存结构化测试结果的本地 JSON 文件路径 |
+| `--no-watchdog` | Flag | `False` | 禁用输出死循环熔断器 |
+| `--timeout` | Int | `120000` | 单次请求超时时间（单位：毫秒） |
+
+---
+
+## 7. 全网天梯榜与云端同步 (Global Leaderboard & Cloud Sync)
+
+全网排行榜通过 Supabase PostgREST API 实现全托管无服务器运转，兼具极高的开放性与数据安全性：
+- **公共榜单地址**: [**LLM_Speed_Test_v3_Leaderboard.html**](https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html)
+- **多维组合筛选**:
+  - **芯片架构**: NVIDIA (Hopper / Ada / Ampere / Blackwell)、Apple Silicon、AMD ROCm、CPU 集群；
+  - **量化级别**: FP16 / BF16、FP8、AWQ、GPTQ、GGUF (Q4/Q8)、EXL2；
+  - **推理引擎**: vLLM、SGLang、llama.cpp、Ollama、TGI；
+  - **并发级别**: 1, 2, 4, 8, 16, 32+ 并发过滤。
+- **高阶可视化呈现**:
+  - **帕累托前沿散点图**: 动态展现解码吞吐 vs 首字延迟的最优效率包络面；
+  - **六维综合雷达图**: Prefill TPS、Decode TPS、首字响应、时延抖动平稳度、并发扩展性、长上下文吞吐保持率；
+  - **2D 矩阵热力透视**: 交互式下钻查看不同并发与提示词长度下的性能衰减梯度；
+  - **离群值自动标识**: 基于四分位距 (IQR) 与物理常识阈值自动识别异常与虚标数据。
+
+---
+
+## 8. 故障排除与常见问题 (Troubleshooting & FAQ)
+
+### Q1: 浏览器测试时并发数为何无法设置超过 6？
+**答**：这是受现代浏览器对同一域名 HTTP/1.1 最大 6 个活动 TCP 连接的沙箱限制所致。若需进行 8、16、32、50+ 等生产级真实高并发压测，请使用本项目内置的 `python/llm_test_backend.py` 命令行或脚本，其利用 AsyncIO 和 HTTP/2 连接池可轻松并发支撑 256+ 连接。
+
+### Q2: 为何测试某些长思考模型时出现 `ERROR: loop`？
+**答**：说明触发了平台的 **Repetition Watchdog（死循环熔断器）**。许多模型（尤其是经过低比特量化的推理模型）在特定提示词下会进入无限死循环生成。Watchdog 在检测到 4 个相同周期且重复超过 4096 字符时会主动熔断，避免测试卡死或产生上万字无意义重复，保护您的显卡显存并剔除异常成绩。
+
+### Q3: 运行 Python CLI 提示 `ImportError: h2`？
+**答**：本项目的高并发压测引擎支持真正的 HTTP/2 多路复用连接池。请确保安装了完整依赖包：
+```bash
+pip install -r python/requirements.txt
+```
+
+### Q4: 提示无法连接到云端排行榜数据库？
+**答**：云端数据库托管于 Supabase（`cvezaerrczywfzqcaqmx.supabase.co`）。若处于无外网连接的纯离线局域网或内网沙箱环境，系统会自动进入离线保护模式，将测试结果保存在本地浏览器 `localStorage` 或本地 JSON 文件中，界面各项本地分析功能均不受影响。
+
+---
+
+## 9. 贡献、更新日志与致谢 (Contributing, Changelog & Credits)
+
+### 9.1 更新日志 (v3.5.0 全新发布)
+- 🚀 **全面重构双语文档体系**：中英文文档 100% 章节对称，补充严谨学术级测速公式与 12 维功能对比矩阵；
+- ⚡ **2D 矩阵与稳态持续解码双引擎**：前端（`index.html`）与 Python 后端（`llm_test_backend.py`）全栈支持 2D Concurrency $\times$ Context 矩阵热力扫频与 Sustained Steady-State Decode 稳态解码压测；
+- 🛡️ **双通道 Watchdog 守卫与 DOM 健壮性**：内置基于二分周期的双通道循环检测熔断；彻底消除了停止测试时的 DOM null 异常并接入 `AbortController` 响应式即时中断；
+- 📊 **天梯榜高维飞跃**：上线帕累托前沿最优曲线、六维性能雷达图、2D 并发-上下文矩阵透视与防伪指纹认证徽章（`vh_xxxxxxxx`）；
+- 🐍 **高并发与服务端遥测**：Python 套件支持 256 并发 HTTP/2 连接池与 Prometheus `/metrics` KV Cache 实时状态探测，推算打标 `(X/Y)*` 有效并发率；
+- 🧪 **世界级工业级 E2E 测试验证**：97 项端到端全场景自动化测试用例（431 项断言，4 层递进式架构）100% 覆盖通过，零回归缺陷；
+- 🌐 **纯前端零死链保障**：全面消除外部脆弱翻译 API，实现 100% 纯本地离线双语即时热切换。
+
+### 9.2 致谢 (Credits)
+- 本项目最初受 Bilibili 创作者 **“纸鸢随风”** 与 **DeepSeek-R1-0528** 开源测速脚本启发；
+- 矩阵基准测试理念与周期检测算法吸纳自开源基准项目 [llm-inference-bench](https://github.com/local-inference-lab/llm-inference-bench)；
+- 谨向 vLLM、SGLang、Ollama、llama.cpp 等伟大开源推理引擎的贡献者们致以崇高敬意！
+
+### 9.3 社区交流与反馈
+- **GitHub Issues**: [提交问题与特性建议](https://github.com/gengchaogit/llm_speedtest/issues)
+- **开发者交流 QQ 群**: 1028429001
+- **代码仓库**: [https://github.com/gengchaogit/llm_speedtest](https://github.com/gengchaogit/llm_speedtest)
