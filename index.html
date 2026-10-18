@@ -79,7 +79,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v3</title>
+    <title>本地大模型推理速度测试工具 v3.5</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1431,8 +1431,8 @@
 
 <body>
     <div class="container">
-        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8
-                (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
+        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v3.5
+                (chao魔改版)</span><button class="lang-toggle" id="langToggle">English</button></h1>
 
         <div id="starSupportBanner"
             style="text-align: center; margin-bottom: 20px; font-size: 15px; background: #fffbf0; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; color: #d35400;">
@@ -1809,7 +1809,7 @@
         // ===============================================================================
         const translations = {
             'zh': {
-                pageTitle: '大模型 Prefill & Decode 性能测试工具 v3 (chao魔改版)',
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v3.5 (chao魔改版)',
                 langToggle: 'English',
                 starSupportBanner: '❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub 仓库</a> 随手点个 ⭐️ Star 支持一下！非常感谢！🙏 <br> <a href="LLM_Speed_Test_v3_Leaderboard.html" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline; display: inline-block; margin-top: 8px;">查看测速排行榜 🏆</a>',
                 apiOpenAI: 'OpenAI兼容接口',
@@ -2141,7 +2141,7 @@
                 batchUploadUnknownModel: '未知历史模型'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3 (chao mod)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3.5 (chao mod)',
                 langToggle: '中文',
                 starSupportBanner: '❤️ Thanks for using this tool! Open source is not easy. If you find it helpful, please visit the <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline;">GitHub repository</a> and drop a ⭐️ Star. Thank you very much! 🙏 <br> <a href="LLM_Speed_Test_v3_Leaderboard.html" target="_blank" style="color: var(--primary-color); font-weight: bold; text-decoration: underline; display: inline-block; margin-top: 8px;">View Leaderboard 🏆</a>',
                 apiOpenAI: 'OpenAI Compatible API',
@@ -9020,8 +9020,10 @@
                     configSummaryHtml = `<div><strong>并发阶梯:</strong> ${matrixConc} | <strong>输出长度:</strong> ${record.config.outputLength} | <strong>测试单元格:</strong> ${record.results?.length || 0}</div>`;
                     statsSummaryHtml = `<div><strong>2D 解码吞吐:</strong> P50/P90/P95: ${record.stats?.decode?.p50 || '-'}/${record.stats?.decode?.p90 || '-'}/${record.stats?.decode?.p95 || '-'} tokens/s</div>`;
                 } else if (recMode === 'sustained_decode') {
-                    modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
                     const sItem = record.results?.[0] || {};
+                    const histTaskType = sItem.task_type || sItem.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                    const taskBadge = getTaskTypeBadgeHtml(histTaskType, currentLang === 'en');
+                    modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>${taskBadge}`;
                     configSummaryHtml = `<div><strong>并发池规模:</strong> ${record.config.concurrency}x | <strong>提示词长度:</strong> ${sItem.promptLength || '-'} | <strong>总 Token:</strong> ${sItem.outputTokens || '-'}</div>`;
                     statsSummaryHtml = `<div><strong>稳态吞吐:</strong> <span style="color:#10b981; font-weight:bold;">${sItem.outputSpeed || '-'} tokens/s</span> | <strong>完成流:</strong> ${sItem.successful || sItem.completedStreams || '-'} | <strong>平均TTFT:</strong> ${sItem.avgTtftMs || sItem.prefillTimeMs || '-'}ms</div>`;
                 } else {
@@ -9175,12 +9177,18 @@
                 });
 
             } else if (recMode === 'sustained_decode') {
-                modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
                 const sItem = record.results?.[0] || {};
+                const histTaskType = sItem.task_type || sItem.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                const taskMeta = TASK_TYPE_META[histTaskType] || TASK_TYPE_META.general;
+                const isEn = (currentLang === 'en');
+                const taskName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+                const taskBadge = getTaskTypeBadgeHtml(histTaskType, isEn);
+                modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>${taskBadge}`;
                 const durSec = parseFloat(sItem.outputTimeMs) / 1000 || parseFloat(record.config?.sustainedDuration) || 30;
                 configItemsHtml = `
                     <li>API URL: ${record.config.apiUrl}</li>
                     <li>评测模式: 稳态持续解码</li>
+                    <li>评测场景 (测试类型): <strong>${taskName}</strong> ${taskBadge}</li>
                     <li>并发流池规模: ${record.config.concurrency}x</li>
                     <li>持续实测窗口: ${durSec.toFixed(1)}s</li>
                     <li>提示词长度: ${sItem.promptLength || record.config.minLength || '-'}</li>
@@ -9195,6 +9203,7 @@
                 statsBlockHtml = `
                     <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
                         <h4 style="color: #61afef; margin-bottom: 10px;">⏱️ 稳态持续解码报告 (Sustained Decode Stats)</h4>
+                        <p><strong>评测场景 (测试类型):</strong> ${taskName} ${taskBadge}</p>
                         <p><strong>稳态解码吞吐:</strong> <span style="color:#10b981; font-weight:bold; font-size:16px;">${sItem.outputSpeed || '-'} tokens/s</span></p>
                         <p><strong>实测持续时长:</strong> ${durSec.toFixed(1)} 秒</p>
                         <p><strong>累计生成 Token:</strong> ${sItem.outputTokens || '-'}</p>
@@ -9542,12 +9551,21 @@
                 const itlStd = item.itl_stats?.std ?? '-';
                 const effConc = item.effectiveConcurrency || `${conc}/${conc}`;
 
+                const histTaskType = item.task_type || item.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                const taskMeta = TASK_TYPE_META[histTaskType] || TASK_TYPE_META.general;
+                const isEn = (currentLang === 'en');
+                const taskName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+                const taskBadgeHtml = getTaskTypeBadgeHtml(histTaskType, isEn);
+
                 const sustainedContainer = document.createElement('div');
                 sustainedContainer.className = 'sustained-live-dashboard';
                 sustainedContainer.style.cssText = 'background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;';
                 sustainedContainer.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                        <h3 style="margin:0; color:#61afef;">⏱️ 稳态持续解码历史回显 (Sustained Decode History)</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <h3 style="margin:0; color:#61afef;">⏱️ 稳态持续解码历史回显 (Sustained Decode History)</h3>
+                            ${taskBadgeHtml}
+                        </div>
                         <div style="font-family:monospace; font-size:14px; color:#8b949e;">${durationSec.toFixed(1)}s 实测窗口</div>
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
@@ -9576,6 +9594,7 @@
                 reportDiv.innerHTML = `
                     <h4 style="margin:0 0 10px 0; color:#10b981;">🎉 稳态持续解码评测回显</h4>
                     <div style="font-size:14px; line-height:1.6;">
+                        • 评测任务场景 (测试类型): <strong>${taskName}</strong> ${taskBadgeHtml}<br>
                         • 持续窗口实测时长: <strong>${durationSec.toFixed(2)} 秒</strong><br>
                         • 稳态解码吞吐 (Sustained Decode TPS): <strong style="color:#10b981; font-size:16px;">${sustainedTps.toFixed(2)} tokens/s</strong><br>
                         • 首字时延分位数: <strong>P50: ${ttftP50}ms | P90: ${ttftP90}ms | P99: ${ttftP99}ms</strong><br>

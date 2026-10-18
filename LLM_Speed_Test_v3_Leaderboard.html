@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Speed Test Leaderboard</title>
+    <title>LLM Speed Test v3.5 Leaderboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -2661,7 +2661,7 @@
     </div>
 
     <div class="container">
-        <h1 id="mainTitle">LLM Speed Test 🏆 排行榜</h1>
+        <h1 id="mainTitle">LLM Speed Test v3.5 🏆 排行榜</h1>
         <div id="headerSub" class="header-sub">对比不同硬件和框架下的模型推理性能</div>
 
         <div id="modelTagsPanel" class="model-tags-panel" style="display:none;">
@@ -3480,7 +3480,7 @@
         // ==================== Complete Static Bilingual i18n Dictionary ====================
         const I18N_DICTIONARY = {
             'zh-CN': {
-                appTitle: 'LLM Speed Test 🏆 排行榜',
+                appTitle: 'LLM Speed Test v3.5 🏆 排行榜',
                 headerSub: '对比不同硬件和框架下的模型推理性能',
                 modelTagsTitle: '快速切换模型',
                 toggleModelTagsOpen: '展开 ⬇️',
@@ -3623,7 +3623,7 @@
                 compareTitleItl: '词间延迟 (ITL) 对比'
             },
             'en': {
-                appTitle: 'LLM Speed Test 🏆 Leaderboard',
+                appTitle: 'LLM Speed Test v3.5 🏆 Leaderboard',
                 headerSub: 'Compare LLM inference performance across hardware and serving frameworks',
                 modelTagsTitle: 'Quick Model Filter',
                 toggleModelTagsOpen: 'Expand ⬇️',
@@ -3794,7 +3794,7 @@
         function applyStaticTranslations(root = document.body) {
             const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
             document.documentElement.lang = isEn ? 'en' : 'zh-CN';
-            document.title = isEn ? 'LLM Speed Test 🏆 Leaderboard' : 'LLM Speed Test 🏆 排行榜';
+            document.title = isEn ? 'LLM Speed Test v3.5 🏆 Leaderboard' : 'LLM Speed Test v3.5 🏆 排行榜';
 
             const elements = {
                 'mainTitle': t('appTitle'),

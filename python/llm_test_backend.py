@@ -26,6 +26,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from urllib.parse import urlparse, quote
 
+__version__ = "3.5.0"
+
 # ============================================================
 # Supabase 配置（云端结果共享）
 # ============================================================
@@ -74,7 +76,7 @@ NVIDIA_MODEL_NAME_HINTS = {
     "minimax/minimax-m2.5": "minimaxai/minimax-m2.5",
 }
 
-app = FastAPI(title="LLM Speed Test Backend")
+app = FastAPI(title="LLM Speed Test Backend", version=__version__)
 
 # 速率限制器
 limiter = Limiter(key_func=get_remote_address)
@@ -3572,6 +3574,7 @@ async def run_sustained_decode_benchmark(
         {
             "concurrency": concurrency,
             "prompt_length": prompt_length,
+            "task_type": task_type,
             "decode_tps": round(steady_decode_tps, 2),
             "output_speed": round(steady_decode_tps, 2),
             "prefill_speed": avg_prefill,
@@ -4155,6 +4158,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
         description="LLM Speed Test — High-Concurrency AsyncIO Benchmark Suite & Telemetry Backend",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
     # Server mode flags
     parser.add_argument("--server", "--serve", action="store_true", help="Launch FastAPI / WebSocket server mode")
     parser.add_argument("--port", type=int, default=None, help="Port to bind server (default: 18000 or next free)")

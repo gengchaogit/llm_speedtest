@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "===================================="
-echo "   LLM Speed Test - Quick Start"
+echo "   LLM Speed Test v3.5 - Quick Start"
 echo "===================================="
 echo ""
 

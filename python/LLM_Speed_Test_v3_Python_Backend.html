@@ -77,7 +77,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地大模型推理速度测试工具 v3 Python后端版</title>
+    <title>本地大模型推理速度测试工具 v3.5 Python后端版</title>
     <!-- 引入 Chart.js 用于绘图 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1325,8 +1325,8 @@
 
 <body>
     <div class="container">
-        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v1.8
-                (chao魔改版-加绘图修bug-自动保存api)</span><button class="lang-toggle" id="langToggle">English</button></h1>
+        <h1><span class="logo">🚀</span> <span id="pageTitle">大模型 Prefill & Decode 性能测试工具 v3.5
+                (chao魔改版 - Python后端版)</span><button class="lang-toggle" id="langToggle">English</button></h1>
         <div
             style="text-align: center; margin-bottom: 20px; font-size: 15px; background: #fffbf0; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; color: #d35400;">
             ❤️ 感谢大家使用！开源不易，如果觉得本工具好用，请帮忙到 <a href="https://github.com/gengchaogit/llm_speedtest" target="_blank"
@@ -1617,8 +1617,11 @@
 
         <!-- Sustained Decode Live Dashboard Container -->
         <div id="sustainedDashboard" class="sustained-dashboard" style="display: none;">
-            <div class="matrix-header">
-                <h3 id="sustainedDashboardTitle">⏱️ 稳态持续解码实时监控看板</h3>
+            <div class="matrix-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <h3 id="sustainedDashboardTitle" style="margin:0;">⏱️ 稳态持续解码实时监控看板</h3>
+                    <span id="sustainedDashboardTaskBadge"></span>
+                </div>
             </div>
             <div class="sustained-grid">
                 <div class="sustained-card">
@@ -1731,7 +1734,7 @@
         // ===============================================================================
         const translations = {
             'zh': {
-                pageTitle: '大模型 Prefill & Decode 性能测试工具 v3 (chao魔改版)',
+                pageTitle: '大模型 Prefill & Decode 性能测试工具 v3.5 (chao魔改版 - Python后端版)',
                 langToggle: 'English',
                 apiOpenAI: 'OpenAI兼容接口',
                 apiOllama: 'Ollama接口',
@@ -2070,7 +2073,7 @@
                 optTaskReasoning: '🧠 深度思考推理 (Reasoning CoT) — 复杂逻辑与数学思维链超长输出'
             },
             'en': {
-                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3 (chao mod)',
+                pageTitle: 'LLM Prefill & Decode Performance Testing Tool v3.5 (chao mod - Python Backend)',
                 langToggle: '中文',
                 apiOpenAI: 'OpenAI Compatible API',
                 apiOllama: 'Ollama API',
@@ -2766,6 +2769,15 @@
             "harmony", "unity", "solidarity", "partnership", "network", "community", "integration", "bond"
         ];
 
+        function escapeHtml(text) {
+            return String(text ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant.';
 
         const TASK_SYSTEM_PROMPTS = {
@@ -2783,6 +2795,71 @@
 
         function getSelectedTaskType() {
             return document.getElementById('taskTypeSelect')?.value || 'general';
+        }
+
+        const TASK_TYPE_META = {
+            general: {
+                zh: '🌐 通用混合',
+                en: '🌐 General',
+                fullZh: '🌐 通用混合场景 (General / Essay)',
+                fullEn: '🌐 General / Essay Baseline',
+                color: '#61afef',
+                bg: 'rgba(97, 175, 239, 0.15)',
+                border: 'rgba(97, 175, 239, 0.45)',
+            },
+            code: {
+                zh: '💻 代码解码',
+                en: '💻 Code',
+                fullZh: '💻 代码解码任务 (Code Decode)',
+                fullEn: '💻 Code Decode Task',
+                color: '#98c379',
+                bg: 'rgba(152, 195, 121, 0.15)',
+                border: 'rgba(152, 195, 121, 0.45)',
+            },
+            structured: {
+                zh: '📋 结构化JSON',
+                en: '📋 JSON',
+                fullZh: '📋 结构化数据 (Structured JSON)',
+                fullEn: '📋 Structured JSON Generation',
+                color: '#e5c07b',
+                bg: 'rgba(229, 192, 123, 0.15)',
+                border: 'rgba(229, 192, 123, 0.45)',
+            },
+            prose: {
+                zh: '✍️ 散文问答',
+                en: '✍️ Prose & QA',
+                fullZh: '✍️ 散文与深度问答 (Prose & QA)',
+                fullEn: '✍️ Prose & In-depth QA',
+                color: '#d19a66',
+                bg: 'rgba(209, 154, 102, 0.15)',
+                border: 'rgba(209, 154, 102, 0.45)',
+            },
+            prefill_16k: {
+                zh: '📚 16K长文本',
+                en: '📚 Prefill 16K',
+                fullZh: '📚 16K 长上下文首字 (Prefill @ 16K)',
+                fullEn: '📚 16K Long Context Prefill',
+                color: '#c678dd',
+                bg: 'rgba(198, 120, 221, 0.15)',
+                border: 'rgba(198, 120, 221, 0.45)',
+            },
+            reasoning: {
+                zh: '🧠 深度思考',
+                en: '🧠 Reasoning',
+                fullZh: '🧠 深度思考推理 (Reasoning CoT)',
+                fullEn: '🧠 Deep Reasoning CoT',
+                color: '#e06c75',
+                bg: 'rgba(224, 108, 117, 0.15)',
+                border: 'rgba(224, 108, 117, 0.45)',
+            }
+        };
+
+        function getTaskTypeBadgeHtml(taskType, isEn = (currentLang === 'en')) {
+            const key = (taskType || 'general').toLowerCase();
+            const meta = TASK_TYPE_META[key] || TASK_TYPE_META.general;
+            const label = isEn ? meta.en : meta.zh;
+            const title = isEn ? meta.fullEn : meta.fullZh;
+            return `<span class="badge-task-type" style="display:inline-block; font-size:10px; font-weight:600; padding:1px 6px; border-radius:3px; background:${meta.bg}; color:${meta.color}; border:1px solid ${meta.border}; vertical-align:middle;" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
         }
 
         // 根据指定长度生成提示词
@@ -5253,6 +5330,12 @@ async function processOllamaResponse(response, promptLength) {
                 liveTpsVal.textContent = `${(msg.steady_decode_tps || msg.avg_decode_speed || 0).toFixed(1)} tokens/s (稳态)`;
             }
 
+            const resolvedTask = msg.task_type || getSelectedTaskType();
+            const taskMeta = TASK_TYPE_META[resolvedTask] || TASK_TYPE_META.general;
+            const isEn = (currentLang === 'en');
+            const taskFullName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+            const taskBadgeHtml = getTaskTypeBadgeHtml(resolvedTask, isEn);
+
             if (summaryDiv) {
                 const steadyTps = msg.steady_decode_tps || msg.avg_decode_speed || 0;
                 const ttftAvg = msg.ttft_stats?.avg ?? msg.avg_ttft_ms ?? 0;
@@ -5273,8 +5356,12 @@ async function processOllamaResponse(response, promptLength) {
 
                 summaryDiv.innerHTML = `
                     <div style="background: rgba(20, 28, 40, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 16px; margin-top: 15px; color: #e6edf3;">
-                        <h4 style="margin: 0 0 10px 0; color: #58a6ff;">🎯 稳态持续解码评测报告</h4>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                            <h4 style="margin: 0; color: #58a6ff;">🎯 稳态持续解码评测报告</h4>
+                            <div>${taskBadgeHtml}</div>
+                        </div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 13px;">
+                            <div><strong>评测任务场景:</strong> ${taskBadgeHtml} <span style="font-size:11px; color:#8b949e;">(${taskFullName})</span></div>
                             <div><strong>稳态纯解码吞吐:</strong> <span style="color: #10b981; font-weight: bold; font-size: 15px;">${Number(steadyTps).toFixed(2)} tokens/s</span> <span style="font-size:11px; color:#8b949e;">(扣除Prefill)</span></div>
                             <div><strong>端到端总生成吞吐:</strong> <span style="color: #61afef; font-weight: bold;">${e2eTps}</span> <span style="font-size:11px; color:#8b949e;">(含首字及排队)</span></div>
                             <div><strong>单流纯解码速度:</strong> ${avgStreamTps}</div>
@@ -5326,10 +5413,11 @@ async function processOllamaResponse(response, promptLength) {
                     p90: msg.itl_stats?.p90 ?? 0,
                     std: msg.itl_stats?.std ?? 0
                 },
+                task_type: resolvedTask,
                 status: '成功',
                 concurrentDetails: msg.completed_requests || [],
                 benchmarkMode: 'sustained_decode',
-                recordTags: ['mode:sustained_decode']
+                recordTags: ['mode:sustained_decode', `task:${resolvedTask}`]
             };
 
             const existingIndex = testResultsData.findIndex(r => r.recordTags && r.recordTags.includes('mode:sustained_decode'));
@@ -6285,6 +6373,12 @@ async function processOllamaResponse(response, promptLength) {
 
                 const sDash = document.getElementById('sustainedDashboard');
                 if (sDash) sDash.style.display = 'block';
+
+                const curTask = getSelectedTaskType();
+                const taskBadgeEl = document.getElementById('sustainedDashboardTaskBadge');
+                if (taskBadgeEl) {
+                    taskBadgeEl.innerHTML = getTaskTypeBadgeHtml(curTask, currentLang === 'en');
+                }
 
                 const dur = parseFloat(document.getElementById('sustainedDuration')?.value) || 30.0;
                 const timerVal = document.getElementById('sustainedTimerVal');
@@ -7976,8 +8070,10 @@ async function processOllamaResponse(response, promptLength) {
                     configSummaryHtml = `<div><strong>并发阶梯:</strong> ${matrixConc} | <strong>输出长度:</strong> ${record.config.outputLength} | <strong>测试单元格:</strong> ${record.results?.length || 0}</div>`;
                     statsSummaryHtml = `<div><strong>2D 解码吞吐:</strong> P50/P90/P95: ${record.stats?.decode?.p50 || '-'}/${record.stats?.decode?.p90 || '-'}/${record.stats?.decode?.p95 || '-'} tokens/s</div>`;
                 } else if (recMode === 'sustained_decode') {
-                    modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
                     const sItem = record.results?.[0] || {};
+                    const histTaskType = sItem.task_type || sItem.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                    const taskBadge = getTaskTypeBadgeHtml(histTaskType, currentLang === 'en');
+                    modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>${taskBadge}`;
                     configSummaryHtml = `<div><strong>并发池规模:</strong> ${record.config.concurrency}x | <strong>提示词长度:</strong> ${sItem.promptLength || '-'} | <strong>总 Token:</strong> ${sItem.outputTokens || '-'}</div>`;
                     statsSummaryHtml = `<div><strong>稳态吞吐:</strong> <span style="color:#10b981; font-weight:bold;">${sItem.outputSpeed || '-'} tokens/s</span> | <strong>完成流:</strong> ${sItem.successful || sItem.completedStreams || '-'} | <strong>平均TTFT:</strong> ${sItem.avgTtftMs || sItem.prefillTimeMs || '-'}ms</div>`;
                 } else {
@@ -8131,12 +8227,18 @@ async function processOllamaResponse(response, promptLength) {
                 });
 
             } else if (recMode === 'sustained_decode') {
-                modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>`;
                 const sItem = record.results?.[0] || {};
+                const histTaskType = sItem.task_type || sItem.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                const taskMeta = TASK_TYPE_META[histTaskType] || TASK_TYPE_META.general;
+                const isEn = (currentLang === 'en');
+                const taskName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+                const taskBadge = getTaskTypeBadgeHtml(histTaskType, isEn);
+                modeBadge = `<span style="background: #10b981; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 6px; font-weight: 600;">稳态解码</span>${taskBadge}`;
                 const durSec = parseFloat(sItem.outputTimeMs) / 1000 || parseFloat(record.config?.sustainedDuration) || 30;
                 configItemsHtml = `
                     <li>API URL: ${record.config.apiUrl}</li>
                     <li>评测模式: 稳态持续解码</li>
+                    <li>评测场景 (测试类型): <strong>${taskName}</strong> ${taskBadge}</li>
                     <li>并发流池规模: ${record.config.concurrency}x</li>
                     <li>持续实测窗口: ${durSec.toFixed(1)}s</li>
                     <li>提示词长度: ${sItem.promptLength || record.config.minLength || '-'}</li>
@@ -8151,6 +8253,7 @@ async function processOllamaResponse(response, promptLength) {
                 statsBlockHtml = `
                     <div style="background: #2c3e50; padding: 15px; border-radius: 5px; color: white; margin-bottom: 20px;">
                         <h4 style="color: #61afef; margin-bottom: 10px;">⏱️ 稳态持续解码报告 (Sustained Decode Stats)</h4>
+                        <p><strong>评测场景 (测试类型):</strong> ${taskName} ${taskBadge}</p>
                         <p><strong>稳态解码吞吐:</strong> <span style="color:#10b981; font-weight:bold; font-size:16px;">${sItem.outputSpeed || '-'} tokens/s</span></p>
                         <p><strong>实测持续时长:</strong> ${durSec.toFixed(1)} 秒</p>
                         <p><strong>累计生成 Token:</strong> ${sItem.outputTokens || '-'}</p>
@@ -8504,12 +8607,21 @@ async function processOllamaResponse(response, promptLength) {
                 const itlStd = item.itl_stats?.std ?? item.avgItlStd ?? '-';
                 const effConc = item.effectiveConcurrency || (typeof item.status === 'string' && item.status.includes('/') ? item.status : `${conc}/${conc}`);
 
+                const histTaskType = item.task_type || item.taskType || record.config?.task_type || record.config?.taskType || 'general';
+                const taskMeta = TASK_TYPE_META[histTaskType] || TASK_TYPE_META.general;
+                const isEn = (currentLang === 'en');
+                const taskFullName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+                const taskBadgeHtml = getTaskTypeBadgeHtml(histTaskType, isEn);
+
                 const sustainedContainer = document.createElement('div');
                 sustainedContainer.className = 'sustained-live-dashboard';
                 sustainedContainer.style.cssText = 'background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;';
                 sustainedContainer.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                        <h3 style="margin:0; color:#61afef;">⏱️ 稳态持续解码历史回显 (Sustained Decode History)</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <h3 style="margin:0; color:#61afef;">⏱️ 稳态持续解码历史回显 (Sustained Decode History)</h3>
+                            ${taskBadgeHtml}
+                        </div>
                         <div style="font-family:monospace; font-size:14px; color:#8b949e;">${durationSec.toFixed(1)}s 实测窗口</div>
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
@@ -8539,6 +8651,7 @@ async function processOllamaResponse(response, promptLength) {
                 reportDiv.innerHTML = `
                     <h4 style="margin:0 0 10px 0; color:#10b981;">🎉 稳态持续解码评测回显</h4>
                     <div style="font-size:14px; line-height:1.6;">
+                        • 评测任务场景 (测试类型): <strong>${taskFullName}</strong> ${taskBadgeHtml}<br>
                         • 持续窗口实测时长: <strong>${durationSec.toFixed(2)} 秒</strong><br>
                         • 稳态纯解码吞吐 (Sustained Decode TPS): <strong style="color:#10b981; font-size:16px;">${sustainedTps.toFixed(2)} tokens/s</strong> <span style="font-size:12px; color:#8b949e;">(纯解码阶段，已排除Prefill)</span><br>
                         • 端到端总生成吞吐 (End-to-End Generation TPS): <strong style="color:#61afef;">${e2eSpeedEcho} tokens/s</strong> <span style="font-size:12px; color:#8b949e;">(含首字预填充与排队调度)</span><br>
@@ -9625,6 +9738,9 @@ async function processOllamaResponse(response, promptLength) {
                 payload.benchmark_mode = '1d_sweep';
                 recordTags.push('mode:1d_sweep');
             }
+            const selectedTask = document.getElementById('taskTypeSelect')?.value || 'general';
+            payload.task_type = selectedTask;
+            recordTags.push(`task:${selectedTask}`);
             payload.record_tags = Array.from(new Set(recordTags));
             if (runCommand) payload.run_command = runCommand;
             return payload;

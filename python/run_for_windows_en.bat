@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ====================================
-echo    LLM Speed Test Tool - Quick Start
+echo    LLM Speed Test Tool v3.5 - Quick Start
 echo ====================================
 echo.
 
