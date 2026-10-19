@@ -2661,6 +2661,48 @@
             opacity: 1;
             pointer-events: auto;
         }
+
+        /* Data-Saver / Low-Data Mode Banner & Toggle */
+        .data-mode-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: rgba(86, 182, 194, 0.12);
+            border: 1px solid rgba(86, 182, 194, 0.35);
+            border-radius: 6px;
+            padding: 9px 14px;
+            margin-bottom: 14px;
+            font-size: 12px;
+            color: var(--text-main);
+            flex-wrap: wrap;
+        }
+        .data-mode-banner.full-data {
+            background: rgba(152, 195, 121, 0.12);
+            border-color: rgba(152, 195, 121, 0.35);
+        }
+        .data-mode-banner .banner-action-btn {
+            background: var(--bg-secondary);
+            color: var(--accent-blue);
+            border: 1px solid var(--border-color);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .data-mode-banner .banner-action-btn:hover {
+            background: var(--accent-blue);
+            color: #fff;
+            border-color: var(--accent-blue);
+        }
+        .btn-low-data-active {
+            color: #98c379 !important;
+            border-color: rgba(152, 195, 121, 0.6) !important;
+            background: rgba(152, 195, 121, 0.12) !important;
+        }
     </style>
 </head>
 
@@ -2703,6 +2745,7 @@
                     <a id="btnGoTest" class="entry-link-btn primary" href="https://gengchaogit.github.io/llm_speedtest/" target="_blank" rel="noopener noreferrer">去测速</a>
                     <a id="btnGithub" class="entry-link-btn" href="https://github.com/gengchaogit/llm_speedtest" target="_blank" rel="noopener noreferrer">GitHub</a>
                     <button type="button" id="manualViewToggleBtn" class="entry-link-btn" onclick="toggleManualMobileView()">手机视图 关</button>
+                    <button type="button" id="lowDataToggleBtn" class="entry-link-btn btn-low-data-active" onclick="toggleLowDataMode()" title="开启后延迟按需加载，每次只加载精简数据，大幅节省移动流量与加载时间">⚡ 省流极速 开</button>
                     <span class="tabs-community">
                         <span id="communityTitle" class="community-title">QQ群</span>
                         <span id="communityMeta" class="community-meta" title="本地部署deepseek-r1:671b纯GPU方案 · 1028429001">本地部署deepseek-r1:671b纯GPU方案 · 1028429001</span>
@@ -2761,6 +2804,7 @@
                     </div>
                 </div>
             </div>
+            <div id="paretoLowDataBanner" class="data-mode-banner" style="display:none;"></div>
             <div class="pareto-chart-wrapper">
                 <canvas id="paretoFrontierChart"></canvas>
             </div>
@@ -2813,6 +2857,17 @@
                         <input type="hidden" id="radarHardwareSelect" value="all">
                     </div>
 
+                    <!-- 评测模式筛选 -->
+                    <div class="searchable-combobox-wrapper" id="radarModeComboboxWrapper">
+                        <label for="radarModeSelect" style="font-size:12px; color:var(--text-muted); font-weight:bold;" id="lblRadarMode">📊 评测模式：</label>
+                        <select id="radarModeSelect" class="searchable-dropdown-btn" style="padding:6px 10px; background:var(--bg-secondary); color:var(--text-main); border:1px solid var(--border-color); border-radius:6px; cursor:pointer;" onchange="onRadarBenchmarkModeChange()">
+                            <option value="all" id="optRadarModeAll">全部模式 (综合)</option>
+                            <option value="1d_sweep" id="optRadarMode1d">📊 1D阶梯</option>
+                            <option value="2d_matrix" id="optRadarMode2d">🧊 2D矩阵</option>
+                            <option value="sustained_decode" id="optRadarModeSustained">⏱️ 稳态解码</option>
+                        </select>
+                    </div>
+
                     <!-- 模型多选下拉触发器 -->
                     <div class="radar-select-dropdown-wrapper" style="position:relative;">
                         <button type="button" id="btnRadarModelDropdown" class="entry-link-btn" onclick="toggleRadarDropdown(event)" style="display:flex; align-items:center; gap:8px;">
@@ -2837,6 +2892,8 @@
                     <button class="entry-link-btn" onclick="resetRadarSelection()" id="btnResetRadar">重置对比</button>
                 </div>
             </div>
+
+            <div id="radarLowDataBanner" class="data-mode-banner" style="display:none;"></div>
 
             <!-- 已选模型标签与热门推荐栏 -->
             <div class="radar-selection-bar" style="margin-bottom:16px; display:flex; flex-direction:column; gap:8px;">
@@ -2919,6 +2976,8 @@
                     </div>
                 </div>
             </div>
+
+            <div id="matrixLowDataBanner" class="data-mode-banner" style="display:none;"></div>
 
             <div id="matrixLoadingNotice" style="display:none; text-align:center; padding:45px 20px; color:var(--text-muted); font-size:13px; background:rgba(0,0,0,0.15); border:1px dashed var(--border-color); border-radius:6px; margin-bottom:12px;">
                 <span style="font-size:18px;">⏳</span> 正在拉取该模型 2D 矩阵测试梯度与延迟采样 (TTFT/ITL)...
@@ -3021,8 +3080,8 @@
                         <button type="button" class="filter-pill pill-task" data-task="code" onclick="setTaskTypeFilter('code')">💻 代码解码</button>
                         <button type="button" class="filter-pill pill-task" data-task="structured" onclick="setTaskTypeFilter('structured')">📋 结构化JSON</button>
                         <button type="button" class="filter-pill pill-task" data-task="prose" onclick="setTaskTypeFilter('prose')">✍️ 散文问答</button>
-                        <button type="button" class="filter-pill pill-task" data-task="prefill_16k" onclick="setTaskTypeFilter('prefill_16k')">📚 16K长文本</button>
-                        <button type="button" class="filter-pill pill-task" data-task="reasoning" onclick="setTaskTypeFilter('reasoning')">🧠 深度思考</button>
+                        <button type="button" class="filter-pill pill-task" data-task="prefill_16k" onclick="setTaskTypeFilter('prefill_16k')">📚 文档知识库</button>
+                        <button type="button" class="filter-pill pill-task" data-task="reasoning" onclick="setTaskTypeFilter('reasoning')">🧮 数理逻辑</button>
                     </div>
                 </div>
             </div>
@@ -3194,6 +3253,19 @@
         const MODEL_TAG_FETCH_LIMIT = 3000;
         const RESULTS_FETCH_PAGE_SIZE = 1000;
         const RESULTS_FETCH_LIMIT = 5000;
+        const LOW_DATA_STORAGE_KEY = 'llm_speedtest_low_data_mode';
+        const LOW_DATA_SAMPLE_LIMIT = 200;
+
+        function getStoredLowDataMode() {
+            try {
+                const stored = localStorage.getItem(LOW_DATA_STORAGE_KEY);
+                if (stored !== null) return stored === 'true';
+            } catch (_) {}
+            return true; // Default to true: save data & ultra-fast loading
+        }
+
+        let isLowDataModeEnabled = getStoredLowDataMode();
+        let hasReachedEndInGlobalFetch = false;
 
         let currentMode = 'global';
         let currentTargetUserCode = null;
@@ -3452,6 +3524,7 @@
             const title = currentPageLanguage === PAGE_LANGUAGE.EN ? 'Switch page language' : '切换页面语言';
             zhBtn.title = title;
             enBtn.title = title;
+            updateLowDataUI();
         }
 
         function getRunCommandLabel() {
@@ -3531,6 +3604,8 @@
                 btnGithub: 'GitHub',
                 btnMobileToggleOff: '手机视图 关',
                 btnMobileToggleOn: '手机视图 开',
+                btnLowDataOn: '⚡ 省流极速 开',
+                btnLowDataOff: '⚡ 省流模式 关',
                 qqTitle: 'QQ群',
                 qqMeta: '本地部署deepseek-r1:671b纯GPU方案 · 1028429001',
                 btnCopyGroup: '复制群号',
@@ -3610,6 +3685,11 @@
                 thParetoLat: '首字延迟 TTFT (ms)',
                 thParetoBadge: '校验指纹',
                 lblRadarHw: '🖥️ 运行显卡：',
+                lblRadarMode: '📊 评测模式：',
+                optRadarModeAll: '全部模式 (综合)',
+                optRadarMode1d: '📊 1D阶梯',
+                optRadarMode2d: '🧊 2D矩阵',
+                optRadarModeSustained: '⏱️ 稳态解码',
                 radarDropdownBtnLabel: '🤖 挑选对比模型',
                 btnRadarDefault: '默认热门',
                 btnRadarClear: '清空',
@@ -3678,6 +3758,8 @@
                 btnGithub: 'GitHub',
                 btnMobileToggleOff: 'Mobile View: OFF',
                 btnMobileToggleOn: 'Mobile View: ON',
+                btnLowDataOn: '⚡ Data Saver ON',
+                btnLowDataOff: '⚡ Data Saver OFF',
                 qqTitle: 'Community',
                 qqMeta: 'Pure GPU DeepSeek-R1:671B Cluster Solution · 1028429001',
                 btnCopyGroup: 'Copy Group ID',
@@ -3757,6 +3839,11 @@
                 thParetoLat: 'TTFT (ms)',
                 thParetoBadge: 'Verification Hash',
                 lblRadarHw: '🖥️ Hardware / GPU:',
+                lblRadarMode: '📊 Benchmark Mode:',
+                optRadarModeAll: 'All Modes (Combined)',
+                optRadarMode1d: '📊 1D Ladder',
+                optRadarMode2d: '🧊 2D Matrix',
+                optRadarModeSustained: '⏱️ Sustained Decode',
                 radarDropdownBtnLabel: '🤖 Select Models',
                 btnRadarDefault: 'Default Top',
                 btnRadarClear: 'Clear All',
@@ -3908,6 +3995,11 @@
                 'thParetoLat': t('thParetoLat'),
                 'thParetoBadge': t('thParetoBadge'),
                 'lblRadarHw': t('lblRadarHw'),
+                'lblRadarMode': t('lblRadarMode'),
+                'optRadarModeAll': t('optRadarModeAll'),
+                'optRadarMode1d': t('optRadarMode1d'),
+                'optRadarMode2d': t('optRadarMode2d'),
+                'optRadarModeSustained': t('optRadarModeSustained'),
                 'radarDropdownBtnLabel': t('radarDropdownBtnLabel'),
                 'btnRadarDefault': t('btnRadarDefault'),
                 'btnRadarClear': t('btnRadarClear'),
@@ -4353,14 +4445,14 @@
                 },
                 {
                     id: 'prefill_16k',
-                    nameZh: '📚 16K长文本',
-                    nameEn: '📚 16K Prefill',
+                    nameZh: '📚 文档知识库',
+                    nameEn: '📚 Doc QA',
                     matcher: (tType, row) => tType === 'prefill_16k' || tType === 'all' || rowHasTask(row, 'prefill_16k')
                 },
                 {
                     id: 'reasoning',
-                    nameZh: '🧠 深度思考',
-                    nameEn: '🧠 Reasoning',
+                    nameZh: '🧮 数理逻辑',
+                    nameEn: '🧮 Math & Logic',
                     matcher: (tType, row) => tType === 'reasoning' || tType === 'all' || rowHasTask(row, 'reasoning')
                 }
             ]
@@ -5027,18 +5119,27 @@
         }
 
         async function ensureAllDataLoaded(options = {}) {
-            const needDetails = !!options?.needDetails;
+            const forceFull = (options?.forceFull !== undefined) ? !!options.forceFull : !isLowDataModeEnabled;
+            const needDetails = !!options?.needDetails && forceFull;
             const loading = document.getElementById('loadingIndicator');
             const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
 
-            if (globalAllLoadedRows.length === 0) {
+            const targetLimit = forceFull ? RESULTS_FETCH_LIMIT : LOW_DATA_SAMPLE_LIMIT;
+            const needMoreRows = (forceFull && globalAllLoadedRows.length < targetLimit && !hasReachedEndInGlobalFetch) || (globalAllLoadedRows.length === 0);
+
+            if (needMoreRows) {
                 if (loading) {
                     loading.style.display = 'block';
-                    loading.textContent = isEn ? 'Loading benchmark data... ⏳' : '加载全网基准数据中... ⏳';
+                    loading.textContent = isEn 
+                        ? (forceFull ? 'Loading full benchmark database (~3MB)... ⏳' : 'Loading lightweight benchmark sample... ⏳')
+                        : (forceFull ? '加载全网全量基准数据中 (约3MB)... ⏳' : '加载轻量基准样本中 (省流模式)... ⏳');
                 }
                 try {
-                    let rows = await fetchAllLeaderboardRows('global', null, null);
+                    let rows = await fetchAllLeaderboardRows('global', null, null, targetLimit);
                     globalAllLoadedRows = normalizeLeaderboardRows(rows);
+                    if (rows.length < targetLimit) {
+                        hasReachedEndInGlobalFetch = true;
+                    }
                 } catch (e) {
                     console.error('Failed to load all leaderboard rows:', e);
                 } finally {
@@ -5049,10 +5150,10 @@
             if (needDetails && !hasAnalyticalDetailsLoaded) {
                 if (loading) {
                     loading.style.display = 'block';
-                    loading.textContent = isEn ? 'Loading high-precision latency samples (TTFT/ITL)... ⏳' : '加载高精度延迟明细 (TTFT/ITL)... ⏳';
+                    loading.textContent = isEn ? 'Loading latency details (TTFT/ITL)... ⏳' : '加载高精度延迟明细 (TTFT/ITL)... ⏳';
                 }
                 try {
-                    const detailRows = await fetchAnalyticalDetailRows(500);
+                    const detailRows = await fetchAnalyticalDetailRows(forceFull ? 300 : 50);
                     if (Array.isArray(detailRows) && detailRows.length > 0) {
                         const detailMap = new Map();
                         detailRows.forEach(r => {
@@ -5078,7 +5179,9 @@
                 }
             }
 
-            return globalAllLoadedRows;
+            return isLowDataModeEnabled && !forceFull 
+                ? globalAllLoadedRows.slice(0, LOW_DATA_SAMPLE_LIMIT) 
+                : globalAllLoadedRows;
         }
 
         function normalizeSpecificGpu(raw) {
@@ -5729,7 +5832,27 @@
             const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
             populateParetoMetricDropdownList(isEn);
 
-            const allRows = await ensureAllDataLoaded({ needDetails: true });
+            const allRows = await ensureAllDataLoaded({ needDetails: !isLowDataModeEnabled });
+
+            const banner = document.getElementById('paretoLowDataBanner');
+            if (banner) {
+                banner.style.display = 'flex';
+                if (isLowDataModeEnabled) {
+                    banner.className = 'data-mode-banner';
+                    banner.innerHTML = isEn
+                        ? `<span>⚡ <strong>Data Saver Active</strong>: Plotted from latest ${allRows.length} benchmark points (Saved ~95% data & ultra-fast).</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 Load Full Dataset (~3MB)</button>`
+                        : `<span>⚡ <strong>省流极速模式已开启</strong>：基于最新 ${allRows.length} 条基准测速点快速绘制前沿 (已节省 95% 流量与加载时间)。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 加载全量历史数据 (~3MB)</button>`;
+                } else {
+                    banner.className = 'data-mode-banner full-data';
+                    banner.innerHTML = isEn
+                        ? `<span>🌐 <strong>Full Dataset Active</strong>: Generated from all ${allRows.length} historical benchmark records.</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ Switch to Data Saver Mode</button>`
+                        : `<span>🌐 <strong>全量数据分析模式</strong>：基于全量 ${allRows.length} 条测试记录生成能效包络前沿。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ 切换为省流极速模式</button>`;
+                }
+            }
             const metricType = currentParetoMetric || document.getElementById('paretoMetricSelect')?.value || 'decode_ttft';
             const hwSelect = document.getElementById('paretoHardwareSelect');
 
@@ -6255,6 +6378,45 @@
             renderRadarCapabilityView();
         }
 
+        let currentRadarBenchmarkModeFilter = 'all';
+
+        function onRadarBenchmarkModeChange() {
+            const sel = document.getElementById('radarModeSelect');
+            currentRadarBenchmarkModeFilter = sel ? sel.value : 'all';
+            renderRadarCapabilityView();
+        }
+
+        function matchesRadarBenchmarkMode(row, filterVal) {
+            if (!filterVal || filterVal === 'all') return true;
+            return getRowBenchmarkMode(row) === filterVal;
+        }
+
+        function getRadarHwKey(hw) {
+            if (!hw) return 'unknown';
+            let s = String(hw).trim().toLowerCase();
+            s = s.replace(/[\s_\-]+/g, '');
+            s = s.replace(/(24gb|16gb|32gb|48gb|80gb|64gb|40gb|8gb|12gb)/g, '');
+            return s || 'unknown';
+        }
+
+        function extractRowDetails(r) {
+            if (!r) return [];
+            let rj = r.results_json;
+            if (typeof rj === 'string') {
+                try { rj = JSON.parse(rj); } catch {}
+            }
+            if (!rj) return [];
+            if (Array.isArray(rj)) return rj;
+            if (Array.isArray(rj.points) && rj.points.length > 0) return rj.points;
+            if (Array.isArray(rj.matrix)) return rj.matrix.flat(2).filter(Boolean);
+            if (rj.matrix && typeof rj.matrix === 'object') {
+                return Object.values(rj.matrix).flatMap(v => Array.isArray(v) ? v : Object.values(v)).filter(Boolean);
+            }
+            if (Array.isArray(rj.all_cell_results)) return rj.all_cell_results;
+            if (Array.isArray(rj.sustained_samples)) return rj.sustained_samples;
+            return [];
+        }
+
         const RADAR_COLORS = [
             '#61afef', // Accent Blue
             '#98c379', // Accent Green
@@ -6266,10 +6428,13 @@
             '#abb2bf'  // Light Gray
         ];
 
-        function computeModelRadarScores(modelName, rows, hardwareFilter = 'all') {
+        function computeModelRadarScores(modelName, rows, hardwareFilter = 'all', benchmarkModeFilter = 'all', options = {}) {
             let modelRows = rows.filter(r => r.model_name === modelName && !isRowAnomaly(r));
             if (hardwareFilter && hardwareFilter !== 'all') {
                 modelRows = modelRows.filter(r => matchesRadarHardware(r, hardwareFilter));
+            }
+            if (benchmarkModeFilter && benchmarkModeFilter !== 'all') {
+                modelRows = modelRows.filter(r => matchesRadarBenchmarkMode(r, benchmarkModeFilter));
             }
             if (modelRows.length === 0) return [0, 0, 0, 0, 0, 0];
 
@@ -6279,7 +6444,8 @@
             let bestJitter = Infinity;
 
             const hwMap = {};
-            let bestCtxRatio = 0.85;
+            const hwConcPlMap = {};
+            let bestCtxRatio = null;
 
             modelRows.forEach(r => {
                 const p = getRowMetricValue(r, 'max_prefill_speed');
@@ -6288,46 +6454,176 @@
                 if (d > maxDecode) maxDecode = d;
 
                 const q = extractRowQuantiles(r);
-                if (Number.isFinite(q.ttft.p50) && q.ttft.p50 < minTtft) minTtft = q.ttft.p50;
-                if (Number.isFinite(q.itl.jitter) && q.itl.jitter < bestJitter) bestJitter = q.itl.jitter;
+                if (Number.isFinite(q.ttft?.p50) && q.ttft.p50 > 0 && q.ttft.p50 < minTtft) minTtft = q.ttft.p50;
+                if (Number.isFinite(q.itl?.jitter) && q.itl.jitter >= 0 && q.itl.jitter < bestJitter) bestJitter = q.itl.jitter;
 
-                const hwKey = (r.hardware || 'unknown').trim().toLowerCase();
-                if (!hwMap[hwKey]) hwMap[hwKey] = { c1: 0, cMax: 0 };
-                const c = Number(r.concurrency) || 1;
-                if (c === 1 && d > hwMap[hwKey].c1) hwMap[hwKey].c1 = d;
-                if (c > 1 && d > hwMap[hwKey].cMax) hwMap[hwKey].cMax = d;
+                const hwKey = getRadarHwKey(r.hardware);
+                if (!hwMap[hwKey]) hwMap[hwKey] = { c1: 0, cMax: 0, maxC: 1 };
+                if (!hwConcPlMap[hwKey]) hwConcPlMap[hwKey] = {};
 
-                const details = Array.isArray(r.results_json) ? r.results_json : (r.results_json?.points || (Array.isArray(r.results_json?.matrix) ? r.results_json.matrix.flat().filter(Boolean) : []));
-                let rowShort = 0;
-                let rowLong = 0;
-                details.forEach(pt => {
-                    const pl = Number(pt?.prompt_length ?? pt?.promptLength ?? pt?.prompt_tokens);
-                    const spd = Number(pt?.output_speed ?? pt?.outputSpeed ?? pt?.decode_speed ?? pt?.decodeSpeed);
-                    if (Number.isFinite(pl) && Number.isFinite(spd) && spd > 0) {
-                        if (pl <= 512 && spd > rowShort) rowShort = spd;
-                        if (pl >= 2048 && spd > rowLong) rowLong = spd;
+                // 1. Scan internal details (critical for 2D matrix & multi-concurrency sweep)
+                const pts = extractRowDetails(r);
+
+                pts.forEach(pt => {
+                    const ptC = Number(pt?.concurrency ?? pt?.pool_concurrency ?? r.concurrency) || 1;
+                    const ptSpd = Number(pt?.output_speed ?? pt?.outputSpeed ?? pt?.decode_speed ?? pt?.decodeSpeed ?? pt?.decode_tps ?? pt?.avg_decode_speed);
+                    const ptPrefill = Number(pt?.prefill_speed ?? pt?.prefillSpeed);
+                    const ptPl = Number(pt?.prompt_length ?? pt?.promptLength ?? pt?.prompt_tokens ?? pt?.context ?? pt?.requested_prompt_length);
+
+                    if (Number.isFinite(ptPrefill) && ptPrefill > maxPrefill) maxPrefill = ptPrefill;
+                    if (Number.isFinite(ptSpd) && ptSpd > 0) {
+                        if (ptSpd > maxDecode) maxDecode = ptSpd;
+                        if (ptC === 1 && ptSpd > hwMap[hwKey].c1) hwMap[hwKey].c1 = ptSpd;
+                        if (ptC > 1 && ptSpd > hwMap[hwKey].cMax) {
+                            hwMap[hwKey].cMax = ptSpd;
+                            if (ptC > hwMap[hwKey].maxC) hwMap[hwKey].maxC = ptC;
+                        }
+                        if (Number.isFinite(ptPl) && ptPl > 0) {
+                            if (!hwConcPlMap[hwKey][ptC]) hwConcPlMap[hwKey][ptC] = {};
+                            if (!hwConcPlMap[hwKey][ptC][ptPl] || ptSpd > hwConcPlMap[hwKey][ptC][ptPl]) {
+                                hwConcPlMap[hwKey][ptC][ptPl] = ptSpd;
+                            }
+                        }
                     }
                 });
-                if (rowShort > 0 && rowLong > 0) {
-                    const ratio = rowLong / rowShort;
-                    if (ratio > bestCtxRatio) bestCtxRatio = ratio;
+
+                // 2. Scan top-level concurrency
+                const rowC = Number(r.concurrency) || 1;
+                if (rowC === 1 && d > hwMap[hwKey].c1) hwMap[hwKey].c1 = d;
+                if (rowC > 1 && d > hwMap[hwKey].cMax) {
+                    hwMap[hwKey].cMax = d;
+                    if (rowC > hwMap[hwKey].maxC) hwMap[hwKey].maxC = rowC;
                 }
             });
 
-            let bestScalingRatio = 1;
+            // 3. Scan context ladder per hardware and concurrency tier
+            Object.values(hwConcPlMap).forEach(concMap => {
+                Object.values(concMap).forEach(plMap => {
+                    const pls = Object.keys(plMap).map(Number).sort((a, b) => a - b);
+                    let rowShort = 0;
+                    let rowLong = 0;
+                    pls.forEach(pl => {
+                        if (pl <= 512 && plMap[pl] > rowShort) rowShort = plMap[pl];
+                        if (pl >= 2048 && plMap[pl] > rowLong) rowLong = plMap[pl];
+                    });
+                    if (rowShort > 0 && rowLong > 0) {
+                        const ratio = rowLong / rowShort;
+                        if (bestCtxRatio === null || ratio > bestCtxRatio) bestCtxRatio = ratio;
+                    } else if (pls.length >= 2) {
+                        const minPl = pls[0];
+                        const maxPl = pls[pls.length - 1];
+                        if (maxPl >= minPl * 1.5 && plMap[minPl] > 0 && plMap[maxPl] > 0) {
+                            const ratio = plMap[maxPl] / plMap[minPl];
+                            if (bestCtxRatio === null || ratio > bestCtxRatio) bestCtxRatio = ratio;
+                        }
+                    }
+                });
+            });
+
+            // 4. Sibling cross-run evaluation for single-row view (e.g. Detail Modal)
+            const siblingSource = options.siblingRows || (typeof globalAllLoadedRows !== 'undefined' ? globalAllLoadedRows : []);
+            if (modelRows.length === 1 && siblingSource.length > 0) {
+                const singleRow = modelRows[0];
+                const singleHwKey = getRadarHwKey(singleRow.hardware);
+                const group = hwMap[singleHwKey];
+
+                if (group && (group.c1 === 0 || group.cMax === 0)) {
+                    const siblings = siblingSource.filter(sib => sib.model_name === modelName && !isRowAnomaly(sib) && getRadarHwKey(sib.hardware) === singleHwKey);
+                    siblings.forEach(sib => {
+                        const sc = Number(sib.concurrency) || 1;
+                        const sd = getRowMetricValue(sib, 'max_decode_speed');
+                        if (sc === 1 && sd > group.c1) group.c1 = sd;
+                        if (sc > 1 && sd > group.cMax) {
+                            group.cMax = sd;
+                            if (sc > group.maxC) group.maxC = sc;
+                        }
+                        const sibPts = extractRowDetails(sib);
+                        sibPts.forEach(pt => {
+                            const ptC = Number(pt?.concurrency ?? pt?.pool_concurrency ?? sib.concurrency) || 1;
+                            const ptSpd = Number(pt?.output_speed ?? pt?.outputSpeed ?? pt?.decode_speed ?? pt?.decodeSpeed ?? pt?.decode_tps ?? pt?.avg_decode_speed);
+                            if (Number.isFinite(ptSpd) && ptSpd > 0) {
+                                if (ptC === 1 && ptSpd > group.c1) group.c1 = ptSpd;
+                                if (ptC > 1 && ptSpd > group.cMax) {
+                                    group.cMax = ptSpd;
+                                    if (ptC > group.maxC) group.maxC = ptC;
+                                }
+                            }
+                        });
+                    });
+                }
+
+                if (bestCtxRatio === null) {
+                    const siblings = siblingSource.filter(sib => sib.model_name === modelName && !isRowAnomaly(sib) && getRadarHwKey(sib.hardware) === singleHwKey);
+                    const sibConcPlMap = {};
+                    siblings.forEach(sib => {
+                        const sibPts = extractRowDetails(sib);
+                        sibPts.forEach(pt => {
+                            const ptC = Number(pt?.concurrency ?? pt?.pool_concurrency ?? sib.concurrency) || 1;
+                            const pl = Number(pt?.prompt_length ?? pt?.promptLength ?? pt?.prompt_tokens ?? pt?.context ?? pt?.requested_prompt_length);
+                            const spd = Number(pt?.output_speed ?? pt?.outputSpeed ?? pt?.decode_speed ?? pt?.decodeSpeed ?? pt?.decode_tps ?? pt?.avg_decode_speed);
+                            if (Number.isFinite(pl) && Number.isFinite(spd) && spd > 0) {
+                                if (!sibConcPlMap[ptC]) sibConcPlMap[ptC] = {};
+                                if (!sibConcPlMap[ptC][pl] || spd > sibConcPlMap[ptC][pl]) {
+                                    sibConcPlMap[ptC][pl] = spd;
+                                }
+                            }
+                        });
+                    });
+                    Object.values(sibConcPlMap).forEach(plMap => {
+                        const pls = Object.keys(plMap).map(Number).sort((a, b) => a - b);
+                        let sShort = 0, sLong = 0;
+                        pls.forEach(pl => {
+                            if (pl <= 512 && plMap[pl] > sShort) sShort = plMap[pl];
+                            if (pl >= 2048 && plMap[pl] > sLong) sLong = plMap[pl];
+                        });
+                        if (sShort > 0 && sLong > 0) {
+                            const r = sLong / sShort;
+                            if (bestCtxRatio === null || r > bestCtxRatio) bestCtxRatio = r;
+                        } else if (pls.length >= 2) {
+                            const minPl = pls[0];
+                            const maxPl = pls[pls.length - 1];
+                            if (maxPl >= minPl * 1.5 && plMap[minPl] > 0 && plMap[maxPl] > 0) {
+                                const r = plMap[maxPl] / plMap[minPl];
+                                if (bestCtxRatio === null || r > bestCtxRatio) bestCtxRatio = r;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 5. Evaluate concurrency scaling score
+            let bestScalingScore = null;
             Object.values(hwMap).forEach(group => {
                 if (group.c1 > 0 && group.cMax > 0) {
                     const ratio = group.cMax / group.c1;
-                    if (ratio > bestScalingRatio) bestScalingRatio = ratio;
+                    const targetC = Math.min(Math.max(group.maxC, 2), 4);
+                    const eff = (ratio - 1) / (targetC - 1);
+                    const score = Math.max(25, Math.min(100, Math.round(25 + eff * 115)));
+                    if (bestScalingScore === null || score > bestScalingScore) bestScalingScore = score;
                 }
             });
 
-            const sPrefill = Math.min(100, Math.round((maxPrefill / 8000) * 100));
-            const sDecode = Math.min(100, Math.round((maxDecode / 250) * 100));
-            const sTtft = minTtft < Infinity ? Math.max(10, Math.min(100, Math.round(100 - (minTtft / 20)))) : 50;
-            const sStability = bestJitter < Infinity ? Math.max(10, Math.min(100, Math.round(100 - bestJitter))) : 60;
-            const sConcurrency = Math.max(20, Math.min(100, Math.round((bestScalingRatio / 4) * 100)));
-            const sContext = Math.max(20, Math.min(100, Math.round(bestCtxRatio * 100)));
+            // 1. Prefill: smooth saturating curve with standout reward (5k+ -> 83+, 8k+ -> 95+)
+            const sPrefill = maxPrefill > 0 ? Math.min(100, Math.round(100 * (maxPrefill / (maxPrefill + 2500)) * 1.25)) : 0;
+
+            // 2. Decode: smooth saturating curve with standout reward (80 t/s -> 68, 100 t/s -> 75, 150 t/s -> 88, 200+ t/s -> 96+)
+            const sDecode = maxDecode > 0 ? Math.min(100, Math.round(100 * (maxDecode / (maxDecode + 80)) * 1.35)) : 0;
+
+            // 3. TTFT: logarithmic agility curve (<100ms -> 89-100, 200-500ms -> 71-81, 1-2s -> 56-64, 5-10s -> 39-46)
+            const sTtft = minTtft < Infinity 
+                ? Math.max(10, Math.min(100, Math.round(100 - 25 * Math.log10(Math.max(1, minTtft / 35))))) 
+                : 60;
+
+            // 4. Stability: smooth jitter curve (<3% -> 97+, 5% -> 95, 10% -> 90)
+            const sStability = bestJitter < Infinity 
+                ? Math.max(10, Math.min(100, Math.round(100 - Math.pow(bestJitter, 0.95) * 1.1))) 
+                : 75;
+
+            // 5. Concurrency: physics-aware memory-bound scaling (2.0x -> 63, 2.5x -> 83, 2.8x -> 94) with 55 neutral fallback
+            const sConcurrency = bestScalingScore !== null ? bestScalingScore : 55;
+
+            // 6. Context retention: percentage retention with 88 neutral fallback
+            const sContext = bestCtxRatio !== null ? Math.max(20, Math.min(100, Math.round(bestCtxRatio * 100))) : 88;
 
             return [sPrefill, sDecode, sTtft, sStability, sConcurrency, sContext];
         }
@@ -6337,10 +6633,43 @@
             if (!container) return;
             container.style.display = 'block';
 
-            const allRows = await ensureAllDataLoaded({ needDetails: true });
+            const allRows = await ensureAllDataLoaded({ needDetails: !isLowDataModeEnabled });
+
+            const banner = document.getElementById('radarLowDataBanner');
+            const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
+            if (banner) {
+                banner.style.display = 'flex';
+                if (isLowDataModeEnabled) {
+                    banner.className = 'data-mode-banner';
+                    banner.innerHTML = isEn
+                        ? `<span>⚡ <strong>Data Saver Active</strong>: Radar generated from lightweight benchmark sample (${allRows.length} runs). Ultra-fast & saves mobile data.</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 Load Full Dataset (~3MB)</button>`
+                        : `<span>⚡ <strong>省流极速模式已开启</strong>：基于高能效轻量测速样本 (${allRows.length} 条记录) 快速评估六维综合雷达，极速呈现。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 加载全量历史数据 (~3MB)</button>`;
+                } else {
+                    banner.className = 'data-mode-banner full-data';
+                    banner.innerHTML = isEn
+                        ? `<span>🌐 <strong>Full Dataset Active</strong>: Generated from all ${allRows.length} historical records across all GPUs.</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ Switch to Data Saver Mode</button>`
+                        : `<span>🌐 <strong>全量数据分析模式</strong>：基于全量 ${allRows.length} 条历史测速记录进行六维全面加权评估。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ 切换为省流极速模式</button>`;
+                }
+            }
+
             populateRadarSpecificHardwareOptions(allRows);
 
-            const hwFilteredRows = allRows.filter(r => !isRowAnomaly(r) && matchesRadarHardware(r, currentRadarHardwareFilter));
+            // Sync mode filter dropdown from global filter if unset
+            const modeSelectEl = document.getElementById('radarModeSelect');
+            if (modeSelectEl && currentBenchmarkModeFilter && currentBenchmarkModeFilter !== 'all' && currentRadarBenchmarkModeFilter === 'all') {
+                currentRadarBenchmarkModeFilter = currentBenchmarkModeFilter;
+                modeSelectEl.value = currentBenchmarkModeFilter;
+            }
+
+            const hwFilteredRows = allRows.filter(r => 
+                !isRowAnomaly(r) && 
+                matchesRadarHardware(r, currentRadarHardwareFilter) && 
+                matchesRadarBenchmarkMode(r, currentRadarBenchmarkModeFilter)
+            );
 
             const counts = {};
             hwFilteredRows.forEach(r => {
@@ -6365,7 +6694,6 @@
                     : `已选 ${radarSelectedModels.length} 个 (最多支持 6 个)`;
             }
 
-            const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
             const dropdownListEl = document.getElementById('radarDropdownList');
             if (dropdownListEl) {
                 if (allModelsSorted.length === 0) {
@@ -6420,7 +6748,7 @@
             }
 
             const datasets = radarSelectedModels.map((m, idx) => {
-                const scores = computeModelRadarScores(m, allRows, currentRadarHardwareFilter);
+                const scores = computeModelRadarScores(m, allRows, currentRadarHardwareFilter, currentRadarBenchmarkModeFilter, { siblingRows: allRows });
                 const color = RADAR_COLORS[idx % RADAR_COLORS.length];
                 return {
                     label: m,
@@ -6504,7 +6832,7 @@
                 '长文保持'
             ];
 
-            const scores = computeModelRadarScores(row.model_name, [row]);
+            const scores = computeModelRadarScores(row.model_name, [row], 'all', 'all', { siblingRows: typeof globalAllLoadedRows !== 'undefined' ? globalAllLoadedRows : [] });
             charts.modalRadar = new Chart(ctx, {
                 type: 'radar',
                 data: {
@@ -6537,39 +6865,46 @@
         }
 
         let currentMatrixHardware = '';
-        const matrixDetailCache = new Set();
+        const matrixModelRowsCache = new Map();
 
-        async function fetchModelMatrixDetails(modelName) {
-            if (!modelName || matrixDetailCache.has(modelName)) return;
+        async function fetchModelMatrixDetails(modelName, requestedLimit = null) {
+            if (!modelName) return [];
+            const limit = requestedLimit || (isLowDataModeEnabled ? 15 : 50);
+            if (matrixModelRowsCache.has(modelName)) {
+                const cached = matrixModelRowsCache.get(modelName);
+                if (isLowDataModeEnabled || cached.length >= limit) {
+                    return cached;
+                }
+            }
             try {
-                const url = `${SUPABASE_URL}/rest/v1/speed_results?model_name=eq.${encodeURIComponent(modelName)}&select=id,results_json`;
+                // Fetch on-demand matrix runs for this specific model, including results_json and hardware
+                const url = `${SUPABASE_URL}/rest/v1/speed_results?model_name=eq.${encodeURIComponent(modelName)}&select=id,user_code,model_name,hardware,framework,quantization,concurrency,max_decode_speed,max_prefill_speed,created_at,results_json&order=created_at.desc&limit=${limit}`;
                 const response = await fetch(url, { headers: SB_HEADERS });
                 if (response.ok) {
                     const rows = await response.json();
-                    if (Array.isArray(rows) && rows.length > 0) {
-                        const detailMap = new Map();
+                    if (Array.isArray(rows)) {
                         rows.forEach(item => {
                             let d = item.results_json ?? [];
                             if (typeof d === 'string') {
                                 try { d = JSON.parse(d); } catch { d = []; }
                             }
-                            if ((Array.isArray(d) && d.length > 0) || (d && typeof d === 'object' && Object.keys(d).length > 0)) {
-                                detailMap.set(item.id, d);
-                            }
+                            item.results_json = d;
                         });
-
-                        globalAllLoadedRows.forEach(r => {
-                            if (r.model_name === modelName && detailMap.has(r.id)) {
-                                r.results_json = detailMap.get(r.id);
-                            }
-                        });
+                        matrixModelRowsCache.set(modelName, rows);
+                        if (globalAllLoadedRows.length > 0) {
+                            const detailMap = new Map();
+                            rows.forEach(r => detailMap.set(r.id, r.results_json));
+                            globalAllLoadedRows.forEach(r => {
+                                if (detailMap.has(r.id)) r.results_json = detailMap.get(r.id);
+                            });
+                        }
+                        return rows;
                     }
                 }
             } catch (e) {
                 console.warn('Failed to fetch matrix details for model:', modelName, e);
-            } finally {
-                matrixDetailCache.add(modelName);
             }
+            return matrixModelRowsCache.get(modelName) || [];
         }
 
         let cachedMatrixHwCounts = {};
@@ -6865,13 +7200,28 @@
 
             if (loadingNotice) loadingNotice.style.display = 'block';
 
-            const allRows = await ensureAllDataLoaded();
-            const counts = {};
-            allRows.forEach(r => {
-                if (r.model_name) counts[r.model_name] = (counts[r.model_name] || 0) + 1;
-            });
+            // Lazy loading: derive models and counts from cached tags or lightweight loaded sample
+            let counts = {};
+            if (Array.isArray(currentModelTags) && currentModelTags.length > 0) {
+                currentModelTags.forEach(t => {
+                    counts[t.name] = t.count;
+                });
+            } else if (globalAllLoadedRows.length > 0) {
+                globalAllLoadedRows.forEach(r => {
+                    if (r.model_name) counts[r.model_name] = (counts[r.model_name] || 0) + 1;
+                });
+            }
 
-            const models = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            let models = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            if (models.length === 0) {
+                // If model tags haven't loaded yet, ensure lightweight sample
+                const sampleRows = await ensureAllDataLoaded();
+                sampleRows.forEach(r => {
+                    if (r.model_name) counts[r.model_name] = (counts[r.model_name] || 0) + 1;
+                });
+                models = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            }
+
             if (!currentMatrixModel || !counts[currentMatrixModel]) {
                 currentMatrixModel = models[0] || '';
             }
@@ -6882,10 +7232,33 @@
             }
             populateMatrixModelDropdownList(models, counts, currentPageLanguage === PAGE_LANGUAGE.EN);
 
-            // 精准补查当前模型的阶梯测速采样明细 (避免全局拉取漏查与网络过大)
-            await fetchModelMatrixDetails(currentMatrixModel);
+            // Fetch matrix details on demand ONLY for the current model
+            const modelRows = await fetchModelMatrixDetails(currentMatrixModel, isLowDataModeEnabled ? 15 : 50);
 
-            const modelRows = allRows.filter(r => r.model_name === currentMatrixModel && !isRowAnomaly(r));
+            if (loadingNotice) loadingNotice.style.display = 'none';
+
+            // Update Low Data Banner
+            const banner = document.getElementById('matrixLowDataBanner');
+            const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
+            if (banner) {
+                banner.style.display = 'flex';
+                if (isLowDataModeEnabled) {
+                    banner.className = 'data-mode-banner';
+                    banner.innerHTML = isEn
+                        ? `<span>⚡ <strong>Data Saver Active</strong>: Loaded latest ${modelRows.length} matrix test runs for <em>${escapeHtml(currentMatrixModel)}</em> (only ~50KB data).</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 Load More History (~200KB)</button>`
+                        : `<span>⚡ <strong>省流极速模式已开启</strong>：仅按需拉取当前模型 <em>${escapeHtml(currentMatrixModel)}</em> 最新 ${modelRows.length} 组矩阵压测样本 (仅消耗 ~50KB 流量)。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">🚀 加载更深历史矩阵 (~200KB)</button>`;
+                } else {
+                    banner.className = 'data-mode-banner full-data';
+                    banner.innerHTML = isEn
+                        ? `<span>🌐 <strong>Full Dataset Active</strong>: Loaded ${modelRows.length} historical matrix runs for <em>${escapeHtml(currentMatrixModel)}</em>.</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ Switch to Data Saver Mode</button>`
+                        : `<span>🌐 <strong>全量数据分析模式</strong>：已加载 <em>${escapeHtml(currentMatrixModel)}</em> 共 ${modelRows.length} 组历史完整压测样本。</span>
+                           <button type="button" class="banner-action-btn" onclick="toggleLowDataMode()">⚡ 切换为省流极速模式</button>`;
+                }
+            }
+
             updateMatrixHardwareOptions(currentMatrixModel, modelRows);
 
             // 按照模型 + 显卡硬件双重切片过滤 (让数据真正跟着显卡走！)
@@ -6894,7 +7267,6 @@
                 return (r.hardware || '').trim() === currentMatrixHardware.trim();
             });
 
-            const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
             if (badgeText) {
                 if (currentMatrixHardware === 'all') {
                     badgeText.innerHTML = isEn
@@ -7266,12 +7638,13 @@
             throw new Error(`HTTP error ${response.status}${detail ? `: ${detail}` : ''}`);
         }
 
-        async function fetchAllLeaderboardRows(mode, signal, personalUserCode) {
+        async function fetchAllLeaderboardRows(mode, signal, personalUserCode, maxLimit = null) {
             const rows = [];
             let offset = 0;
+            const effectiveLimit = maxLimit ? Math.min(maxLimit, RESULTS_FETCH_LIMIT) : (isLowDataModeEnabled ? LOW_DATA_SAMPLE_LIMIT : RESULTS_FETCH_LIMIT);
 
-            while (offset < RESULTS_FETCH_LIMIT) {
-                const limit = Math.min(RESULTS_FETCH_PAGE_SIZE, RESULTS_FETCH_LIMIT - offset);
+            while (offset < effectiveLimit) {
+                const limit = Math.min(RESULTS_FETCH_PAGE_SIZE, effectiveLimit - offset);
                 const batch = await fetchLeaderboardRows(mode, offset, limit, signal, personalUserCode);
                 if (!Array.isArray(batch) || batch.length === 0) break;
                 rows.push(...batch);
@@ -7279,7 +7652,7 @@
                 if (batch.length < limit) break;
             }
 
-            if (offset >= RESULTS_FETCH_LIMIT) {
+            if (offset >= effectiveLimit && effectiveLimit === RESULTS_FETCH_LIMIT) {
                 console.warn(`Leaderboard fetch reached cap: ${RESULTS_FETCH_LIMIT} rows.`);
             }
 
@@ -7610,8 +7983,8 @@
             } else {
                 const p = pickDisplaySpeed(row.max_prefill_speed, row.avg_prefill_speed);
                 const d = pickDisplaySpeed(row.max_decode_speed, row.avg_decode_speed);
-                if (!Number.isFinite(p) || p > 100000) return true;
-                if (!Number.isFinite(d) || d > 50000) return true;
+                if (p > 100000 || p < 0 || p === Infinity) return true;
+                if (d > 50000 || d < 0 || d === Infinity) return true;
             }
             const tags = Array.isArray(row.record_tags) ? row.record_tags : [];
             if (tags.includes('time_anomaly') || tags.some(t => typeof t === 'string' && t.startsWith('anomaly:'))) return true;
@@ -7900,6 +8273,48 @@
             syncMobileFilterPanel(true);
         }
 
+        function updateLowDataUI() {
+            const btn = document.getElementById('lowDataToggleBtn');
+            const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
+            if (btn) {
+                btn.textContent = isLowDataModeEnabled
+                    ? (isEn ? '⚡ Data Saver ON' : '⚡ 省流极速 开')
+                    : (isEn ? '⚡ Data Saver OFF' : '⚡ 省流模式 关');
+                btn.classList.toggle('btn-low-data-active', isLowDataModeEnabled);
+                btn.title = isEn
+                    ? (isLowDataModeEnabled ? 'Data saver active: lazy loads lightweight data only. Click to switch to full dataset.' : 'Full dataset active. Click to switch to data saver mode.')
+                    : (isLowDataModeEnabled ? '省流极速模式开启：延迟按需加载轻量数据，大幅节省流量与加载耗时。点击可切换全量数据。' : '全量模式开启：加载完整历史数据。点击可切换省流极速模式。');
+            }
+        }
+
+        function setLowDataMode(val) {
+            isLowDataModeEnabled = !!val;
+            try {
+                localStorage.setItem(LOW_DATA_STORAGE_KEY, String(isLowDataModeEnabled));
+            } catch (_) {}
+            updateLowDataUI();
+        }
+
+        async function toggleLowDataMode() {
+            setLowDataMode(!isLowDataModeEnabled);
+            const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
+            const msg = isLowDataModeEnabled
+                ? (isEn ? '⚡ Data Saver Enabled: Lightweight sample & fast loading' : '⚡ 省流模式已开启：仅按需加载轻量样本，极速且节省流量')
+                : (isEn ? '🌐 Full Dataset Mode Enabled: Loading comprehensive data...' : '🌐 全量模式已开启：正在加载完整历史数据...');
+            showToast(msg);
+
+            // Re-render the active view
+            if (currentMode === 'pareto') {
+                await renderParetoFrontierView();
+            } else if (currentMode === 'radar') {
+                await renderRadarCapabilityView();
+            } else if (currentMode === 'matrix') {
+                await renderMatrixPerspectiveView();
+            } else {
+                loadLeaderboard(currentMode, false);
+            }
+        }
+
         function toggleModelTags() {
             const bar = document.getElementById('modelTagBar');
             const btn = document.getElementById('toggleModelTagsBtn');
@@ -8024,6 +8439,7 @@
             initializePageTranslation();
             updateLanguageToggleState(false);
             updateRunCommandLabels();
+            updateLowDataUI();
 
             const pageEl = document.getElementById('pageSizeSelect');
             if (pageEl) pageEl.value = String(currentPageSize);
@@ -8631,7 +9047,11 @@
 
                     data = normalizeLeaderboardRows(rawRows);
                     totalPages = Math.max(1, Math.ceil(totalMatched / currentPageSize));
-                    ensureAllDataLoaded().then(all => updateDynamicSmartFilterPills(all));
+                    if (globalAllLoadedRows.length > 0) {
+                        updateDynamicSmartFilterPills(globalAllLoadedRows);
+                    } else {
+                        updateDynamicSmartFilterPills(data);
+                    }
                 }
 
                 if (!data || data.length === 0) {

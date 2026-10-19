@@ -312,7 +312,7 @@ Executing `python3 python/llm_test_backend.py` supports all standard options:
 | `--host HOST` | String | `0.0.0.0` | Host address to bind server |
 | `--benchmark`, `--cli` | Flag | `False` | Launch headless CLI benchmarking mode |
 | `--benchmark-mode`, `--mode` | Choice | `1d_sweep` | Benchmark execution mode: `1d_sweep`, `2d_matrix`, `sustained_decode` |
-| `--task-type`, `--task` | Choice | `general` | Benchmark workload scenario library: `general`, `code`, `structured`, `prose`, `prefill_16k`, `reasoning` |
+| `--task-type`, `--task` | Choice | `general` | Benchmark workload scenario library: `general` (General/Essay), `code` (Code Decode), `structured` (Structured JSON), `prose` (Prose & QA), `prefill_16k` (Technical Doc QA), `reasoning` (Math & Logic) |
 | `--matrix-concurrency` | String | `'1,2,4,8'` | 2D matrix concurrency ladder, comma-separated |
 | `--matrix-context` | String | `'512,1024,2048'` | 2D matrix context token length ladder, comma-separated |
 | `--matrix-max-kv-tokens` | Int | `32768` | 2D matrix KV cache memory budget limit for cell skipping (0 for unlimited) |

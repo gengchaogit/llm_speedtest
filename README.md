@@ -313,7 +313,7 @@ python3 llm_test_backend.py --benchmark \
 | `--host HOST` | String | `0.0.0.0` | 本地服务监听地址 |
 | `--benchmark`, `--cli` | Flag | `False` | 启动无头 CLI 基准测试模式 |
 | `--benchmark-mode`, `--mode` | Choice | `1d_sweep` | 评测执行模式：`1d_sweep`、`2d_matrix`、`sustained_decode` |
-| `--task-type`, `--task` | Choice | `general` | 评测场景题库选择：`general`、`code`、`structured`、`prose`、`prefill_16k`、`reasoning` |
+| `--task-type`, `--task` | Choice | `general` | 评测场景题库选择：`general` (通用混合)、`code` (代码解码)、`structured` (结构化JSON)、`prose` (散文深度问答)、`prefill_16k` (技术文档分析/文档知识库)、`reasoning` (数理逻辑推演) |
 | `--matrix-concurrency` | String | `'1,2,4,8'` | 2D 矩阵并发梯队，以逗号分隔 |
 | `--matrix-context` | String | `'512,1024,2048'` | 2D 矩阵上下文长度梯队，以逗号分隔 |
 | `--matrix-max-kv-tokens` | Int | `32768` | 2D 矩阵显存预算跳过阈值（0 表示不限制） |
