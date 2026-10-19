@@ -7,3 +7,4 @@ python/.backend_port
 *.log
 tests/adversarial_results.json
 python/test_cli*.json
+.agents/

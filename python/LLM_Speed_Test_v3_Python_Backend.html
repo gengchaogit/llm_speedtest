@@ -7012,6 +7012,9 @@ async function processOllamaResponse(response, promptLength) {
             const tasksToRun = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
 
             startTestBtn.disabled = true;
+            window.activeSequenceTaskType = 'all';
+            const taskTypeSelectorEl = document.getElementById('taskTypeSelect');
+            if (taskTypeSelectorEl) taskTypeSelectorEl.value = 'all';
             const btnAll = document.getElementById('btnRunAllTasks');
             if (btnAll) btnAll.disabled = true;
             const btnAllMain = document.getElementById('btnRunAllTasksMain');
@@ -7255,6 +7258,8 @@ async function processOllamaResponse(response, promptLength) {
 
                 if (sequenceResults.length > 0) {
                     renderAllTasksComparison(sequenceResults);
+                    window.allTasksComparisonData = sequenceResults;
+                    window.activeSequenceTaskType = 'all';
 
                     const currentConfig = {
                         apiUrl,
@@ -12015,9 +12020,15 @@ async function processOllamaResponse(response, promptLength) {
                 payload.all_tasks_comparison = window.allTasksComparisonData;
                 recordTags.push('all_tasks');
             }
-            const selectedTask = document.getElementById('taskTypeSelect')?.value || 'general';
+            let selectedTask = document.getElementById('taskTypeSelect')?.value || 'general';
+            if (window.activeSequenceTaskType === 'all' || (window.allTasksComparisonData && window.allTasksComparisonData.length > 0)) {
+                selectedTask = 'all';
+            }
             payload.task_type = selectedTask;
             recordTags.push(`task:${selectedTask}`);
+            if (selectedTask === 'all' && !recordTags.includes('all_tasks')) {
+                recordTags.push('all_tasks');
+            }
             payload.record_tags = Array.from(new Set(recordTags));
             if (runCommand) payload.run_command = runCommand;
             return payload;

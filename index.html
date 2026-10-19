@@ -3295,9 +3295,11 @@
             if (targetCount <= 0) return '';
             const wordsPool = TASK_PADDING_TOKENS[taskType] || PROMPT_TOKEN_WORDS;
             const words = [];
-            let state = Math.imul(seed || 1, 1000003) ^ 1234567;
+            // Incorporate dynamic high-entropy salt (timestamp + random) to prevent deterministic prefix cache hits in SGLang/vLLM
+            const dynamicSalt = (Date.now() ^ Math.floor(Math.random() * 10000000)) >>> 0;
+            let state = (Math.imul((seed || 1) ^ dynamicSalt, 1000003) ^ 1234567) >>> 0;
             for (let i = 0; i < targetCount; i++) {
-                state = Math.imul(state ^ (state >>> 15), 1103515245) + 12345;
+                state = (Math.imul(state ^ (state >>> 15), 1103515245) + 12345) >>> 0;
                 const idx = Math.abs(state) % wordsPool.length;
                 words.push(wordsPool[idx]);
             }
@@ -3309,7 +3311,9 @@
             const suffixTokens = estimateTokenCount(verificationSuffix);
             const neededBodyTokens = Math.max(targetLength - suffixTokens, 64);
             const bodyParts = [];
-            let currentTokens = 0;
+            const sessionNonce = `[Benchmark Session ID: ${Date.now().toString(36)}-${Math.floor(Math.random() * 100000).toString(36)}]\n`;
+            bodyParts.push(sessionNonce);
+            let currentTokens = estimateTokenCount(sessionNonce);
             let cycle = 0;
             while (currentTokens < neededBodyTokens) {
                 for (let idx = 0; idx < PREFILL_16K_DOC_SECTIONS.length; idx++) {
@@ -9343,6 +9347,9 @@
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'block';
             testResultsData = [];
+            window.activeSequenceTaskType = 'all';
+            const taskTypeSelectorEl = document.getElementById('taskTypeSelect');
+            if (taskTypeSelectorEl) taskTypeSelectorEl.value = 'all';
 
             // Add sequence progress monitor
             const seqHeader = document.createElement('div');
@@ -9554,6 +9561,8 @@
 
                 if (sequenceResults.length > 0) {
                     renderAllTasksComparison(sequenceResults);
+                    window.allTasksComparisonData = sequenceResults;
+                    window.activeSequenceTaskType = 'all';
 
                     const currentConfig = {
                         apiUrl,
@@ -12861,9 +12870,15 @@
                 } else {
                     recordTags.push('benchmark_mode:1d_sweep');
                 }
-                const selectedTask = getSelectedTaskType();
+                let selectedTask = getSelectedTaskType();
+                if (window.activeSequenceTaskType === 'all' || (window.allTasksComparisonData && window.allTasksComparisonData.length > 0)) {
+                    selectedTask = 'all';
+                }
                 if (selectedTask) {
                     recordTags.push(`task:${selectedTask}`);
+                }
+                if (selectedTask === 'all' && !recordTags.includes('all_tasks')) {
+                    recordTags.push('all_tasks');
                 }
                 if (vp.some(r => Array.isArray(r.tokenWarnings) && r.tokenWarnings.length > 0)) {
                     recordTags.push('token_source:api_stats_anomaly');
@@ -12898,6 +12913,7 @@
                 const pointsData = vp.map(r => {
                     const pointStats = _resolveUploadPointStats(r, concurrency);
                     return {
+                        task_type: r.task_type || r.taskType || selectedTask || 'general',
                         prompt_length: parseFloat(r.promptLength),
                         prefill_speed: parseFloat(r.prefillSpeed),
                         output_speed: parseFloat(r.outputSpeed),
@@ -12946,6 +12962,7 @@
 
                 const resultsJsonObj = {
                     benchmark_mode: activeBenchmarkMode,
+                    task_type: selectedTask,
                     pool_concurrency: concurrency,
                     effective_concurrency: vp[0]?.effectiveConcurrency || `${concurrency}/${concurrency}`,
                     matrix: matrixData,

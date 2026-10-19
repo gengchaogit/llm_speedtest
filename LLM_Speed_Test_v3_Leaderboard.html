@@ -2045,6 +2045,16 @@
             background: rgba(198, 120, 221, 0.25);
             box-shadow: 0 0 10px rgba(198, 120, 221, 0.3);
         }
+        .filter-pill.active.pill-mode {
+            border-color: #e5c07b;
+            background: rgba(229, 192, 123, 0.25);
+            box-shadow: 0 0 10px rgba(229, 192, 123, 0.3);
+        }
+        .filter-pill.active.pill-task {
+            border-color: #61afef;
+            background: rgba(97, 175, 239, 0.25);
+            box-shadow: 0 0 10px rgba(97, 175, 239, 0.3);
+        }
         .pill-badge {
             font-size: 10px;
             opacity: 0.8;
@@ -2994,6 +3004,27 @@
                         <button type="button" class="filter-pill" data-c="32+" onclick="setConcurrencyFilter('32+')">32+ 高并发</button>
                     </div>
                 </div>
+                <div class="filter-row">
+                    <span class="filter-row-label" id="lblModeFilter">评测模式</span>
+                    <div class="filter-pills" id="modeFilterPills">
+                        <button type="button" class="filter-pill pill-mode active" data-mode="all" onclick="setBenchmarkModeFilter('all')">全部模式</button>
+                        <button type="button" class="filter-pill pill-mode" data-mode="1d_sweep" onclick="setBenchmarkModeFilter('1d_sweep')">📊 1D阶梯</button>
+                        <button type="button" class="filter-pill pill-mode" data-mode="2d_matrix" onclick="setBenchmarkModeFilter('2d_matrix')">🧊 2D矩阵</button>
+                        <button type="button" class="filter-pill pill-mode" data-mode="sustained_decode" onclick="setBenchmarkModeFilter('sustained_decode')">⏱️ 稳态解码</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-row-label" id="lblTaskFilter">题目类型</span>
+                    <div class="filter-pills" id="taskFilterPills">
+                        <button type="button" class="filter-pill pill-task active" data-task="all" onclick="setTaskTypeFilter('all')">全部题目</button>
+                        <button type="button" class="filter-pill pill-task" data-task="general" onclick="setTaskTypeFilter('general')">🌐 通用混合</button>
+                        <button type="button" class="filter-pill pill-task" data-task="code" onclick="setTaskTypeFilter('code')">💻 代码解码</button>
+                        <button type="button" class="filter-pill pill-task" data-task="structured" onclick="setTaskTypeFilter('structured')">📋 结构化JSON</button>
+                        <button type="button" class="filter-pill pill-task" data-task="prose" onclick="setTaskTypeFilter('prose')">✍️ 散文问答</button>
+                        <button type="button" class="filter-pill pill-task" data-task="prefill_16k" onclick="setTaskTypeFilter('prefill_16k')">📚 16K长文本</button>
+                        <button type="button" class="filter-pill pill-task" data-task="reasoning" onclick="setTaskTypeFilter('reasoning')">🧠 深度思考</button>
+                    </div>
+                </div>
             </div>
 
             <div class="leaderboard-tools">
@@ -3216,6 +3247,8 @@
         let currentQuantFilter = 'all';
         let currentEngineFilter = 'all';
         let currentConcurrencyFilter = 'all';
+        let currentBenchmarkModeFilter = 'all';
+        let currentTaskTypeFilter = 'all';
         let currentRadarHardwareFilter = 'all';
         let radarSelectedModels = [];
         let radarDropdownOpen = false;
@@ -3506,10 +3539,14 @@
                 lblQuantFilter: '量化精度',
                 lblEngineFilter: '推理引擎',
                 lblConcurrencyFilter: '并发等级',
+                lblModeFilter: '评测模式',
+                lblTaskFilter: '题目类型',
                 chipAll: '全部芯片',
                 quantAll: '全部精度',
                 engineAll: '全部引擎',
                 concurrencyAll: '全部并发',
+                modeAll: '全部模式',
+                taskAll: '全部题目',
                 btnCollapseFilter: '收起筛选条件',
                 btnExpandFilter: '展开筛选条件',
                 lblPageSize: '每页条数',
@@ -3649,10 +3686,14 @@
                 lblQuantFilter: 'Quantization',
                 lblEngineFilter: 'Serving Engine',
                 lblConcurrencyFilter: 'Concurrency',
+                lblModeFilter: 'Benchmark Mode',
+                lblTaskFilter: 'Workload Type',
                 chipAll: 'All Chips',
                 quantAll: 'All Quant',
                 engineAll: 'All Engines',
                 concurrencyAll: 'All Concurrency',
+                modeAll: 'All Modes',
+                taskAll: 'All Workloads',
                 btnCollapseFilter: 'Collapse Filters',
                 btnExpandFilter: 'Expand Filters',
                 lblPageSize: 'Page Size',
@@ -3819,6 +3860,8 @@
                 'lblQuantFilter': t('lblQuantFilter'),
                 'lblEngineFilter': t('lblEngineFilter'),
                 'lblConcurrencyFilter': t('lblConcurrencyFilter'),
+                'lblModeFilter': t('lblModeFilter'),
+                'lblTaskFilter': t('lblTaskFilter'),
                 'lblPageSize': t('lblPageSize'),
                 'lblMinDecode': t('lblMinDecode'),
                 'lblMinPrefill': t('lblMinPrefill'),
@@ -3940,6 +3983,10 @@
             if (pillAllQuant) pillAllQuant.textContent = t('quantAll');
             const pillAllEngine = document.querySelector('#engineFilterPills .filter-pill[data-engine="all"]');
             if (pillAllEngine) pillAllEngine.textContent = t('engineAll');
+            const pillAllMode = document.querySelector('#modeFilterPills .filter-pill[data-mode="all"]');
+            if (pillAllMode) pillAllMode.textContent = t('modeAll');
+            const pillAllTask = document.querySelector('#taskFilterPills .filter-pill[data-task="all"]');
+            if (pillAllTask) pillAllTask.textContent = t('taskAll');
             document.querySelectorAll('#concurrencyFilterPills .filter-pill').forEach(btn => {
                 const c = btn.getAttribute('data-c');
                 if (c === 'all') btn.textContent = t('concurrencyAll');
@@ -4036,6 +4083,40 @@
         // 内置全量多维分类体系 (Master Catalogs)
         // 覆盖历史所有野性手填格式 (Freeform Input Normalization)
         // -------------------------------------------------------------
+        function rowHasTask(row, targetTask) {
+            if (!row || !targetTask) return false;
+            const t = String(targetTask).toLowerCase();
+            const rowTask = (extractRowTaskType(row) || '').toLowerCase();
+            if (rowTask === t || rowTask === 'all') return true;
+
+            let rj = row.results_json;
+            if (typeof rj === 'string') {
+                try { rj = JSON.parse(rj); } catch {}
+            }
+            if (rj && typeof rj === 'object') {
+                if (rj.task_type && String(rj.task_type).toLowerCase() === t) return true;
+                if (rj.taskType && String(rj.taskType).toLowerCase() === t) return true;
+                if (rj.all_matrices && typeof rj.all_matrices === 'object' && rj.all_matrices[t]) return true;
+                if (row.all_matrices && typeof row.all_matrices === 'object' && row.all_matrices[t]) return true;
+                if (Array.isArray(rj.all_tasks_comparison) && rj.all_tasks_comparison.some(x => String(x.task_type || x.taskType || '').toLowerCase() === t)) return true;
+                if (Array.isArray(rj.all_tasks_results) && rj.all_tasks_results.some(x => String(x.task_type || x.taskType || '').toLowerCase() === t)) return true;
+                if (Array.isArray(row.all_tasks_comparison) && row.all_tasks_comparison.some(x => String(x.task_type || x.taskType || '').toLowerCase() === t)) return true;
+                if (Array.isArray(rj.points) && rj.points.some(p => String(p.task_type || p.taskType || '').toLowerCase() === t)) return true;
+                if (Array.isArray(rj) && rj.some(p => String(p.task_type || p.taskType || '').toLowerCase() === t)) return true;
+                if (rj.sustained_summary && String(rj.sustained_summary.task_type || rj.sustained_summary.taskType || '').toLowerCase() === t) return true;
+            }
+
+            let tags = row.record_tags;
+            if (typeof tags === 'string') {
+                try { tags = JSON.parse(tags); } catch {}
+            }
+            if (Array.isArray(tags)) {
+                if (tags.some(tag => typeof tag === 'string' && (tag.toLowerCase() === `task:${t}` || tag.toLowerCase() === `task=${t}`))) return true;
+                if (tags.some(tag => typeof tag === 'string' && (tag === 'all_tasks' || tag === 'all-tasks' || tag === 'multi_matrix'))) return true;
+            }
+            return false;
+        }
+
         const SMART_FILTER_CATALOGS = {
             chip: [
                 {
@@ -4224,6 +4305,64 @@
                     nameEn: 'Concurrency 32+',
                     matcher: c => c >= 32
                 }
+            ],
+            mode: [
+                {
+                    id: '1d_sweep',
+                    nameZh: '📊 1D阶梯',
+                    nameEn: '📊 1D Ladder',
+                    matcher: (mode, row) => mode === '1d_sweep'
+                },
+                {
+                    id: '2d_matrix',
+                    nameZh: '🧊 2D矩阵',
+                    nameEn: '🧊 2D Matrix',
+                    matcher: (mode, row) => mode === '2d_matrix'
+                },
+                {
+                    id: 'sustained_decode',
+                    nameZh: '⏱️ 稳态解码',
+                    nameEn: '⏱️ Sustained Decode',
+                    matcher: (mode, row) => mode === 'sustained_decode'
+                }
+            ],
+            task: [
+                {
+                    id: 'general',
+                    nameZh: '🌐 通用混合',
+                    nameEn: '🌐 General',
+                    matcher: (tType, row) => tType === 'general' || tType === 'all' || rowHasTask(row, 'general')
+                },
+                {
+                    id: 'code',
+                    nameZh: '💻 代码解码',
+                    nameEn: '💻 Code',
+                    matcher: (tType, row) => tType === 'code' || tType === 'all' || rowHasTask(row, 'code')
+                },
+                {
+                    id: 'structured',
+                    nameZh: '📋 结构化JSON',
+                    nameEn: '📋 Structured JSON',
+                    matcher: (tType, row) => tType === 'structured' || tType === 'all' || rowHasTask(row, 'structured')
+                },
+                {
+                    id: 'prose',
+                    nameZh: '✍️ 散文问答',
+                    nameEn: '✍️ Prose & QA',
+                    matcher: (tType, row) => tType === 'prose' || tType === 'all' || rowHasTask(row, 'prose')
+                },
+                {
+                    id: 'prefill_16k',
+                    nameZh: '📚 16K长文本',
+                    nameEn: '📚 16K Prefill',
+                    matcher: (tType, row) => tType === 'prefill_16k' || tType === 'all' || rowHasTask(row, 'prefill_16k')
+                },
+                {
+                    id: 'reasoning',
+                    nameZh: '🧠 深度思考',
+                    nameEn: '🧠 Reasoning',
+                    matcher: (tType, row) => tType === 'reasoning' || tType === 'all' || rowHasTask(row, 'reasoning')
+                }
             ]
         };
 
@@ -4259,6 +4398,22 @@
             applyLeaderboardFilters();
         }
 
+        function setBenchmarkModeFilter(mode) {
+            currentBenchmarkModeFilter = mode;
+            document.querySelectorAll('#modeFilterPills .filter-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+            });
+            applyLeaderboardFilters();
+        }
+
+        function setTaskTypeFilter(task) {
+            currentTaskTypeFilter = task;
+            document.querySelectorAll('#taskFilterPills .filter-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-task') === task);
+            });
+            applyLeaderboardFilters();
+        }
+
         function updateDynamicSmartFilterPills(dataRows) {
             if (!Array.isArray(dataRows) || dataRows.length === 0) return;
             const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
@@ -4279,16 +4434,22 @@
                     const notes = String(row.notes || '').toLowerCase();
                     const fullText = `${hw} ${fw} ${quant} ${cmd} ${notes}`;
                     const c = Number(row.concurrency) || 1;
+                    const mode = getRowBenchmarkMode(row);
+                    const tType = extractRowTaskType(row);
 
                     catalog.forEach(item => {
                         if (filterType === 'chip' && item.matcher(hw, fullText)) counts[item.id]++;
                         else if (filterType === 'quant' && item.matcher(quant, fullText)) counts[item.id]++;
                         else if (filterType === 'engine' && item.matcher(fw, fullText)) counts[item.id]++;
                         else if (filterType === 'concurrency' && item.matcher(c)) counts[item.id]++;
+                        else if (filterType === 'mode' && item.matcher(mode, row)) counts[item.id]++;
+                        else if (filterType === 'task' && item.matcher(tType, row)) counts[item.id]++;
                     });
                 });
 
-                const allLabel = isEn ? (filterType === 'chip' ? 'All Chips' : filterType === 'quant' ? 'All Quant' : filterType === 'engine' ? 'All Engines' : 'All Concurrency') : (filterType === 'chip' ? '全部芯片' : filterType === 'quant' ? '全部精度' : filterType === 'engine' ? '全部引擎' : '全部并发');
+                const allLabel = isEn 
+                    ? (filterType === 'chip' ? 'All Chips' : filterType === 'quant' ? 'All Quant' : filterType === 'engine' ? 'All Engines' : filterType === 'mode' ? 'All Modes' : filterType === 'task' ? 'All Workloads' : 'All Concurrency') 
+                    : (filterType === 'chip' ? '全部芯片' : filterType === 'quant' ? '全部精度' : filterType === 'engine' ? '全部引擎' : filterType === 'mode' ? '全部模式' : filterType === 'task' ? '全部题目' : '全部并发');
                 const dataAttr = filterType === 'concurrency' ? 'data-c' : `data-${filterType}`;
                 
                 let html = `<button type="button" class="filter-pill pill-${filterType} ${currentActive === 'all' ? 'active' : ''}" ${dataAttr}="all" onclick="${clickFnName}('all')">${allLabel}</button>`;
@@ -4310,6 +4471,8 @@
             renderRowPills('quantFilterPills', SMART_FILTER_CATALOGS.quant, currentQuantFilter, 'setQuantFilter', 'quant');
             renderRowPills('engineFilterPills', SMART_FILTER_CATALOGS.engine, currentEngineFilter, 'setEngineFilter', 'engine');
             renderRowPills('concurrencyFilterPills', SMART_FILTER_CATALOGS.concurrency, currentConcurrencyFilter, 'setConcurrencyFilter', 'concurrency');
+            renderRowPills('modeFilterPills', SMART_FILTER_CATALOGS.mode, currentBenchmarkModeFilter, 'setBenchmarkModeFilter', 'mode');
+            renderRowPills('taskFilterPills', SMART_FILTER_CATALOGS.task, currentTaskTypeFilter, 'setTaskTypeFilter', 'task');
         }
 
         function passesSmartFilters(row) {
@@ -4355,6 +4518,26 @@
                     if (!item.matcher(c)) return false;
                 } else {
                     if (Number(currentConcurrencyFilter) && c !== Number(currentConcurrencyFilter)) return false;
+                }
+            }
+
+            if (currentBenchmarkModeFilter !== 'all') {
+                const rowMode = getRowBenchmarkMode(row);
+                const item = SMART_FILTER_CATALOGS.mode.find(m => m.id === currentBenchmarkModeFilter);
+                if (item) {
+                    if (!item.matcher(rowMode, row)) return false;
+                } else if (rowMode !== currentBenchmarkModeFilter) {
+                    return false;
+                }
+            }
+
+            if (currentTaskTypeFilter !== 'all') {
+                const rowTask = extractRowTaskType(row);
+                const item = SMART_FILTER_CATALOGS.task.find(t => t.id === currentTaskTypeFilter);
+                if (item) {
+                    if (!item.matcher(rowTask, row)) return false;
+                } else if (rowTask !== currentTaskTypeFilter && !rowHasTask(row, currentTaskTypeFilter)) {
+                    return false;
                 }
             }
 
@@ -4469,8 +4652,12 @@
             general: {
                 zh: '🌐 通用混合',
                 en: '🌐 General',
+                shortZh: '🌐 通用混合',
+                shortEn: '🌐 General',
                 fullZh: '🌐 通用混合场景 (General / Essay)',
                 fullEn: '🌐 General / Essay Baseline',
+                descZh: '基础哲学与散文问答，通用基准基线',
+                descEn: 'General philosophical essay baseline',
                 color: '#61afef',
                 bg: 'rgba(97, 175, 239, 0.15)',
                 border: 'rgba(97, 175, 239, 0.45)',
@@ -4478,8 +4665,12 @@
             code: {
                 zh: '💻 代码解码',
                 en: '💻 Code',
+                shortZh: '💻 代码解码',
+                shortEn: '💻 Code',
                 fullZh: '💻 代码解码任务 (Code Decode)',
                 fullEn: '💻 Code Decode Task',
+                descZh: '代码语法高度确定，推测采样高命中率',
+                descEn: 'High syntactic certainty, high speculative hit rate',
                 color: '#98c379',
                 bg: 'rgba(152, 195, 121, 0.15)',
                 border: 'rgba(152, 195, 121, 0.45)',
@@ -4487,8 +4678,12 @@
             structured: {
                 zh: '📋 结构化JSON',
                 en: '📋 JSON',
+                shortZh: '📋 结构化JSON',
+                shortEn: '📋 JSON',
                 fullZh: '📋 结构化数据 (Structured JSON)',
                 fullEn: '📋 Structured JSON Generation',
+                descZh: 'JSON Schema 状态机受限生成约束解码',
+                descEn: 'JSON Schema constrained decoding',
                 color: '#e5c07b',
                 bg: 'rgba(229, 192, 123, 0.15)',
                 border: 'rgba(229, 192, 123, 0.45)',
@@ -4496,26 +4691,38 @@
             prose: {
                 zh: '✍️ 散文问答',
                 en: '✍️ Prose & QA',
+                shortZh: '✍️ 散文问答',
+                shortEn: '✍️ Prose & QA',
                 fullZh: '✍️ 散文与深度问答 (Prose & QA)',
                 fullEn: '✍️ Prose & In-depth QA',
+                descZh: '高发散长文创作，显存带宽敏感基准',
+                descEn: 'High-entropy natural prose, memory-bandwidth bound',
                 color: '#d19a66',
                 bg: 'rgba(209, 154, 102, 0.15)',
                 border: 'rgba(209, 154, 102, 0.45)',
             },
             prefill_16k: {
-                zh: '📚 16K长文本',
-                en: '📚 Prefill 16K',
-                fullZh: '📚 16K 长上下文首字 (Prefill @ 16K)',
-                fullEn: '📚 16K Long Context Prefill',
+                zh: '📚 文档知识库',
+                en: '📚 Doc QA',
+                shortZh: '📚 文档知识库',
+                shortEn: '📚 Doc QA',
+                fullZh: '📚 技术文档分析 (Technical Doc QA)',
+                fullEn: '📚 Technical Doc QA & Extraction',
+                descZh: '长上下文事实检索，高信息密度长文本',
+                descEn: 'High-density technical doc fact retrieval and extraction',
                 color: '#c678dd',
                 bg: 'rgba(198, 120, 221, 0.15)',
                 border: 'rgba(198, 120, 221, 0.45)',
             },
             reasoning: {
-                zh: '🧠 深度思考',
-                en: '🧠 Reasoning',
-                fullZh: '🧠 深度思考推理 (Reasoning CoT)',
-                fullEn: '🧠 Deep Reasoning CoT',
+                zh: '🧮 数理逻辑',
+                en: '🧮 Math & Logic',
+                shortZh: '🧮 数理逻辑',
+                shortEn: '🧮 Math & Logic',
+                fullZh: '🧮 数理逻辑推演 (Math & Logic)',
+                fullEn: '🧮 Math & Logic Reasoning',
+                descZh: '复杂数理与组合逻辑，严格多步推导',
+                descEn: 'Complex math and algorithmic multi-step deductive reasoning',
                 color: '#e06c75',
                 bg: 'rgba(224, 108, 117, 0.15)',
                 border: 'rgba(224, 108, 117, 0.45)',
@@ -4523,8 +4730,12 @@
             all: {
                 zh: '⚡ 全场景',
                 en: '⚡ All Tasks',
-                fullZh: '⚡ 全场景对比 (All Workloads Sequence)',
+                shortZh: '⚡ 全场景',
+                shortEn: '⚡ All Tasks',
+                fullZh: '⚡ 全场景自动化对比 (All Workloads Benchmark)',
                 fullEn: '⚡ All Workloads Benchmark',
+                descZh: '6大场景全自动化顺序测试，全面洞察模型综合性能',
+                descEn: 'Comprehensive sequential benchmark across all 6 workload scenarios',
                 color: '#38bdf8',
                 bg: 'rgba(56, 189, 248, 0.15)',
                 border: 'rgba(56, 189, 248, 0.45)',
@@ -4550,6 +4761,12 @@
                     const t = rj.taskType.trim().toLowerCase();
                     if (TASK_TYPE_META[t]) return t;
                 }
+                if (Array.isArray(rj.all_tasks_comparison) && rj.all_tasks_comparison.length > 0) {
+                    return 'all';
+                }
+                if (Array.isArray(rj.all_tasks_results) && rj.all_tasks_results.length > 0) {
+                    return 'all';
+                }
                 if (rj.sustained_summary?.task_type && typeof rj.sustained_summary.task_type === 'string') {
                     const t = rj.sustained_summary.task_type.trim().toLowerCase();
                     if (TASK_TYPE_META[t]) return t;
@@ -4557,6 +4774,25 @@
                 if (rj.matrix_summary?.task_type && typeof rj.matrix_summary.task_type === 'string') {
                     const t = rj.matrix_summary.task_type.trim().toLowerCase();
                     if (TASK_TYPE_META[t]) return t;
+                }
+                const pts = Array.isArray(rj.points) ? rj.points : (Array.isArray(rj) ? rj : []);
+                if (pts.length > 0) {
+                    const distinctTasks = new Set(pts.map(p => p?.task_type || p?.taskType).filter(Boolean));
+                    if (distinctTasks.size > 1) {
+                        return 'all';
+                    }
+                    if (pts.length >= 12) {
+                        let cycleCount = 0;
+                        let lastLen = -1;
+                        for (const p of pts) {
+                            const curLen = Number(p?.prompt_length ?? p?.promptLength);
+                            if (curLen <= lastLen && lastLen > 0) cycleCount++;
+                            lastLen = curLen;
+                        }
+                        if (cycleCount >= 3) {
+                            return 'all';
+                        }
+                    }
                 }
                 if (Array.isArray(rj.points) && rj.points.length > 0 && rj.points[0]?.task_type) {
                     const t = String(rj.points[0].task_type).trim().toLowerCase();
@@ -4572,6 +4808,9 @@
                 try { tags = JSON.parse(tags); } catch {}
             }
             if (Array.isArray(tags)) {
+                if (tags.some(t => typeof t === 'string' && (t === 'all_tasks' || t === 'all-tasks' || t.toLowerCase() === 'task:all'))) {
+                    return 'all';
+                }
                 for (const t of tags) {
                     if (typeof t === 'string') {
                         const match = t.match(/task[:=]([a-zA-Z0-9_]+)/i);
@@ -4581,6 +4820,10 @@
                         }
                     }
                 }
+            }
+            const notes = String(row.notes || '');
+            if (notes.includes('全场景') || notes.toLowerCase().includes('all tasks') || notes.toLowerCase().includes('all workloads')) {
+                return 'all';
             }
             return 'general';
         }
@@ -7464,6 +7707,8 @@
             if (currentQuantFilter && currentQuantFilter !== 'all') url.searchParams.set('quant', currentQuantFilter);
             if (currentEngineFilter && currentEngineFilter !== 'all') url.searchParams.set('engine', currentEngineFilter);
             if (currentConcurrencyFilter && currentConcurrencyFilter !== 'all') url.searchParams.set('c', currentConcurrencyFilter);
+            if (currentBenchmarkModeFilter && currentBenchmarkModeFilter !== 'all') url.searchParams.set('mode', currentBenchmarkModeFilter);
+            if (currentTaskTypeFilter && currentTaskTypeFilter !== 'all') url.searchParams.set('task', currentTaskTypeFilter);
             return url.toString();
         }
 
@@ -7754,10 +7999,14 @@
             currentQuantFilter = 'all';
             currentEngineFilter = 'all';
             currentConcurrencyFilter = 'all';
+            currentBenchmarkModeFilter = 'all';
+            currentTaskTypeFilter = 'all';
             document.querySelectorAll('#chipFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-chip') === 'all'));
             document.querySelectorAll('#quantFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-quant') === 'all'));
             document.querySelectorAll('#engineFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-engine') === 'all'));
             document.querySelectorAll('#concurrencyFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-c') === 'all'));
+            document.querySelectorAll('#modeFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-mode') === 'all'));
+            document.querySelectorAll('#taskFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-task') === 'all'));
 
             refreshModelTags();
             if (isMobileViewport()) setMobileFilterCollapsed(true);
@@ -7806,6 +8055,8 @@
             const quantParam = urlParams.get('quant');
             const engineParam = urlParams.get('engine');
             const concParam = urlParams.get('c');
+            const modeParam = urlParams.get('mode');
+            const taskParam = urlParams.get('task');
             const langParam = urlParams.get('lang');
 
             if (langParam === 'en' || langParam === 'zh-CN') {
@@ -7829,6 +8080,14 @@
             if (concParam) {
                 currentConcurrencyFilter = concParam;
                 document.querySelectorAll('#concurrencyFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-c') === concParam));
+            }
+            if (modeParam) {
+                currentBenchmarkModeFilter = modeParam;
+                document.querySelectorAll('#modeFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-mode') === modeParam));
+            }
+            if (taskParam) {
+                currentTaskTypeFilter = taskParam;
+                document.querySelectorAll('#taskFilterPills .filter-pill').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-task') === taskParam));
             }
 
             if (tabParam && ['pareto', 'radar', 'matrix', 'personal', 'contributors'].includes(tabParam)) {
@@ -8347,7 +8606,7 @@
                 let totalPages = 1;
                 let offset = (currentPage - 1) * currentPageSize;
 
-                const isSmartFiltering = (currentChipFilter !== 'all' || currentQuantFilter !== 'all' || currentEngineFilter !== 'all' || currentConcurrencyFilter !== 'all');
+                const isSmartFiltering = (currentChipFilter !== 'all' || currentQuantFilter !== 'all' || currentEngineFilter !== 'all' || currentConcurrencyFilter !== 'all' || currentBenchmarkModeFilter !== 'all' || currentTaskTypeFilter !== 'all');
 
                 if (isSmartFiltering) {
                     const allRows = await ensureAllDataLoaded();
@@ -8720,6 +8979,80 @@
                     </div>
                 </div>
             `;
+        }
+
+        function reconstructAllTasksList(rawResults, concurrency = 1) {
+            if (!Array.isArray(rawResults) || rawResults.length === 0) return [];
+            const ORDERED_TASKS = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
+
+            const hasTaskTypes = rawResults.some(r => r.task_type || r.taskType);
+            let taskGroups = {};
+
+            if (hasTaskTypes) {
+                rawResults.forEach(r => {
+                    const t = (r.task_type || r.taskType || 'general').toLowerCase();
+                    if (!taskGroups[t]) taskGroups[t] = [];
+                    taskGroups[t].push(r);
+                });
+            } else {
+                let currentCycle = 0;
+                let lastLen = -1;
+                rawResults.forEach(r => {
+                    const curLen = Number(r.prompt_length ?? r.promptLength ?? 0);
+                    if (curLen <= lastLen && lastLen > 0) {
+                        currentCycle++;
+                    }
+                    lastLen = curLen;
+                    const t = ORDERED_TASKS[currentCycle % ORDERED_TASKS.length];
+                    if (!taskGroups[t]) taskGroups[t] = [];
+                    taskGroups[t].push(r);
+                });
+            }
+
+            const taskKeys = Object.keys(taskGroups);
+            if (taskKeys.length <= 1) return [];
+
+            const allTasksList = [];
+            const sortedKeys = ORDERED_TASKS.filter(k => taskGroups[k]).concat(taskKeys.filter(k => !ORDERED_TASKS.includes(k)));
+
+            sortedKeys.forEach(k => {
+                const items = taskGroups[k];
+                if (!items || items.length === 0) return;
+                const validSpeeds = items.map(r => Number(r.output_speed ?? r.outputSpeed ?? r.decode_speed ?? r.decodeSpeed)).filter(n => Number.isFinite(n) && n > 0);
+                const avgSpeed = validSpeeds.length > 0 ? (validSpeeds.reduce((a, b) => a + b, 0) / validSpeeds.length) : 0;
+
+                const validTtfts = items.map(r => Number(r.avg_ttft_ms ?? r.avgTtftMs ?? r.prefill_time_ms ?? r.prefillTimeMs)).filter(n => Number.isFinite(n) && n > 0);
+                const avgTtft = validTtfts.length > 0 ? (validTtfts.reduce((a, b) => a + b, 0) / validTtfts.length) : 0;
+
+                const itlList = items.map(r => Number(r.avg_itl_mean ?? r.avgItlMean)).filter(n => Number.isFinite(n) && n > 0);
+                const avgItl = itlList.length > 0 ? (itlList.reduce((a, b) => a + b, 0) / itlList.length) : (avgSpeed > 0 ? 1000 / avgSpeed : 0);
+
+                const validE2e = items.map(r => Number(r.e2e_speed ?? r.e2eSpeed)).filter(n => Number.isFinite(n) && n > 0);
+                const avgE2e = validE2e.length > 0 ? (validE2e.reduce((a, b) => a + b, 0) / validE2e.length) : avgSpeed;
+
+                const totalTokens = items.reduce((sum, r) => sum + (Number(r.output_tokens ?? r.outputTokens) || 0), 0);
+                const conc = items[0]?.concurrency || concurrency || 1;
+                const streamSpeed = conc > 0 ? (avgSpeed / conc) : avgSpeed;
+
+                allTasksList.push({
+                    task_type: k,
+                    outputSpeed: avgSpeed.toFixed(2),
+                    steady_decode_tps: avgSpeed.toFixed(2),
+                    peakSpeed: (validSpeeds.length > 0 ? Math.max(...validSpeeds) : 0).toFixed(2),
+                    prefillTimeMs: avgTtft.toFixed(2),
+                    ttft_stats: { p50: avgTtft },
+                    itl_stats: { p50: avgItl },
+                    avgItlMean: avgItl.toFixed(1),
+                    outputTokens: totalTokens,
+                    effectiveConcurrency: `${conc}/${conc}`,
+                    concurrency: conc,
+                    e2eSpeed: avgE2e.toFixed(2),
+                    e2e_throughput_tps: avgE2e.toFixed(2),
+                    avgStreamDecodeSpeed: streamSpeed.toFixed(2),
+                    avg_stream_decode_tps: streamSpeed.toFixed(2)
+                });
+            });
+            return allTasksList;
         }
 
         window.highlightMatrixDetailRow = function(c, ctx, taskKey = null) {
@@ -9170,6 +9503,553 @@
             }
         }
 
+        window.switchLeaderboardSustainedTask = function(taskKey) {
+            window.activeLeaderboardSustainedTask = taskKey;
+            window.leaderboardSustainedViewMode = 'tabs';
+            const row = window.activeLeaderboardRow;
+            if (!row) return;
+            renderLeaderboardSustainedView(row);
+        };
+
+        window.toggleLeaderboardSustainedView = function(mode) {
+            window.leaderboardSustainedViewMode = mode;
+            const row = window.activeLeaderboardRow;
+            if (!row) return;
+            renderLeaderboardSustainedView(row);
+        };
+
+        window.showLeaderboardTaskNotice = function(clickedTaskKey, currentTestedTaskKey) {
+            const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
+            const meta = TASK_TYPE_META[clickedTaskKey] || TASK_TYPE_META.general;
+            const currentMeta = TASK_TYPE_META[currentTestedTaskKey] || TASK_TYPE_META.general;
+            const clickedName = isEn ? meta.fullEn : meta.fullZh;
+            const currentName = isEn ? currentMeta.fullEn : currentMeta.fullZh;
+            const msg = isEn
+                ? `💡 This benchmark record only tested [${currentName}]. To unlock and switch between all 6 question types, run "⚡ All Tasks Sequence" on the benchmark page!`
+                : `💡 该记录仅压测了【${currentName}】任务。如需在稳态排行榜中无缝切换 6 大题目类型，推荐在测速页面运行「⚡ 稳态全场景自动化序列」！`;
+            showToast(msg, 4500);
+        };
+
+        function renderLeaderboardSingleSustainedCard(taskKey, taskData, row, isEn, cardIndex = null, totalCards = null) {
+            const taskBadge = getTaskTypeBadgeHtml(taskKey, isEn);
+            const taskMeta = TASK_TYPE_META[taskKey] || TASK_TYPE_META.general;
+            const taskName = isEn ? taskMeta.fullEn : taskMeta.fullZh;
+
+            // 核心时长与速率指标解析
+            const rawDurMs = Number(taskData?.output_time_ms ?? taskData?.outputTimeMs);
+            const durationSec = rawDurMs > 0 
+                ? (rawDurMs / 1000)
+                : (row.notes && row.notes.includes('s') ? parseFloat(row.notes) : 30);
+            const sustainedTps = Number(taskData?.steady_decode_tps ?? taskData?.output_speed ?? taskData?.outputSpeed ?? row.max_decode_speed ?? row.avg_decode_speed) || 0;
+            const prefillSpeed = Number(taskData?.prefill_speed ?? taskData?.prefillSpeed ?? row.max_prefill_speed ?? row.avg_prefill_speed) || 0;
+            const totalTokens = taskData?.total_tokens ?? taskData?.outputTokens ?? taskData?.output_tokens ?? (Math.round(sustainedTps * durationSec) || '-');
+            const poolConcurrency = Number(taskData?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+            const completedStreams = Number(taskData?.successful ?? taskData?.completedStreams ?? poolConcurrency) || 1;
+            const effConc = taskData?.effective_concurrency ?? taskData?.effectiveConcurrency ?? row.results_json?.effective_concurrency ?? `${poolConcurrency}/${poolConcurrency}`;
+
+            // 端到端总吞吐与纯解码时长计算
+            const e2eSpeed = Number(taskData?.e2e_throughput_tps ?? taskData?.e2e_speed ?? taskData?.e2eSpeed) 
+                || (durationSec > 0 && Number(totalTokens) > 0 ? (Number(totalTokens) / durationSec) : sustainedTps);
+            const pureDecodeTimeSec = Number(taskData?.pure_decode_time_sec ?? taskData?.pureDecodeTimeSec) 
+                || (rawDurMs > 0 ? (rawDurMs / 1000) : durationSec);
+            const avgStreamTps = Number(taskData?.avg_stream_decode_tps ?? taskData?.avg_stream_decode_speed ?? taskData?.avgStreamDecodeSpeed) 
+                || (poolConcurrency > 0 ? (sustainedTps / poolConcurrency) : sustainedTps);
+
+            // 时延分位数与抖动统计 (Quantiles)
+            const q = taskData?.quantiles || row.results_json?.quantiles || {};
+            const tStats = taskData?.ttft_stats || {};
+            const ttftP50 = Number.isFinite(Number(tStats?.p50)) ? Number(tStats.p50).toFixed(1) 
+                : (Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) 
+                : (Number(taskData?.avg_ttft_ms ?? taskData?.avgTtftMs) ? Number(taskData.avg_ttft_ms ?? taskData.avgTtftMs).toFixed(1) : '-'));
+            const ttftP90 = Number.isFinite(Number(tStats?.p90)) ? Number(tStats.p90).toFixed(1) 
+                : (Number.isFinite(Number(q?.ttft?.p90)) ? Number(q.ttft.p90).toFixed(1) : '-');
+            const ttftP99 = Number.isFinite(Number(tStats?.p99)) ? Number(tStats.p99).toFixed(1) 
+                : (Number.isFinite(Number(q?.ttft?.p99)) ? Number(q.ttft.p99).toFixed(1) : '-');
+
+            const iStats = taskData?.itl_stats || {};
+            const itlP50 = Number.isFinite(Number(iStats?.p50)) ? Number(iStats.p50).toFixed(1) 
+                : (Number.isFinite(Number(q?.itl?.p50)) ? Number(q.itl.p50).toFixed(1) 
+                : (Number(taskData?.avg_itl_mean ?? taskData?.avgItlMean) ? Number(taskData.avg_itl_mean ?? taskData.avgItlMean).toFixed(1) : '-'));
+            const itlP90 = Number.isFinite(Number(iStats?.p90)) ? Number(iStats.p90).toFixed(1) 
+                : (Number.isFinite(Number(q?.itl?.p90)) ? Number(q.itl.p90).toFixed(1) : '-');
+            const itlP99 = Number.isFinite(Number(iStats?.p99)) ? Number(iStats.p99).toFixed(1) 
+                : (Number.isFinite(Number(q?.itl?.p99)) ? Number(q.itl.p99).toFixed(1) : '-');
+            const itlStd = Number.isFinite(Number(iStats?.std)) ? Number(iStats.std).toFixed(2) 
+                : (Number.isFinite(Number(taskData?.avg_itl_std ?? taskData?.avgItlStd)) ? Number(taskData.avg_itl_std ?? taskData.avgItlStd).toFixed(2) : '-');
+
+            // 看门狗与防作弊签名状态 (Watchdogs & Signature)
+            const watchdog = taskData?.watchdog || row.results_json?.watchdog || {};
+            const loopText = watchdog.loop_detected 
+                ? (isEn ? '<span style="color:#e06c75;">⚠️ Loop Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出死循环</span>') 
+                : (isEn ? '<span style="color:#98c379;">✅ No Loop Detected</span>' : '<span style="color:#98c379;">✅ 未检出死循环</span>');
+            const driftText = watchdog.cjk_drift_detected 
+                ? (isEn ? '<span style="color:#e06c75;">⚠️ CJK Drift Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出中文退化漂移</span>') 
+                : (isEn ? '<span style="color:#98c379;">✅ Language Output Normal</span>' : '<span style="color:#98c379;">✅ 语言输出正常</span>');
+            const verifInfo = row.results_json?.verification || {};
+            const verifText = verifInfo.hash 
+                ? (isEn ? `<span style="color:var(--accent-blue);">Certified Signature (${escapeHtml(verifInfo.hash)})</span>` : `<span style="color:var(--accent-blue);">已签名认证 (${escapeHtml(verifInfo.hash)})</span>`)
+                : (isEn ? 'Standard Verification Passed' : '标准校验通过');
+
+            // 标题与卡片国际化标签
+            const sustainedProfileTitle = isEn ? '⏱️ Sustained Decode Profile' : '⏱️ 稳态持续解码压测性能卡 (Sustained Decode Profile)';
+            const windowDurationText = durationSec > 0 ? (isEn ? durationSec.toFixed(1) + 's Benchmark Window' : durationSec.toFixed(1) + 's 实测窗口') : '';
+            const cardDecodeTps = isEn ? 'Sustained Decode (TPS)' : '稳态解码吞吐 (TPS)';
+            const cardE2eTps = isEn ? 'E2E Throughput (TPS)' : '端到端总吞吐 (TPS)';
+            const cardPrefillTps = isEn ? 'Prefill Speed (TPS)' : '预填充吞吐 (TPS)';
+            const cardTotalTokens = isEn ? 'Total Tokens Produced' : '产出总 Token';
+            const cardCompletedStreams = isEn ? 'Completed Streams' : '完成流数量';
+            const cardStreamPool = isEn ? 'Stream Pool Size' : '并发流池规模';
+            const reportTitle = isEn ? '🎯 Sustained Decode Benchmark Report' : '🎯 稳态持续解码评测详报';
+
+            // 提取并发流明细列表 (Concurrent Streams Breakdown)
+            const rawStreams = Array.isArray(taskData?.concurrent_details) && taskData.concurrent_details.length > 0
+                ? taskData.concurrent_details
+                : (Array.isArray(taskData?.concurrentDetails) && taskData.concurrentDetails.length > 0 
+                    ? taskData.concurrentDetails 
+                    : (Array.isArray(row.results_json?.points) && row.results_json.points.length > 1 ? row.results_json.points : []));
+            
+            let streamRows = [];
+            if (rawStreams.length > 0) {
+                streamRows = rawStreams.map((st, idx) => {
+                    const outTps = Number(st.output_speed ?? st.outputSpeed ?? st.decode_tps ?? avgStreamTps) || avgStreamTps;
+                    const prefTps = Number(st.prefill_speed ?? st.prefillSpeed) || (prefillSpeed > 0 ? prefillSpeed : '-');
+                    const tokens = Number(st.output_tokens ?? st.outputTokens ?? st.tokens) 
+                        || (completedStreams > 0 && Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-');
+                    const ttft = Number.isFinite(Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms)) 
+                        ? Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms).toFixed(1) 
+                        : ttftP50;
+                    const itl = Number.isFinite(Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean)) 
+                        ? Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean).toFixed(1) 
+                        : itlP50;
+                    const dur = Number(st.output_time_ms ?? st.outputTimeMs) > 0 
+                        ? (Number(st.output_time_ms ?? st.outputTimeMs) / 1000).toFixed(2) + 's' 
+                        : (durationSec > 0 ? durationSec.toFixed(1) + 's' : '-');
+                    return {
+                        id: st.stream_id || (idx + 1),
+                        outTps: typeof outTps === 'number' ? outTps.toFixed(1) : outTps,
+                        prefTps: typeof prefTps === 'number' ? prefTps.toFixed(1) : prefTps,
+                        tokens,
+                        ttft,
+                        itl,
+                        duration: dur,
+                        status: st.status || (isEn ? 'Passed' : '正常通过')
+                    };
+                });
+            } else if (completedStreams > 0) {
+                const perStreamTokens = Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-';
+                const streamCount = Math.min(completedStreams, 16);
+                for (let i = 0; i < streamCount; i++) {
+                    streamRows.push({
+                        id: i + 1,
+                        outTps: avgStreamTps > 0 ? avgStreamTps.toFixed(1) : sustainedTps.toFixed(1),
+                        prefTps: prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A',
+                        tokens: perStreamTokens,
+                        ttft: ttftP50,
+                        itl: itlP50,
+                        duration: durationSec.toFixed(1) + 's',
+                        status: isEn ? 'Passed' : '正常通过'
+                    });
+                }
+            }
+
+            const streamTableRowsHtml = streamRows.map(st => `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:7px 10px; font-weight:600; color:#61afef;">#${st.id}</td>
+                    <td style="padding:7px 10px; font-weight:bold; color:#e5c07b;">${st.tokens}</td>
+                    <td style="padding:7px 10px; font-family:monospace; color:#61afef;">${st.ttft !== '-' ? `${st.ttft}ms` : '-'}</td>
+                    <td style="padding:7px 10px; font-family:monospace; color:#e5c07b;">${st.itl !== '-' ? `${st.itl}ms` : '-'}</td>
+                    <td style="padding:7px 10px; font-weight:bold; color:#c678dd;">${st.outTps} <span style="font-size:10px; font-weight:normal;">t/s</span></td>
+                    <td style="padding:7px 10px; color:#98c379;">${st.prefTps !== '-' && st.prefTps !== 'N/A' ? `${st.prefTps} t/s` : (st.prefTps || '-')}</td>
+                    <td style="padding:7px 10px; font-family:monospace; color:var(--text-muted);">${st.duration}</td>
+                    <td style="padding:7px 10px; color:#98c379;">${st.status.includes('Passed') || st.status.includes('通过') || st.status.includes('成功') ? '✅ ' + escapeHtml(st.status) : escapeHtml(st.status)}</td>
+                </tr>
+            `).join('');
+
+            const streamAccordionHtml = streamRows.length > 0 ? `
+                <details class="detail-matrix-accordion" open style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:20px; overflow:hidden;">
+                    <summary style="padding:12px 16px; cursor:pointer; font-weight:600; color:var(--accent-blue); background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; user-select:none;">
+                        <span style="display:inline-flex; align-items:center; gap:8px;">
+                            <span class="detail-command-arrow">▶</span>
+                            <span style="color:var(--accent-green);">📋</span>
+                            <span>${isEn ? 'Concurrent Streams & Request Breakdown Table' : '并发流与请求测试明细表 (Streams Breakdown)'}</span>
+                        </span>
+                        <span style="font-size:12px; color:var(--text-muted); font-weight:normal;">${isEn ? `Total ${streamRows.length} streams` : `共 ${streamRows.length} 个流记录`}</span>
+                    </summary>
+                    <div style="padding:12px; overflow-x:auto;">
+                        <table class="leaderboard-table" style="width:100%; font-size:12px; text-align:center; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:rgba(255,255,255,0.04); color:var(--text-muted);">
+                                    <th style="padding:8px 10px;">${isEn ? 'Stream #' : '流序号'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'Tokens' : '产出 Token'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'TTFT (ms)' : '首字时延 (TTFT)'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'ITL Jitter (ms)' : '单字间隔 (ITL)'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'Decode TPS' : '纯解码吞吐'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'Prefill TPS' : '预填充吞吐'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'Duration' : '单流耗时'}</th>
+                                    <th style="padding:8px 10px;">${isEn ? 'Status' : '执行状态'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${streamTableRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            ` : '';
+
+            // Card Header: Stacked Mode or Single Mode
+            const cardHeaderHtml = cardIndex && totalCards ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="background:rgba(255,255,255,0.1); color:#cbd5e1; font-size:11px; padding:2px 7px; border-radius:4px; font-weight:600;">${isEn ? `Workload ${cardIndex}/${totalCards}` : `评测场景 ${cardIndex}/${totalCards}`}</span>
+                        ${taskBadge}
+                        <span style="font-weight:600; color:#f8fafc; font-size:15px;">${escapeHtml(taskName)}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        ${sustainedTps > 0 ? `<span style="font-size:12px; color:#10b981; font-weight:bold;">⚡ ${sustainedTps.toFixed(1)} t/s</span>` : ''}
+                        <button type="button" style="background:#10b981; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;" onclick="switchLeaderboardSustainedTask('${taskKey}')">${isEn ? 'View Single Tab' : '切换到该单项'}</button>
+                    </div>
+                </div>
+            ` : `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <h3 style="margin:0; color:var(--accent-blue); font-size:16px;">${sustainedProfileTitle}</h3>
+                        ${taskBadge}
+                    </div>
+                    <div style="font-family:monospace; font-size:13px; color:var(--text-muted);">${windowDurationText}</div>
+                </div>
+            `;
+
+            return `
+                <div class="sustained-task-card" style="margin-bottom:24px; border:1px solid ${cardIndex ? 'rgba(16,185,129,0.35)' : 'transparent'}; border-radius:8px; padding:${cardIndex ? '16px' : '0'}; background:${cardIndex ? 'rgba(15,23,42,0.45)' : 'transparent'};">
+                    <!-- 1. 顶部 6 项关键性能看板卡片 (Top 6 Metric Cards Dashboard) -->
+                    <div class="sustained-live-dashboard" style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;">
+                        ${cardHeaderHtml}
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardDecodeTps}</div>
+                                <div style="font-size:24px; font-weight:bold; color:var(--accent-green); margin-top:4px;">${sustainedTps.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Excl. prefill' : '纯解码稳态'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardE2eTps}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#61afef; margin-top:4px;">${e2eSpeed.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Incl. prefill & queue' : '端到端总吞吐'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardPrefillTps}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#98c379; margin-top:4px;">${prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A'} <span style="font-size:12px; font-weight:normal;">${prefillSpeed > 0 ? 't/s' : ''}</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Prompt prefill' : '提示词预填充'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardTotalTokens}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#e5c07b; margin-top:4px;">${totalTokens}</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Tokens generated' : '已产出 Token'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardCompletedStreams}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#d19a66; margin-top:4px;">${completedStreams}</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Streams finished' : '已完成并发流'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardStreamPool}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#c678dd; margin-top:4px;">${poolConcurrency}x</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Stream pool size' : '并发流池规模'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. 时延与单字抖动质量分析看板 (Latency & Jitter Quality Panels) -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:20px;">
+                        <!-- 首字时延 TTFT 分布卡片 -->
+                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(97,175,239,0.25); border-radius:8px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <strong style="color:#61afef; font-size:14px;">⏱️ ${isEn ? 'TTFT Latency Distribution' : '首字时延 (TTFT) 分布'}</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">${isEn ? 'Time to First Token' : '首字响应时延'}</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 单字间隔 ITL Jitter 抖动分布卡片 -->
+                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(229,192,123,0.25); border-radius:8px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <strong style="color:#e5c07b; font-size:14px;">📊 ${isEn ? 'ITL Jitter Distribution' : '单字间隔抖动 (ITL Jitter)'}</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">${itlStd !== '-' ? `σ: ${itlStd}ms` : (isEn ? 'Inter-Token Latency' : '流式字间间隔')}</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. 并发流与请求测试明细表 (Streams Breakdown Table) -->
+                    ${streamAccordionHtml}
+
+                    <!-- 4. 稳态压测详报与防作弊看门狗卡片 (Benchmark Report & Watchdogs) -->
+                    <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:18px; margin-bottom:20px; font-size:13px; line-height:1.9;">
+                        <h4 style="margin:0 0 14px 0; color:var(--accent-green); font-size:15px;">${reportTitle}</h4>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:10px; margin-bottom:14px;">
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Workload Scenario' : '评测任务场景'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${taskBadge} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(${escapeHtml(taskName)})</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Window & Pure Decode Time' : '实测窗口与纯解码耗时'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${durationSec.toFixed(1)}s <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(纯解码: ${pureDecodeTimeSec.toFixed(2)}s)</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Effective Scheduling Concurrency' : '有效调度并发与流池规模'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:var(--accent-blue);">${effConc} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(流池: ${poolConcurrency}x 并发)</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Single-Stream Pure Decode Rate' : '单流纯解码平均速率'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#98c379;">${avgStreamTps.toFixed(2)} tokens/s</div>
+                            </div>
+                        </div>
+                        <div style="color:var(--text-main); font-size:13px; line-height:1.9; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
+                            • <strong>${isEn ? 'Anti-Cheating Watchdogs: ' : '防作弊守卫看门狗：'}</strong>${loopText} ｜ ${driftText}<br>
+                            • <strong>${isEn ? 'Digital Verification Checksum: ' : '数字防伪指纹认证：'}</strong>${verifText}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLeaderboardSustainedView(row) {
+            const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
+            const dataContainer = document.getElementById('modalDataContainer');
+            const chartsGrid = document.querySelector('.charts-grid');
+            const radarSection = document.getElementById('modalRadarSection');
+
+            if (chartsGrid) chartsGrid.style.display = 'none';
+            ['prefill', 'decode', 'ttft', 'itl'].forEach(k => {
+                if (charts[k]) { charts[k].destroy(); delete charts[k]; }
+            });
+            if (radarSection) radarSection.style.display = 'none';
+
+            // 1. 测速备注展示卡片 (Notes Banner)
+            const notesText = row.notes ? escapeHtml(row.notes) : (isEn ? 'No notes provided' : '无用户备注');
+            const notesHtml = `
+                <div class="modal-notes-banner" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); padding:10px 14px; border-radius:6px; color:#98c379; font-size:13px; font-weight:500; margin-bottom:16px; display:flex; align-items:flex-start; gap:8px;">
+                    <span style="font-size:16px; line-height:1;">📝</span>
+                    <div style="flex:1;">
+                        <strong style="color:#61afef;">${isEn ? 'Benchmark Notes / Configuration:' : '测速备注 / 配置说明:'}</strong>
+                        <span style="color:#e2e8f0; margin-left:6px; word-break:break-word;">${notesText}</span>
+                    </div>
+                </div>
+            `;
+
+            // 启动命令展示
+            const runCommandText = row.run_command ? escapeHtml(row.run_command) : '';
+            const runCommandHtml = runCommandText ? `
+                <details class="detail-command-accordion" ontoggle="handleDetailCommandToggle(this)">
+                    <summary>
+                        <span style="display:inline-flex; align-items:center; gap:8px;">
+                            <span class="detail-command-arrow">▶</span>
+                            <span style="color:var(--accent-yellow);">⚡</span>
+                            <span data-translate-skip="true" data-detail-command-label="true">${isEn ? 'Run Command' : '启动命令'}</span>
+                            <span style="font-size:12px; color:var(--text-muted); font-weight:normal;" data-detail-command-hint="true">${isEn ? '(Click to expand)' : '(点击展开)'}</span>
+                        </span>
+                        <button type="button" class="btn-run-command" onclick="copyDetailRunCommand(event, this)" data-copy-command-btn="true" data-run-command="${encodeURIComponent(row.run_command)}" style="font-size:11px; padding:2px 8px;">${isEn ? 'Copy Command' : '复制命令'}</button>
+                    </summary>
+                    <div class="detail-command-body">
+                        <pre class="run-command-block" data-translate-skip="true">${runCommandText}</pre>
+                    </div>
+                </details>
+            ` : '';
+
+            // 2. 收集该记录包含的所有测试题目类型 (Multi-Task Workloads Discovery)
+            const allTasksList = row.results_json?.all_tasks_comparison 
+                || row.results_json?.all_tasks_results 
+                || row.all_tasks_comparison 
+                || null;
+
+            const tasksMap = {};
+            if (Array.isArray(allTasksList) && allTasksList.length > 0) {
+                allTasksList.forEach(t => {
+                    const k = (t.task_type || t.taskType || 'general').toLowerCase();
+                    tasksMap[k] = t;
+                });
+            }
+
+            const points = Array.isArray(row.results_json?.points)
+                ? row.results_json.points
+                : (Array.isArray(row.results_json) ? row.results_json : []);
+            points.forEach((p, idx) => {
+                const k = (p.task_type || p.taskType || (idx === 0 ? extractRowTaskType(row) : null))?.toLowerCase();
+                if (k && !tasksMap[k]) {
+                    tasksMap[k] = p;
+                }
+            });
+
+            const rowTaskType = (extractRowTaskType(row) || 'general').toLowerCase();
+            if (rowTaskType !== 'all' && !tasksMap[rowTaskType]) {
+                tasksMap[rowTaskType] = points[0] || row.results_json?.sustained_summary || {};
+            }
+
+            const ORDERED_TASKS = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
+            const discoveredKeys = Object.keys(tasksMap);
+            let availableTasks = ORDERED_TASKS.filter(k => tasksMap[k]).concat(discoveredKeys.filter(k => !ORDERED_TASKS.includes(k)));
+            if (availableTasks.length === 0) {
+                availableTasks = [rowTaskType || 'general'];
+                if (!tasksMap[availableTasks[0]]) {
+                    tasksMap[availableTasks[0]] = points[0] || row.results_json?.sustained_summary || {};
+                }
+            }
+
+            if (!window.activeLeaderboardSustainedTask || !tasksMap[window.activeLeaderboardSustainedTask]) {
+                window.activeLeaderboardSustainedTask = availableTasks[0];
+            }
+            const currentTask = window.activeLeaderboardSustainedTask;
+            const currentTaskData = tasksMap[currentTask] || {};
+
+            // 3. 更新详情弹窗副标题栏 (Modal Subtitle)
+            const detailVerif = getVerificationBadgeInfo(row);
+            const currentTaskBadge = getTaskTypeBadgeHtml(currentTask, isEn);
+            const sPoint = points[0] || row.results_json?.sustained_summary || currentTaskData;
+            const poolConc = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+            const displayConcurrency = `${poolConc}x (${isEn ? 'Stream Pool' : '并发流池'})`;
+            const modeSubtitleLabel = `<span style="background:rgba(16,185,129,0.25); color:#10b981; border:1px solid rgba(16,185,129,0.5); padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:600;">${isEn ? '⏱️ Sustained Decode Benchmark' : '⏱️ 稳态持续解码压测'}</span>`;
+
+            document.getElementById('modalSubtitle').innerHTML = isEn
+                ? `Hardware: ${escapeHtml(row.hardware)} | Engine: ${escapeHtml(row.framework || '-')} | Concurrency: ${displayConcurrency} | Timestamp: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${currentTaskBadge}`
+                : `硬件: ${escapeHtml(row.hardware)} | 框架: ${escapeHtml(row.framework || '-')} | 并发: ${displayConcurrency} | 记录时间: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${currentTaskBadge}`;
+
+            // 4. 构建题目类型导航切换栏 (Tabs Bar)
+            const isStacked = (window.leaderboardSustainedViewMode === 'stacked');
+            const hasMultipleTasks = availableTasks.length > 1;
+
+            let tabsButtonsHtml = '';
+            if (hasMultipleTasks) {
+                tabsButtonsHtml = availableTasks.map(taskKey => {
+                    const meta = TASK_TYPE_META[taskKey] || TASK_TYPE_META.general;
+                    const tName = isEn ? meta.fullEn : meta.fullZh;
+                    const tData = tasksMap[taskKey] || {};
+                    const taskTps = Number(tData?.steady_decode_tps ?? tData?.output_speed ?? tData?.outputSpeed ?? 0);
+                    const isActive = (taskKey === currentTask && !isStacked);
+
+                    return `
+                        <button type="button" class="lb-sustained-tab-btn" 
+                            onclick="switchLeaderboardSustainedTask('${taskKey}')"
+                            style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.2s ease; border:1px solid ${isActive ? '#10b981' : 'rgba(255,255,255,0.12)'}; background:${isActive ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.04)'}; color:${isActive ? '#34d399' : '#cbd5e1'}; font-weight:${isActive ? '600' : 'normal'};">
+                            <span>${getTaskTypeBadgeHtml(taskKey, isEn)}</span>
+                            <span>${tName}</span>
+                            ${taskTps > 0 ? `<span style="font-size:10px; background:rgba(16,185,129,0.25); color:#10b981; padding:1px 5px; border-radius:3px; margin-left:2px; font-weight:bold;">⚡ ${taskTps.toFixed(1)} t/s</span>` : ''}
+                        </button>
+                    `;
+                }).join('');
+            } else {
+                const testedKey = availableTasks[0];
+                const testedData = tasksMap[testedKey] || {};
+                const testedTps = Number(testedData?.steady_decode_tps ?? testedData?.output_speed ?? testedData?.outputSpeed ?? row.max_decode_speed ?? row.avg_decode_speed ?? 0);
+
+                tabsButtonsHtml = ORDERED_TASKS.map(taskKey => {
+                    const meta = TASK_TYPE_META[taskKey] || TASK_TYPE_META.general;
+                    const tName = isEn ? meta.fullEn : meta.fullZh;
+                    const isTested = (taskKey === testedKey);
+
+                    if (isTested) {
+                        return `
+                            <button type="button" class="lb-sustained-tab-btn active" 
+                                onclick="switchLeaderboardSustainedTask('${taskKey}')"
+                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid #10b981; background:rgba(16, 185, 129, 0.25); color:#34d399; font-weight:600;">
+                                <span>${getTaskTypeBadgeHtml(taskKey, isEn)}</span>
+                                <span>${tName}</span>
+                                <span style="font-size:10px; background:rgba(16,185,129,0.25); color:#10b981; padding:1px 5px; border-radius:3px; font-weight:bold;">⚡ ${testedTps.toFixed(1)} t/s (${isEn ? 'Tested' : '当前实测'})</span>
+                            </button>
+                        `;
+                    } else {
+                        return `
+                            <button type="button" class="lb-sustained-tab-btn disabled" 
+                                onclick="showLeaderboardTaskNotice('${taskKey}', '${testedKey}')"
+                                title="${isEn ? 'Not included in this single-workload run. Click for tips.' : '当前记录仅压测了单一场景，点击了解如何解锁全场景对比'}"
+                                style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; border:1px dashed rgba(255,255,255,0.15); background:rgba(255,255,255,0.02); color:#64748b; opacity:0.65;">
+                                <span style="filter:grayscale(80%);">${getTaskTypeBadgeHtml(taskKey, isEn)}</span>
+                                <span>${tName}</span>
+                                <span style="font-size:10px; color:#64748b;">🔒</span>
+                            </button>
+                        `;
+                    }
+                }).join('');
+            }
+
+            const viewToggleHtml = hasMultipleTasks ? `
+                <div style="display:flex; gap:6px;">
+                    <button type="button" onclick="toggleLeaderboardSustainedView('tabs')" style="background:${!isStacked ? '#10b981' : 'rgba(255,255,255,0.06)'}; color:${!isStacked ? '#fff' : '#cbd5e1'}; border:1px solid ${!isStacked ? '#34d399' : 'rgba(255,255,255,0.15)'}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">📑 ${isEn ? 'Tabs View' : '单项标签'}</button>
+                    <button type="button" onclick="toggleLeaderboardSustainedView('stacked')" style="background:${isStacked ? '#10b981' : 'rgba(255,255,255,0.06)'}; color:${isStacked ? '#fff' : '#cbd5e1'}; border:1px solid ${isStacked ? '#34d399' : 'rgba(255,255,255,0.15)'}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">📜 ${isEn ? 'Expand All Tasks' : '连续全景'}</button>
+                </div>
+            ` : `
+                <div style="font-size:11px; color:#a7f3d0; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); padding:3px 8px; border-radius:4px;">
+                    💡 ${isEn ? 'Single-Workload Benchmark Record' : '单任务场景独立压测记录'}
+                </div>
+            `;
+
+            const tabsBarHtml = `
+                <div id="leaderboardSustainedTabsBar" style="margin-bottom:16px; padding:12px; background:rgba(20, 28, 40, 0.85); border:1px solid rgba(16,185,129,0.3); border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                        <span style="font-size:13px; font-weight:600; color:#34d399; display:flex; align-items:center; gap:6px;">
+                            ⏱️ ${isEn ? 'Workload Question Type Navigation & Multi-Task Switcher:' : '稳态评测题目类型切换与多场景导航 (Workload Tasks Switcher):'}
+                        </span>
+                        ${viewToggleHtml}
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        ${tabsButtonsHtml}
+                    </div>
+                </div>
+            `;
+
+            // 5. 构建主展示区内容 (Main View Assembly)
+            let mainViewHtml = '';
+            if (isStacked && hasMultipleTasks) {
+                mainViewHtml = availableTasks.map((tKey, idx) => {
+                    return renderLeaderboardSingleSustainedCard(tKey, tasksMap[tKey], row, isEn, idx + 1, availableTasks.length);
+                }).join('');
+            } else {
+                mainViewHtml = renderLeaderboardSingleSustainedCard(currentTask, currentTaskData, row, isEn);
+            }
+
+            // 6. 全场景对比表 (若有 allTasksList)
+            const comparisonHtml = (allTasksList && allTasksList.length > 0)
+                ? buildAllTasksComparisonHtml(allTasksList, isEn, poolConcurrency)
+                : '';
+
+            dataContainer.innerHTML = `
+                ${notesHtml}
+                ${runCommandHtml}
+                ${tabsBarHtml}
+                ${mainViewHtml}
+                ${comparisonHtml}
+            `;
+
+            if (currentPageLanguage === PAGE_LANGUAGE.EN) {
+                schedulePageTranslation();
+            }
+        }
+
         async function viewDetails(id) {
             let row = resultsDataMap[id];
             if (!row) return;
@@ -9281,301 +10161,10 @@
             // Mode Branch 2: Sustained Decode (稳态持续解码压测性能详报)
             // =========================================================================
             if (mode === 'sustained_decode') {
-                if (chartsGrid) chartsGrid.style.display = 'none';
-                ['prefill', 'decode', 'ttft', 'itl'].forEach(k => {
-                    if (charts[k]) { charts[k].destroy(); delete charts[k]; }
-                });
-
-                // 提取稳态测试汇总数据点 (sPoint)
-                const sPoint = (Array.isArray(row.results_json?.points) && row.results_json.points.length > 0)
-                    ? row.results_json.points[0]
-                    : (Array.isArray(row.results_json) && row.results_json.length > 0 ? row.results_json[0] : (row.results_json?.sustained_summary || {}));
-                
-                // 核心时长与速率指标解析
-                const durationSec = Number(sPoint?.output_time_ms ?? sPoint?.outputTimeMs) > 0 
-                    ? (Number(sPoint.output_time_ms ?? sPoint.outputTimeMs) / 1000)
-                    : (row.notes && row.notes.includes('s') ? parseFloat(row.notes) : 30);
-                const sustainedTps = Number(sPoint?.output_speed ?? sPoint?.outputSpeed ?? row.max_decode_speed ?? row.avg_decode_speed) || 0;
-                const prefillSpeed = Number(sPoint?.prefill_speed ?? sPoint?.prefillSpeed ?? row.max_prefill_speed ?? row.avg_prefill_speed) || 0;
-                const totalTokens = sPoint?.outputTokens ?? sPoint?.output_tokens ?? sPoint?.total_tokens ?? (Math.round(sustainedTps * durationSec) || '-');
-                const completedStreams = Number(sPoint?.successful ?? sPoint?.completedStreams ?? row.concurrency) || 1;
-                const poolConcurrency = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
-                const effConc = sPoint?.effective_concurrency ?? row.results_json?.effective_concurrency ?? `${poolConcurrency}/${poolConcurrency}`;
-                
-                // 端到端总吞吐与纯解码时长计算
-                const e2eSpeed = Number(sPoint?.e2e_speed ?? sPoint?.e2eSpeed) 
-                    || (durationSec > 0 && Number(totalTokens) > 0 ? (Number(totalTokens) / durationSec) : sustainedTps);
-                const pureDecodeTimeSec = Number(sPoint?.pure_decode_time_sec ?? sPoint?.pureDecodeTimeSec) 
-                    || (Number(sPoint?.output_time_ms ?? sPoint?.outputTimeMs) > 0 ? (Number(sPoint.output_time_ms ?? sPoint.outputTimeMs) / 1000) : durationSec);
-                const avgStreamTps = Number(sPoint?.avg_stream_decode_speed ?? sPoint?.avgStreamDecodeSpeed) 
-                    || (poolConcurrency > 0 ? (sustainedTps / poolConcurrency) : sustainedTps);
-                
-                // 时延分位数与抖动统计 (Quantiles)
-                const q = row.results_json?.quantiles || {};
-                const ttftP50 = Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) : (Number(sPoint?.avg_ttft_ms ?? sPoint?.avgTtftMs) ? Number(sPoint.avg_ttft_ms ?? sPoint.avgTtftMs).toFixed(1) : '-');
-                const ttftP90 = Number.isFinite(Number(q?.ttft?.p90)) ? Number(q.ttft.p90).toFixed(1) : '-';
-                const ttftP99 = Number.isFinite(Number(q?.ttft?.p99)) ? Number(q.ttft.p99).toFixed(1) : '-';
-                
-                const itlP50 = Number.isFinite(Number(q?.itl?.p50)) ? Number(q.itl.p50).toFixed(1) : (Number(sPoint?.avg_itl_mean ?? sPoint?.avgItlMean) ? Number(sPoint.avg_itl_mean ?? sPoint.avgItlMean).toFixed(1) : '-');
-                const itlP90 = Number.isFinite(Number(q?.itl?.p90)) ? Number(q.itl.p90).toFixed(1) : '-';
-                const itlP99 = Number.isFinite(Number(q?.itl?.p99)) ? Number(q.itl.p99).toFixed(1) : '-';
-                const itlStd = Number.isFinite(Number(sPoint?.avg_itl_std ?? sPoint?.avgItlStd)) ? Number(sPoint.avg_itl_std ?? sPoint.avgItlStd).toFixed(2) : '-';
-                
-                // 看门狗与防作弊签名状态 (Watchdogs & Signature)
-                const watchdog = row.results_json?.watchdog || {};
-                const loopText = watchdog.loop_detected 
-                    ? (isEn ? '<span style="color:#e06c75;">⚠️ Loop Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出死循环</span>') 
-                    : (isEn ? '<span style="color:#98c379;">✅ No Loop Detected</span>' : '<span style="color:#98c379;">✅ 未检出死循环</span>');
-                const driftText = watchdog.cjk_drift_detected 
-                    ? (isEn ? '<span style="color:#e06c75;">⚠️ CJK Drift Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出中文退化漂移</span>') 
-                    : (isEn ? '<span style="color:#98c379;">✅ Language Output Normal</span>' : '<span style="color:#98c379;">✅ 语言输出正常</span>');
-                const verifInfo = row.results_json?.verification || {};
-                const verifText = verifInfo.hash 
-                    ? (isEn ? `<span style="color:var(--accent-blue);">Certified Signature (${escapeHtml(verifInfo.hash)})</span>` : `<span style="color:var(--accent-blue);">已签名认证 (${escapeHtml(verifInfo.hash)})</span>`)
-                    : (isEn ? 'Standard Verification Passed' : '标准校验通过');
-
-                // 标题与卡片国际化标签
-                const sustainedProfileTitle = isEn ? '⏱️ Sustained Decode Profile' : '⏱️ 稳态持续解码压测性能卡 (Sustained Decode Profile)';
-                const windowDurationText = durationSec > 0 ? (isEn ? durationSec.toFixed(1) + 's Benchmark Window' : durationSec.toFixed(1) + 's 实测窗口') : '';
-                const cardDecodeTps = isEn ? 'Sustained Decode (TPS)' : '稳态解码吞吐 (TPS)';
-                const cardE2eTps = isEn ? 'E2E Throughput (TPS)' : '端到端总吞吐 (TPS)';
-                const cardPrefillTps = isEn ? 'Prefill Speed (TPS)' : '预填充吞吐 (TPS)';
-                const cardTotalTokens = isEn ? 'Total Tokens Produced' : '产出总 Token';
-                const cardCompletedStreams = isEn ? 'Completed Streams' : '完成流数量';
-                const cardStreamPool = isEn ? 'Stream Pool Size' : '并发流池规模';
-                const reportTitle = isEn ? '🎯 Sustained Decode Benchmark Report' : '🎯 稳态持续解码评测详报';
-
-                // 提取并发流明细列表 (Concurrent Streams Breakdown)
-                const rawStreams = Array.isArray(sPoint?.concurrent_details) && sPoint.concurrent_details.length > 0
-                    ? sPoint.concurrent_details
-                    : (Array.isArray(sPoint?.concurrentDetails) && sPoint.concurrentDetails.length > 0 
-                        ? sPoint.concurrentDetails 
-                        : (Array.isArray(row.results_json?.points) && row.results_json.points.length > 1 ? row.results_json.points : []));
-                
-                let streamRows = [];
-                if (rawStreams.length > 0) {
-                    streamRows = rawStreams.map((st, idx) => {
-                        const outTps = Number(st.output_speed ?? st.outputSpeed ?? st.decode_tps ?? avgStreamTps) || avgStreamTps;
-                        const prefTps = Number(st.prefill_speed ?? st.prefillSpeed) || (prefillSpeed > 0 ? prefillSpeed : '-');
-                        const tokens = Number(st.output_tokens ?? st.outputTokens ?? st.tokens) 
-                            || (completedStreams > 0 && Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-');
-                        const ttft = Number.isFinite(Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms)) 
-                            ? Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms).toFixed(1) 
-                            : ttftP50;
-                        const itl = Number.isFinite(Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean)) 
-                            ? Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean).toFixed(1) 
-                            : itlP50;
-                        const dur = Number(st.output_time_ms ?? st.outputTimeMs) > 0 
-                            ? (Number(st.output_time_ms ?? st.outputTimeMs) / 1000).toFixed(2) + 's' 
-                            : (durationSec > 0 ? durationSec.toFixed(1) + 's' : '-');
-                        return {
-                            id: st.stream_id || (idx + 1),
-                            outTps: typeof outTps === 'number' ? outTps.toFixed(1) : outTps,
-                            prefTps: typeof prefTps === 'number' ? prefTps.toFixed(1) : prefTps,
-                            tokens,
-                            ttft,
-                            itl,
-                            duration: dur,
-                            status: st.status || (isEn ? 'Passed' : '正常通过')
-                        };
-                    });
-                } else if (completedStreams > 0) {
-                    const perStreamTokens = Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-';
-                    const streamCount = Math.min(completedStreams, 16);
-                    for (let i = 0; i < streamCount; i++) {
-                        streamRows.push({
-                            id: i + 1,
-                            outTps: avgStreamTps > 0 ? avgStreamTps.toFixed(1) : sustainedTps.toFixed(1),
-                            prefTps: prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A',
-                            tokens: perStreamTokens,
-                            ttft: ttftP50,
-                            itl: itlP50,
-                            duration: durationSec.toFixed(1) + 's',
-                            status: isEn ? 'Passed' : '正常通过'
-                        });
-                    }
-                }
-
-                // 渲染并发流测试明细表格行
-                const streamTableRowsHtml = streamRows.map(st => `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <td style="padding:7px 10px; font-weight:600; color:#61afef;">#${st.id}</td>
-                        <td style="padding:7px 10px; font-weight:bold; color:#e5c07b;">${st.tokens}</td>
-                        <td style="padding:7px 10px; font-family:monospace; color:#61afef;">${st.ttft !== '-' ? `${st.ttft}ms` : '-'}</td>
-                        <td style="padding:7px 10px; font-family:monospace; color:#e5c07b;">${st.itl !== '-' ? `${st.itl}ms` : '-'}</td>
-                        <td style="padding:7px 10px; font-weight:bold; color:#c678dd;">${st.outTps} <span style="font-size:10px; font-weight:normal;">t/s</span></td>
-                        <td style="padding:7px 10px; color:#98c379;">${st.prefTps !== '-' && st.prefTps !== 'N/A' ? `${st.prefTps} t/s` : (st.prefTps || '-')}</td>
-                        <td style="padding:7px 10px; font-family:monospace; color:var(--text-muted);">${st.duration}</td>
-                        <td style="padding:7px 10px; color:#98c379;">${st.status.includes('Passed') || st.status.includes('通过') || st.status.includes('成功') ? '✅ ' + escapeHtml(st.status) : escapeHtml(st.status)}</td>
-                    </tr>
-                `).join('');
-
-                const streamAccordionHtml = streamRows.length > 0 ? `
-                    <details class="detail-matrix-accordion" open style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:20px; overflow:hidden;">
-                        <summary style="padding:12px 16px; cursor:pointer; font-weight:600; color:var(--accent-blue); background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; user-select:none;">
-                            <span style="display:inline-flex; align-items:center; gap:8px;">
-                                <span class="detail-command-arrow">▶</span>
-                                <span style="color:var(--accent-green);">📋</span>
-                                <span>${isEn ? 'Concurrent Streams & Request Breakdown Table' : '并发流与请求测试明细表 (Streams Breakdown)'}</span>
-                            </span>
-                            <span style="font-size:12px; color:var(--text-muted); font-weight:normal;">${isEn ? `Total ${streamRows.length} streams` : `共 ${streamRows.length} 个流记录`}</span>
-                        </summary>
-                        <div style="padding:12px; overflow-x:auto;">
-                            <table class="leaderboard-table" style="width:100%; font-size:12px; text-align:center; border-collapse:collapse;">
-                                <thead>
-                                    <tr style="background:rgba(255,255,255,0.04); color:var(--text-muted);">
-                                        <th style="padding:8px 10px;">${isEn ? 'Stream #' : '流序号'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'Tokens' : '产出 Token'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'TTFT (ms)' : '首字时延 (TTFT)'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'ITL Jitter (ms)' : '单字间隔 (ITL)'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'Decode TPS' : '纯解码吞吐'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'Prefill TPS' : '预填充吞吐'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'Duration' : '单流耗时'}</th>
-                                        <th style="padding:8px 10px;">${isEn ? 'Status' : '执行状态'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${streamTableRowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                ` : '';
-
-                let sustainedHtml = `
-                    ${notesHtml}
-                    ${runCommandHtml}
-                    
-                    <!-- 1. 顶部 6 项关键性能看板卡片 (Top 6 Metric Cards Dashboard) -->
-                    <div class="sustained-live-dashboard" style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                <h3 style="margin:0; color:var(--accent-blue); font-size:16px;">${sustainedProfileTitle}</h3>
-                                ${taskBadge}
-                            </div>
-                            <div style="font-family:monospace; font-size:13px; color:var(--text-muted);">${windowDurationText}</div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardDecodeTps}</div>
-                                <div style="font-size:24px; font-weight:bold; color:var(--accent-green); margin-top:4px;">${sustainedTps.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Excl. prefill' : '纯解码稳态'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardE2eTps}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#61afef; margin-top:4px;">${e2eSpeed.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Incl. prefill & queue' : '端到端总吞吐'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardPrefillTps}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#98c379; margin-top:4px;">${prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A'} <span style="font-size:12px; font-weight:normal;">${prefillSpeed > 0 ? 't/s' : ''}</span></div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Prompt prefill' : '提示词预填充'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardTotalTokens}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#e5c07b; margin-top:4px;">${totalTokens}</div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Tokens generated' : '已产出 Token'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardCompletedStreams}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#d19a66; margin-top:4px;">${completedStreams}</div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Streams finished' : '已完成并发流'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
-                                <div style="font-size:11px; color:var(--text-muted);">${cardStreamPool}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#c678dd; margin-top:4px;">${poolConcurrency}x</div>
-                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Stream pool size' : '并发流池规模'}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2. 时延与单字抖动质量分析看板 (Latency & Jitter Quality Panels) -->
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:20px;">
-                        <!-- 首字时延 TTFT 分布卡片 -->
-                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(97,175,239,0.25); border-radius:8px; padding:16px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                                <strong style="color:#61afef; font-size:14px;">⏱️ ${isEn ? 'TTFT Latency Distribution' : '首字时延 (TTFT) 分布'}</strong>
-                                <span style="font-size:11px; color:var(--text-muted);">${isEn ? 'Time to First Token' : '首字响应时延'}</span>
-                            </div>
-                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 单字间隔 ITL Jitter 抖动分布卡片 -->
-                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(229,192,123,0.25); border-radius:8px; padding:16px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                                <strong style="color:#e5c07b; font-size:14px;">📊 ${isEn ? 'ITL Jitter Distribution' : '单字间隔抖动 (ITL Jitter)'}</strong>
-                                <span style="font-size:11px; color:var(--text-muted);">${itlStd !== '-' ? `σ: ${itlStd}ms` : (isEn ? 'Inter-Token Latency' : '流式字间间隔')}</span>
-                            </div>
-                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
-                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
-                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. 并发流与请求测试明细表 (Streams Breakdown Table) -->
-                    ${streamAccordionHtml}
-
-                    <!-- 4. 稳态压测详报与防作弊看门狗卡片 (Benchmark Report & Watchdogs) -->
-                    <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:18px; margin-bottom:20px; font-size:13px; line-height:1.9;">
-                        <h4 style="margin:0 0 14px 0; color:var(--accent-green); font-size:15px;">${reportTitle}</h4>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:10px; margin-bottom:14px;">
-                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Workload Scenario' : '评测任务场景'}</div>
-                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${taskBadge} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(${escapeHtml(taskName)})</span></div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Window & Pure Decode Time' : '实测窗口与纯解码耗时'}</div>
-                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${durationSec.toFixed(1)}s <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(纯解码: ${pureDecodeTimeSec.toFixed(2)}s)</span></div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Effective Scheduling Concurrency' : '有效调度并发与流池规模'}</div>
-                                <div style="margin-top:3px; font-weight:600; color:var(--accent-blue);">${effConc} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(流池: ${poolConcurrency}x 并发)</span></div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Single-Stream Pure Decode Rate' : '单流纯解码平均速率'}</div>
-                                <div style="margin-top:3px; font-weight:600; color:#98c379;">${avgStreamTps.toFixed(2)} tokens/s</div>
-                            </div>
-                        </div>
-                        <div style="color:var(--text-main); font-size:13px; line-height:1.9; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
-                            • <strong>${isEn ? 'Anti-Cheating Watchdogs: ' : '防作弊守卫看门狗：'}</strong>${loopText} ｜ ${driftText}<br>
-                            • <strong>${isEn ? 'Digital Verification Checksum: ' : '数字防伪指纹认证：'}</strong>${verifText}
-                        </div>
-                    </div>
-                `;
-
-                const allTasksList = row.results_json?.all_tasks_results || row.results_json?.all_tasks_comparison || row.all_tasks_comparison;
-                sustainedHtml += buildAllTasksComparisonHtml(allTasksList, isEn, poolConcurrency);
-
-                dataContainer.innerHTML = sustainedHtml;
-                if (radarSection) radarSection.style.display = 'none';
-
-                if (currentPageLanguage === PAGE_LANGUAGE.EN) {
-                    schedulePageTranslation();
-                }
+                window.activeLeaderboardRow = row;
+                window.activeLeaderboardSustainedTask = taskType || 'general';
+                window.leaderboardSustainedViewMode = 'tabs';
+                renderLeaderboardSustainedView(row);
                 return;
             }
 
@@ -9586,8 +10175,26 @@
             if (radarSection) radarSection.style.display = 'block';
 
             const rawResults = Array.isArray(row.results_json) ? row.results_json : (row.results_json?.points || []);
+            const ORDERED_TASKS = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
+
+            // Check if this is an all tasks sequence run
+            const isAllTasks = (taskType === 'all')
+                || (Array.isArray(row.results_json?.all_tasks_comparison) && row.results_json.all_tasks_comparison.length > 0)
+                || (Array.isArray(row.results_json?.all_tasks_results) && row.results_json.all_tasks_results.length > 0)
+                || (Array.isArray(rawResults) && rawResults.length >= 12);
+
+            let allTasksList = row.results_json?.all_tasks_comparison || row.results_json?.all_tasks_results || null;
+            if (isAllTasks && (!allTasksList || allTasksList.length === 0)) {
+                allTasksList = reconstructAllTasksList(rawResults, row.concurrency || 1);
+            }
+            const comparisonHtml = (isAllTasks && allTasksList && allTasksList.length > 0)
+                ? buildAllTasksComparisonHtml(allTasksList, isEn, row.concurrency || 1)
+                : '';
+
             // Normalize per-point schema so both snake_case and camelCase records render correctly.
-            const sortedData = (Array.isArray(rawResults) ? rawResults : []).map(item => {
+            let currentCycle = 0;
+            let lastLen = -1;
+            const mappedData = (Array.isArray(rawResults) ? rawResults : []).map(item => {
                 const promptLength = Number(item?.prompt_length ?? item?.promptLength ?? item?.prompt_tokens);
                 const prefillSpeed = Number(item?.prefill_speed ?? item?.prefillSpeed);
                 const outputSpeed = Number(item?.output_speed ?? item?.outputSpeed ?? item?.decode_speed ?? item?.decodeSpeed);
@@ -9622,8 +10229,15 @@
                 const successCountIsExact = !inferredLegacySingleSuccess && (detailSuccessCount > 0
                     || (hasStoredSuccessful && Number.isFinite(successRaw) && (successRaw === 0 || successRaw > 1 || successRaw === pointConcurrency)));
 
+                if (Number.isFinite(promptLength) && promptLength <= lastLen && lastLen > 0) {
+                    currentCycle++;
+                }
+                lastLen = Number.isFinite(promptLength) ? promptLength : lastLen;
+                const pointTask = (item?.task_type || item?.taskType || (isAllTasks ? ORDERED_TASKS[currentCycle % ORDERED_TASKS.length] : taskType) || 'general').toLowerCase();
+
                 return {
                     ...item,
+                    task_type: pointTask,
                     prompt_length: Number.isFinite(promptLength) ? promptLength : null,
                     prefill_speed: Number.isFinite(prefillSpeed) ? prefillSpeed : null,
                     output_speed: Number.isFinite(outputSpeed) ? outputSpeed : null,
@@ -9633,7 +10247,19 @@
                     successful,
                     success_count_is_exact: successCountIsExact
                 };
-            }).sort((a, b) => (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER));
+            });
+
+            // Sort: if all tasks, preserve task order and sort by length within each task; otherwise sort by prompt length
+            const sortedData = isAllTasks
+                ? [...mappedData].sort((a, b) => {
+                    const taskA = ORDERED_TASKS.indexOf(a.task_type);
+                    const taskB = ORDERED_TASKS.indexOf(b.task_type);
+                    const orderA = taskA >= 0 ? taskA : 999;
+                    const orderB = taskB >= 0 ? taskB : 999;
+                    if (orderA !== orderB) return orderA - orderB;
+                    return (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER);
+                })
+                : [...mappedData].sort((a, b) => (a.prompt_length ?? Number.MAX_SAFE_INTEGER) - (b.prompt_length ?? Number.MAX_SAFE_INTEGER));
             sortedData.forEach(point => {
                 point.anomaly_info = detectPointAnomaly(point, row);
             });
@@ -9655,10 +10281,11 @@
             ` : '';
 
             // ================== Build Detail Data Table ==================
-            let tableHtml = `${notesHtml}${runCommandHtml}${anomalySummaryHtml}
+            let tableHtml = `${notesHtml}${runCommandHtml}${comparisonHtml}${anomalySummaryHtml}
             <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:13px;">
                 <thead>
                     <tr style="background:var(--bg-panel);">
+                        ${isAllTasks ? `<th style="padding:10px; text-align:left; border-bottom:1px solid var(--border-color); color:var(--accent-blue);">${isEn ? 'Task Workload' : '评测场景'}</th>` : ''}
                         <th style="padding:10px; text-align:left; border-bottom:1px solid var(--border-color); color:var(--accent-green);">${isEn ? 'Prompt Length<br>(tokens)' : '提示词长度<br>(tokens)'}</th>
                         <th style="padding:10px; text-align:left; border-bottom:1px solid var(--border-color); color:var(--accent-yellow);">${isEn ? 'TTFT<br>(ms)' : 'TTFT<br>(ms)'}</th>
                         <th style="padding:10px; text-align:left; border-bottom:1px solid var(--border-color); color:var(--accent-yellow);">${isEn ? 'ITL Mean<br>(ms)' : 'ITL平均<br>(ms)'}</th>
@@ -9674,8 +10301,29 @@
             let minDecode = Infinity, maxDecode = 0, sumDecode = 0;
             let validPoints = 0;
             const prefillList = [], decodeList = [];
+            let lastRenderedTask = null;
 
-            sortedData.forEach(r => {
+            sortedData.forEach((r, idx) => {
+                if (isAllTasks && r.task_type && r.task_type !== lastRenderedTask) {
+                    lastRenderedTask = r.task_type;
+                    const meta = TASK_TYPE_META[r.task_type] || TASK_TYPE_META.general;
+                    const taskName = isEn ? meta.fullEn : meta.fullZh;
+                    const taskIdx = ORDERED_TASKS.indexOf(r.task_type);
+                    const stepNum = taskIdx >= 0 ? taskIdx + 1 : idx + 1;
+                    tableHtml += `
+                        <tr class="task-sequence-divider-row" style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95)); border-top: 2px solid ${meta.color}; border-bottom: 1px solid rgba(255,255,255,0.1); height: 36px;">
+                            <td colspan="${isAllTasks ? 7 : 6}" style="padding: 6px 12px; font-weight: 600; font-size: 12px; color: ${meta.color};">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="background: rgba(255,255,255,0.1); color: #cbd5e1; font-size: 10px; padding: 1px 6px; border-radius: 4px;">步骤 ${stepNum}/6</span>
+                                    ${getTaskTypeBadgeHtml(r.task_type, isEn)}
+                                    <span style="color: #f8fafc; font-size: 12px;">${escapeHtml(taskName)}</span>
+                                    <span style="color: #94a3b8; font-size: 11px; font-weight: normal;">— ${escapeHtml(isEn ? (meta.descEn || '') : (meta.descZh || ''))}</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+
                 const ttft = (r.avg_ttft_ms !== null && r.avg_ttft_ms !== undefined) ? r.avg_ttft_ms.toFixed(2) : 'N/A';
                 const itl = (r.avg_itl_mean !== null && r.avg_itl_mean !== undefined) ? r.avg_itl_mean.toFixed(2) : 'N/A';
                 const pSpeed = (r.prefill_speed !== null && r.prefill_speed !== undefined) ? r.prefill_speed.toFixed(2) : 'N/A';
@@ -9699,6 +10347,7 @@
 
                 tableHtml += `
                     <tr${anomalyRowClass} style="border-bottom:1px solid var(--border-color);">
+                        ${isAllTasks ? `<td style="padding:10px;">${getTaskTypeBadgeHtml(r.task_type, isEn)}</td>` : ''}
                         <td style="padding:10px;">${r.prompt_length ?? 'N/A'}</td>
                         <td style="padding:10px;">${ttft}</td>
                         <td style="padding:10px;">${itl}</td>
@@ -9777,29 +10426,93 @@
             dataContainer.innerHTML = tableHtml;
             // ==============================================================
 
-            const labels = sortedData.map(d => (d.prompt_length ?? 'N/A').toString());
-
             // Extract datasets robustly
             const mapToNullIfNaN = (val) => (val === null || val === undefined || isNaN(val)) ? null : val;
 
-            const prefillData = sortedData.map(d => mapToNullIfNaN(d.prefill_speed));
-            const decodeData = sortedData.map(d => mapToNullIfNaN(d.output_speed));
-            const ttftData = sortedData.map(d => mapToNullIfNaN(d.avg_ttft_ms));
-            const itlData = sortedData.map(d => mapToNullIfNaN(d.avg_itl_mean));
+            // Check if there are multiple tasks in the points
+            const distinctTasks = [];
+            ORDERED_TASKS.forEach(t => {
+                if (sortedData.some(d => (d.task_type || 'general') === t)) {
+                    distinctTasks.push(t);
+                }
+            });
+            sortedData.forEach(d => {
+                const t = d.task_type || 'general';
+                if (!distinctTasks.includes(t)) distinctTasks.push(t);
+            });
+            const isMultiTask = isAllTasks || distinctTasks.length > 1;
+
+            // Extract unique prompt lengths for unified X-axis
+            const uniqueLengths = [];
+            sortedData.forEach(d => {
+                const len = d.prompt_length;
+                if (Number.isFinite(len) && !uniqueLengths.includes(len)) {
+                    uniqueLengths.push(len);
+                }
+            });
+            uniqueLengths.sort((a, b) => a - b);
 
             Chart.defaults.color = '#abb2bf';
             Chart.defaults.borderColor = '#3e4451';
-
-            const prefillChartLabel = isEn ? 'Total Prefill Throughput (tokens/s)' : '总 Prefill 吞吐 (tokens/s)';
-            const decodeChartLabel = isEn ? 'Total Decode Throughput (tokens/s)' : '总 Decode 吞吐 (tokens/s)';
-            const ttftChartLabel = isEn ? 'TTFT Latency (ms)' : 'TTFT 首字延迟 (ms)';
-            const itlChartLabel = isEn ? 'ITL Mean Latency (ms)' : 'ITL 均值延迟 (ms)';
             const emptyStateLabel = isEn ? 'No Valid Data' : '无有效数据';
 
-            buildChart('prefill', 'prefillChart', prefillChartLabel, 'tokens/s', labels, prefillData, '#98c379', emptyStateLabel);
-            buildChart('decode', 'decodeChart', decodeChartLabel, 'tokens/s', labels, decodeData, '#c678dd', emptyStateLabel);
-            buildChart('ttft', 'ttftChart', ttftChartLabel, 'ms', labels, ttftData, '#61afef', emptyStateLabel);
-            buildChart('itl', 'itlChart', itlChartLabel, 'ms', labels, itlData, '#e5c07b', emptyStateLabel);
+            if (isMultiTask && uniqueLengths.length > 0) {
+                const chartLabels = uniqueLengths.map(len => len.toString());
+                const buildMultiTaskDatasets = (metricKey) => {
+                    return distinctTasks.map(taskKey => {
+                        const meta = TASK_TYPE_META[taskKey] || TASK_TYPE_META.general;
+                        const taskLabel = isEn ? (meta.en || meta.fullEn) : (meta.zh || meta.fullZh);
+                        const data = uniqueLengths.map(len => {
+                            const match = sortedData.find(d => (d.task_type || 'general') === taskKey && d.prompt_length === len);
+                            return match ? mapToNullIfNaN(match[metricKey]) : null;
+                        });
+                        return {
+                            label: taskLabel,
+                            data: data,
+                            borderColor: meta.color,
+                            backgroundColor: (meta.bg || meta.color + '22'),
+                            borderWidth: 2,
+                            pointBackgroundColor: meta.color,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.15,
+                            fill: false,
+                            spanGaps: true
+                        };
+                    });
+                };
+
+                const prefillDatasets = buildMultiTaskDatasets('prefill_speed');
+                const decodeDatasets = buildMultiTaskDatasets('output_speed');
+                const ttftDatasets = buildMultiTaskDatasets('avg_ttft_ms');
+                const itlDatasets = buildMultiTaskDatasets('avg_itl_mean');
+
+                const titlePrefill = isEn ? 'Prefill Throughput Comparison (tokens/s)' : '预填充 (Prefill) 吞吐多场景对比 (tokens/s)';
+                const titleDecode = isEn ? 'Decode Throughput Comparison (tokens/s)' : '输出 (Decode) 吞吐多场景对比 (tokens/s)';
+                const titleTtft = isEn ? 'TTFT Latency Comparison (ms)' : '首字延迟 (TTFT) 多场景对比 (ms)';
+                const titleItl = isEn ? 'ITL Mean Latency Comparison (ms)' : 'ITL 均值延迟多场景对比 (ms)';
+
+                buildChart('prefill', 'prefillChart', titlePrefill, 'tokens/s', chartLabels, prefillDatasets, '#98c379', emptyStateLabel, true);
+                buildChart('decode', 'decodeChart', titleDecode, 'tokens/s', chartLabels, decodeDatasets, '#c678dd', emptyStateLabel, true);
+                buildChart('ttft', 'ttftChart', titleTtft, 'ms', chartLabels, ttftDatasets, '#61afef', emptyStateLabel, true);
+                buildChart('itl', 'itlChart', titleItl, 'ms', chartLabels, itlDatasets, '#e5c07b', emptyStateLabel, true);
+            } else {
+                const labels = sortedData.map(d => (d.prompt_length ?? 'N/A').toString());
+                const prefillData = sortedData.map(d => mapToNullIfNaN(d.prefill_speed));
+                const decodeData = sortedData.map(d => mapToNullIfNaN(d.output_speed));
+                const ttftData = sortedData.map(d => mapToNullIfNaN(d.avg_ttft_ms));
+                const itlData = sortedData.map(d => mapToNullIfNaN(d.avg_itl_mean));
+
+                const prefillChartLabel = isEn ? 'Total Prefill Throughput (tokens/s)' : '总 Prefill 吞吐 (tokens/s)';
+                const decodeChartLabel = isEn ? 'Total Decode Throughput (tokens/s)' : '总 Decode 吞吐 (tokens/s)';
+                const ttftChartLabel = isEn ? 'TTFT Latency (ms)' : 'TTFT 首字延迟 (ms)';
+                const itlChartLabel = isEn ? 'ITL Mean Latency (ms)' : 'ITL 均值延迟 (ms)';
+
+                buildChart('prefill', 'prefillChart', prefillChartLabel, 'tokens/s', labels, prefillData, '#98c379', emptyStateLabel, false);
+                buildChart('decode', 'decodeChart', decodeChartLabel, 'tokens/s', labels, decodeData, '#c678dd', emptyStateLabel, false);
+                buildChart('ttft', 'ttftChart', ttftChartLabel, 'ms', labels, ttftData, '#61afef', emptyStateLabel, false);
+                buildChart('itl', 'itlChart', itlChartLabel, 'ms', labels, itlData, '#e5c07b', emptyStateLabel, false);
+            }
             renderModalRadarChart(row);
 
             if (currentPageLanguage === PAGE_LANGUAGE.EN) {
@@ -9807,54 +10520,91 @@
             }
         }
 
-        function buildChart(key, canvasId, label, yAxisTitle, labels, data, color, emptyStateLabel = '无有效数据') {
+        function buildChart(key, canvasId, labelOrTitle, yAxisTitle, labels, dataOrDatasets, color, emptyStateLabel = '无有效数据', showTitle = false) {
             if (charts[key]) {
                 charts[key].destroy();
             }
 
-            const ctx = document.getElementById(canvasId).getContext('2d');
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
 
-            // 检查是否所有数据都是 null
-            const allNull = data.every(d => d === null);
+            let datasets = [];
+            const isMulti = Array.isArray(dataOrDatasets) && dataOrDatasets.length > 0 && typeof dataOrDatasets[0] === 'object' && dataOrDatasets[0] !== null && 'data' in dataOrDatasets[0];
 
+            if (isMulti) {
+                datasets = dataOrDatasets;
+            } else {
+                const data = dataOrDatasets || [];
+                const allNull = data.every(d => d === null);
+                datasets = [{
+                    label: allNull ? `${labelOrTitle} (${emptyStateLabel})` : labelOrTitle,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    borderWidth: 2,
+                    pointBackgroundColor: color,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: false,
+                    tension: 0.1,
+                    spanGaps: true
+                }];
+            }
+
+            const isEn = (currentPageLanguage === PAGE_LANGUAGE.EN);
             charts[key] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: allNull ? `${label} (${emptyStateLabel})` : label,
-                        data: data,
-                        borderColor: color,
-                        backgroundColor: color + '33',
-                        borderWidth: 2,
-                        pointBackgroundColor: color,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: false,
-                        tension: 0.1,
-                        spanGaps: true // 健壮性：有缺失点也能连线
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
+                        title: {
+                            display: showTitle,
+                            text: labelOrTitle,
+                            color: '#e5c07b',
+                            font: { size: 13, weight: 'bold' },
+                            padding: { top: 4, bottom: 8 }
+                        },
                         legend: {
-                            labels: { color: '#abb2bf' }
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#abb2bf',
+                                boxWidth: 12,
+                                padding: 8,
+                                font: { size: 11 }
+                            }
                         },
                         tooltip: {
                             mode: 'index',
                             intersect: false,
-                            backgroundColor: 'rgba(33, 37, 43, 0.9)',
+                            backgroundColor: 'rgba(33, 37, 43, 0.95)',
                             titleColor: '#fff',
                             bodyColor: '#abb2bf',
                             borderColor: '#3e4451',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null && context.parsed.y !== undefined) {
+                                        label += context.parsed.y.toFixed(2) + ' ' + (yAxisTitle || '');
+                                    } else {
+                                        label += 'N/A';
+                                    }
+                                    return label;
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: 'Prompt Tokens', color: '#5c6370' },
+                            title: { display: true, text: isEn ? 'Prompt Tokens' : '提示词长度 (tokens)', color: '#5c6370' },
                             grid: { color: '#3e4451' }
                         },
                         y: {

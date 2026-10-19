@@ -258,7 +258,7 @@ usage: llm_test_backend.py [-h] [--server] [--port PORT] [--host HOST]
 | | `--port PORT` | 指定服务端口（默认 18000） |
 | | `--host HOST` | 本地服务监听地址（默认 `0.0.0.0`） |
 | | `--benchmark-mode`, `--mode` | 评测模式选择：`1d_sweep` (默认)、`2d_matrix`、`sustained_decode` |
-| | `--task-type`, `--task` | 评测场景题库选择：`general` (默认通用)、`code` (代码生成)、`structured` (结构化JSON)、`prose` (散文深度问答)、`prefill_16k` (16K长上下文首字)、`reasoning` (思维链推理) |
+| | `--task-type`, `--task` | 评测场景题库选择：`general` (默认通用)、`code` (代码解码)、`structured` (结构化JSON)、`prose` (散文深度问答)、`prefill_16k` (技术文档分析/文档知识库)、`reasoning` (数理逻辑推演) |
 | **2D 矩阵参数** | `--matrix-concurrency` | 2D 矩阵并发梯队，逗号分隔（默认 `'1,2,4,8'`） |
 | | `--matrix-context` | 2D 矩阵上下文长度梯队，逗号分隔（默认 `'512,1024,2048'`） |
 | | `--matrix-max-kv-tokens`, `--max-kv-tokens` | KV Cache 显存容量跳过上限（默认 `32768`，设为 0 取消限制） |
