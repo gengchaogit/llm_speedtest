@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+python/.backend_port
+*.log
+tests/adversarial_results.json
+python/test_cli*.json

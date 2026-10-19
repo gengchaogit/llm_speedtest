@@ -4519,6 +4519,15 @@
                 color: '#e06c75',
                 bg: 'rgba(224, 108, 117, 0.15)',
                 border: 'rgba(224, 108, 117, 0.45)',
+            },
+            all: {
+                zh: '⚡ 全场景',
+                en: '⚡ All Tasks',
+                fullZh: '⚡ 全场景对比 (All Workloads Sequence)',
+                fullEn: '⚡ All Workloads Benchmark',
+                color: '#38bdf8',
+                bg: 'rgba(56, 189, 248, 0.15)',
+                border: 'rgba(56, 189, 248, 0.45)',
             }
         };
 
@@ -7368,6 +7377,31 @@
             return false;
         }
 
+        function passesModeFilter(row, mode, personalUserCode) {
+            if (!row || typeof row !== 'object') return false;
+            if (mode === 'personal') {
+                if (!personalUserCode || row.user_code !== personalUserCode) return false;
+            } else if (mode === 'user') {
+                if (!currentTargetUserCode || row.user_code !== currentTargetUserCode) return false;
+            } else if (mode === 'model') {
+                if (!currentTargetModelName || row.model_name !== currentTargetModelName) return false;
+            } else if (mode === 'search_id') {
+                if (!currentTargetSearch) return true;
+                const q = currentTargetSearch.trim().toLowerCase();
+                if (!q) return true;
+                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+                if (isUUID) {
+                    return String(row.id || '').toLowerCase() === q;
+                }
+                const userCode = String(row.user_code || '').toLowerCase();
+                const nickname = String(row.nickname || '').toLowerCase();
+                const modelName = String(row.model_name || '').toLowerCase();
+                const runCmd = String(row.run_command || '').toLowerCase();
+                return (userCode === q || nickname.includes(q) || modelName.includes(q) || runCmd.includes(q));
+            }
+            return true;
+        }
+
         function passesMetricThresholds(row) {
             if (currentMinDecode > 0) {
                 const decode = getRowMetricValue(row, 'max_decode_speed');
@@ -8317,13 +8351,15 @@
 
                 if (isSmartFiltering) {
                     const allRows = await ensureAllDataLoaded();
-                    const filtered = allRows.filter(r => passesSmartFilters(r));
+                    const scopedRows = allRows.filter(r => passesModeFilter(r, mode, personalUserCode) && passesMetricThresholds(r));
+                    const filtered = scopedRows.filter(r => passesSmartFilters(r));
+                    filtered.sort(compareRowsByCurrentSort);
                     totalMatched = filtered.length;
                     totalPages = Math.max(1, Math.ceil(totalMatched / currentPageSize));
                     if (currentPage > totalPages) currentPage = 1;
                     offset = (currentPage - 1) * currentPageSize;
                     data = filtered.slice(offset, offset + currentPageSize);
-                    updateDynamicSmartFilterPills(allRows);
+                    updateDynamicSmartFilterPills(scopedRows);
                 } else {
                     const pageRes = await fetchLeaderboardPage(mode, currentPage, currentPageSize, signal, personalUserCode);
                     const rawRows = pageRes.rows;
@@ -8424,6 +8460,24 @@
                     const btnDetailLabel = isEn ? 'Details' : '查看';
                     const btnShareLabel = isEn ? 'Share' : '分享';
 
+                    // 确定各评测模式在表格中的准确并发显示 (Determine accurate concurrency badge across 3 benchmark paradigms)
+                    let concurrencyCellDisplay = `${row.concurrency}`;
+                    if (benchmarkMode === 'sustained_decode') {
+                        const sPoint = (Array.isArray(row.results_json?.points) && row.results_json.points.length > 0)
+                            ? row.results_json.points[0]
+                            : (Array.isArray(row.results_json) && row.results_json.length > 0 ? row.results_json[0] : (row.results_json?.sustained_summary || {}));
+                        const poolConc = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+                        concurrencyCellDisplay = `<span style="font-weight:600; color:#10b981;" title="${isEn ? 'Sustained Stream Pool Concurrency: ' : '稳态并发流池规模: '}${poolConc}x">${poolConc}x</span>`;
+                    } else if (benchmarkMode === '2d_matrix') {
+                        const mPoints = Array.isArray(row.results_json?.points) ? row.results_json.points : [];
+                        const concs = mPoints.map(p => parseInt(p.concurrency, 10)).filter(n => Number.isFinite(n) && n > 0);
+                        if (concs.length > 0) {
+                            const minC = Math.min(...concs);
+                            const maxC = Math.max(...concs);
+                            concurrencyCellDisplay = minC === maxC ? `${maxC}x` : `${minC}-${maxC}x`;
+                        }
+                    }
+
                     tr.innerHTML = `
                         <td class="rank-cell col-rank">${formatRankLabel(rank)}</td>
                         <td class="col-time">${dateStr}</td>
@@ -8438,7 +8492,7 @@
                         </td>
                         <td class="col-command">${runCommandCell}</td>
                         <td class="col-source-tags" style="font-size:11px; color:var(--text-muted); line-height:1.35;">${sourceTagsText}</td>
-                        <td class="col-concurrency">${row.concurrency}</td>
+                        <td class="col-concurrency">${concurrencyCellDisplay}</td>
                         <td class="col-prefill" style="color:#98c379; font-weight:bold;">${prefillText}</td>
                         <td class="col-decode" style="color:#c678dd; font-weight:bold;">${decodeText}</td>
                         <td class="col-ttft" style="color:#61afef; font-family:monospace;">${ttftText}</td>
@@ -8571,7 +8625,110 @@
             }
         }
 
-        window.highlightMatrixDetailRow = function(c, ctx) {
+        window.activeLeaderboardRow = null;
+        window.activeLeaderboardMatrixTask = 'general';
+        window.leaderboardMatrixViewMode = 'tabs';
+
+        function extractMatrixCells(taskData, row = null) {
+            if (!taskData) {
+                if (Array.isArray(row?.results_json?.points) && row.results_json.points.length > 0) return row.results_json.points;
+                if (Array.isArray(row?.results_json?.matrix) && row.results_json.matrix.length > 0) return row.results_json.matrix.flat().filter(Boolean);
+                if (Array.isArray(row?.results_json)) return row.results_json;
+                return [];
+            }
+            if (Array.isArray(taskData.testResultsData) && taskData.testResultsData.length > 0) return taskData.testResultsData;
+            if (Array.isArray(taskData.points) && taskData.points.length > 0) return taskData.points;
+            if (Array.isArray(taskData.matrixGrid) && taskData.matrixGrid.length > 0) return taskData.matrixGrid.flat().filter(Boolean);
+            if (Array.isArray(taskData.matrix) && taskData.matrix.length > 0) return taskData.matrix.flat().filter(Boolean);
+            if (typeof taskData.matrixGrid === 'object' && taskData.matrixGrid !== null) {
+                const out = [];
+                Object.keys(taskData.matrixGrid).forEach(c => {
+                    const rowObj = taskData.matrixGrid[c] || {};
+                    Object.keys(rowObj).forEach(ctx => {
+                        if (rowObj[ctx]) out.push(rowObj[ctx]);
+                    });
+                });
+                if (out.length > 0) return out;
+            }
+            if (Array.isArray(taskData)) return taskData.flat().filter(Boolean);
+            return [];
+        }
+
+        function buildAllTasksComparisonHtml(allTasksList, isEn, poolConcurrency = 1) {
+            if (!Array.isArray(allTasksList) || allTasksList.length === 0) return '';
+            const baseItem = allTasksList.find(r => (r.task_type || r.taskType) === 'general') || allTasksList[0];
+            const baseTps = Number(baseItem?.steady_decode_tps ?? baseItem?.outputSpeed ?? baseItem?.peakSpeed) || 0;
+
+            const rowsHtml = allTasksList.map(r => {
+                const k = (r.task_type || r.taskType || 'general').toLowerCase();
+                const meta = TASK_TYPE_META[k] || TASK_TYPE_META.general;
+                const tName = isEn ? meta.fullEn : meta.fullZh;
+                const tBadge = getTaskTypeBadgeHtml(k, isEn);
+                const tps = Number(r.steady_decode_tps ?? r.outputSpeed ?? r.peakSpeed) || 0;
+                const e2e = Number(r.e2e_throughput_tps ?? r.e2eSpeed) || 0;
+                const streamTps = Number(r.avg_stream_decode_tps ?? r.avgStreamDecodeSpeed) || 0;
+                const ttft = r.ttft_stats?.p50 !== undefined ? `${Number(r.ttft_stats.p50).toFixed(1)}ms` : (r.avg_ttft_ms ? `${Number(r.avg_ttft_ms).toFixed(1)}ms` : (r.prefillTimeMs ? `${Number(r.prefillTimeMs).toFixed(1)}ms` : '-'));
+                const itl = r.itl_stats?.p50 !== undefined ? `${Number(r.itl_stats.p50).toFixed(1)}ms` : (r.avg_itl_mean ? `${Number(r.avg_itl_mean).toFixed(1)}ms` : '-');
+                const eff = r.effective_concurrency || r.effectiveConcurrency || `${poolConcurrency}/${poolConcurrency}`;
+                const tokens = r.total_tokens || r.outputTokens || '-';
+
+                let deltaHtml = '<span style="color:var(--text-muted);">' + (isEn ? '0.0% (Base)' : '0.0% (基准)') + '</span>';
+                if (k !== 'general' && baseTps > 0) {
+                    const d = ((tps - baseTps) / baseTps) * 100;
+                    deltaHtml = d > 0 ? `<span style="color:var(--accent-green); font-weight:bold;">+${d.toFixed(1)}% 🚀</span>` : `<span style="color:#e06c75; font-weight:bold;">${d.toFixed(1)}% 🔻</span>`;
+                }
+
+                return `
+                    <tr style="border-bottom:1px solid var(--border-color);">
+                        <td style="padding:8px 10px;">${tBadge} <span style="font-size:12px; color:var(--text-main); margin-left:4px;">${escapeHtml(tName)}</span></td>
+                        <td style="padding:8px 10px; text-align:right; font-weight:bold; color:var(--accent-green);">${tps.toFixed(2)} t/s</td>
+                        <td style="padding:8px 10px; text-align:center;">${deltaHtml}</td>
+                        <td style="padding:8px 10px; text-align:right; color:var(--accent-blue);">${e2e > 0 ? e2e.toFixed(2) + ' t/s' : '-'}</td>
+                        <td style="padding:8px 10px; text-align:right; color:var(--text-muted);">${streamTps > 0 ? streamTps.toFixed(2) + ' t/s' : '-'}</td>
+                        <td style="padding:8px 10px; text-align:right; color:var(--accent-yellow); font-family:monospace;">${ttft}</td>
+                        <td style="padding:8px 10px; text-align:right; color:#e5c07b; font-family:monospace;">${itl}</td>
+                        <td style="padding:8px 10px; text-align:center;"><span style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-size:11px;">${escapeHtml(eff)}</span></td>
+                        <td style="padding:8px 10px; text-align:right; color:var(--text-muted);">${tokens}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:18px; margin-bottom:20px;">
+                    <h4 style="margin:0 0 12px 0; color:#38bdf8; font-size:15px; display:flex; align-items:center; gap:8px;">
+                        <span>🏆 ${isEn ? 'All Workloads Performance Comparison' : '全场景工作负载性能对比 (6大场景)'}</span>
+                    </h4>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left; min-width:760px;">
+                            <thead>
+                                <tr style="background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border-color);">
+                                    <th style="padding:8px 10px; color:var(--accent-blue);">${isEn ? 'Task Workload' : '评测任务场景'}</th>
+                                    <th style="padding:8px 10px; text-align:right; color:var(--accent-green);">${isEn ? 'Throughput / Peak' : '解码吞吐 / 峰值'}</th>
+                                    <th style="padding:8px 10px; text-align:center; color:var(--text-muted);">${isEn ? 'vs Baseline' : '相对通用基线'}</th>
+                                    <th style="padding:8px 10px; text-align:right; color:var(--accent-blue);">${isEn ? 'E2E TPS' : '端到端总吞吐'}</th>
+                                    <th style="padding:8px 10px; text-align:right; color:var(--text-muted);">${isEn ? 'Stream TPS' : '单流纯解码'}</th>
+                                    <th style="padding:8px 10px; text-align:right; color:var(--accent-yellow);">TTFT P50</th>
+                                    <th style="padding:8px 10px; text-align:right; color:#e5c07b;">ITL P50</th>
+                                    <th style="padding:8px 10px; text-align:center; color:var(--text-muted);">${isEn ? 'Eff Conc' : '有效并发'}</th>
+                                    <th style="padding:8px 10px; text-align:right; color:var(--text-muted);">${isEn ? 'Tokens' : '产出 Token'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.highlightMatrixDetailRow = function(c, ctx, taskKey = null) {
+            if (taskKey && taskKey !== window.activeLeaderboardMatrixTask) {
+                window.activeLeaderboardMatrixTask = taskKey;
+                window.leaderboardMatrixViewMode = 'tabs';
+                const row = window.activeLeaderboardRow;
+                if (row) renderLeaderboardMatrixView(row);
+            }
             const detailsEl = document.getElementById('detailMatrixAccordion');
             if (detailsEl && !detailsEl.open) {
                 detailsEl.open = true;
@@ -8586,6 +8743,432 @@
                 }, 1600);
             }
         };
+
+        window.switchLeaderboardMatrixTask = function(taskKey) {
+            window.activeLeaderboardMatrixTask = taskKey;
+            window.leaderboardMatrixViewMode = 'tabs';
+            const row = window.activeLeaderboardRow;
+            if (!row) return;
+            renderLeaderboardMatrixView(row);
+        };
+
+        window.toggleLeaderboardMatrixView = function(mode) {
+            window.leaderboardMatrixViewMode = mode;
+            const row = window.activeLeaderboardRow;
+            if (!row) return;
+            renderLeaderboardMatrixView(row);
+        };
+
+        function renderLeaderboardSingleMatrixTable(cells, taskKey, isEn, peakTpsOverride = null) {
+            const taskBadge = getTaskTypeBadgeHtml(taskKey, isEn);
+            const concurrencies = Array.from(new Set(cells.map(c => Number(c.concurrency)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
+            const contexts = Array.from(new Set(cells.map(c => Number(c.context ?? c.prompt_length ?? c.promptLength)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
+
+            let peakTps = peakTpsOverride || 0;
+            cells.forEach(cell => {
+                const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
+                if (tps > peakTps) {
+                    peakTps = tps;
+                }
+            });
+
+            const heatmapRowsHtml = concurrencies.map(c => {
+                const cellsHtml = contexts.map(ctx => {
+                    const cell = cells.find(x => Number(x.concurrency) === c && Number(x.context ?? x.prompt_length ?? x.promptLength) === ctx);
+                    if (!cell) {
+                        return `<td class="matrix-cell empty">--</td>`;
+                    }
+                    const isSkipped = cell.status === 'SKIP_KV_LIMIT' || cell.skipped || (cell.decode_tps === -1);
+                    const loopDetected = Boolean(cell.loop_detected || cell.hasConfirmedLoop || String(cell.status || '').includes('loop'));
+                    const isSat = cell.is_saturated || (typeof cell.effective_concurrency === 'string' && cell.effective_concurrency.includes('*'));
+                    const eff = cell.effective_concurrency || `${c}/${c}`;
+                    const satBadge = isSat ? `<span class="matrix-eff-badge">${escapeHtml(eff)}</span>` : '';
+
+                    if (isSkipped) {
+                        return `<td class="matrix-cell" style="background:rgba(255,255,255,0.04);"><span class="badge-capacity" style="font-size:10px; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">KV LIMIT</span></td>`;
+                    }
+                    if (loopDetected) {
+                        return `<td class="matrix-cell" style="background:rgba(198, 120, 221, 0.3);"><span style="color:#e06c75; font-size:11px; font-weight:bold;">ERROR: loop</span></td>`;
+                    }
+
+                    const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
+                    const ttft = Number(cell.ttft_ms ?? cell.avg_ttft_ms ?? cell.prefill_time_ms) || 0;
+                    const itl = Number(cell.p50_itl ?? cell.avg_itl_mean) || 0;
+
+                    const ratio = peakTps > 0 ? Math.min(1, Math.max(0, tps / peakTps)) : 0;
+                    const bgR = Math.round(26 + ratio * (16 - 26));
+                    const bgG = Math.round(30 + ratio * (185 - 30));
+                    const bgB = Math.round(40 + ratio * (129 - 40));
+                    const bgOpacity = 0.15 + ratio * 0.45;
+                    const bgColor = `rgba(${bgR}, ${bgG}, ${bgB}, ${bgOpacity.toFixed(2)})`;
+                    const cellTooltip = isEn ? `Click for details: ${c}x concurrency @ ${ctx} context` : `点击查看详情: ${c}x并发 @ ${ctx}上下文`;
+
+                    return `
+                        <td class="matrix-cell" style="background:${bgColor};" onclick="highlightMatrixDetailRow(${c}, ${ctx}, '${taskKey}')" title="${escapeHtml(cellTooltip)}">
+                            <div class="matrix-tps-val">${tps.toFixed(1)} <span style="font-size:10px; font-weight:normal; color:#8b949e;">t/s</span>${satBadge}</div>
+                            <div class="matrix-sub-val">TTFT: ${ttft.toFixed(0)}ms | ITL: ${itl.toFixed(1)}ms</div>
+                        </td>
+                    `;
+                }).join('');
+                return `<tr><th class="matrix-row-header">${c}x</th>${cellsHtml}</tr>`;
+            }).join('');
+
+            const matrixCornerLabel = isEn ? 'Concurrency \\ Context' : '并发 \\ 上下文';
+            const matrixHeatmapTitle = isEn ? '🧊 Concurrency × Context Heatmap' : '🧊 2D 并发×上下文实测热力矩阵 (Concurrency × Context Heatmap)';
+            const matrixHeatmapSub = isEn 
+                ? `Total ${concurrencies.length} concurrency steps × ${contexts.length} context tiers` 
+                : `共 ${concurrencies.length} 个并发梯度 × ${contexts.length} 个上下文阶梯`;
+
+            return `
+                <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:18px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <h3 style="margin:0; color:var(--accent-blue); font-size:15px;">${matrixHeatmapTitle}</h3>
+                            ${taskBadge}
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted);">${matrixHeatmapSub}</div>
+                    </div>
+                    <div class="matrix-table-wrapper" style="margin-top:0;">
+                        <table class="matrix-table">
+                            <thead>
+                                <tr>
+                                    <th class="matrix-corner">${matrixCornerLabel}</th>
+                                    ${contexts.map(ctx => `<th>${ctx} ctx</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${heatmapRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLeaderboardMatrixView(row) {
+            const isEn = currentPageLanguage === PAGE_LANGUAGE.EN;
+            const dataContainer = document.getElementById('modalDataContainer');
+            const chartsGrid = document.querySelector('.charts-grid');
+            const radarSection = document.getElementById('modalRadarSection');
+
+            if (chartsGrid) chartsGrid.style.display = 'none';
+            ['prefill', 'decode', 'ttft', 'itl'].forEach(k => {
+                if (charts[k]) { charts[k].destroy(); delete charts[k]; }
+            });
+
+            // 1. 测速备注展示卡片 (Notes Banner)
+            const notesText = row.notes ? escapeHtml(row.notes) : (isEn ? 'No notes provided' : '无用户备注');
+            const notesHtml = `
+                <div class="modal-notes-banner" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); padding:10px 14px; border-radius:6px; color:#98c379; font-size:13px; font-weight:500; margin-bottom:16px; display:flex; align-items:flex-start; gap:8px;">
+                    <span style="font-size:16px; line-height:1;">📝</span>
+                    <div style="flex:1;">
+                        <strong style="color:#61afef;">${isEn ? 'Benchmark Notes / Configuration:' : '测速备注 / 配置说明:'}</strong>
+                        <span style="color:#e2e8f0; margin-left:6px; word-break:break-word;">${notesText}</span>
+                    </div>
+                </div>
+            `;
+
+            // 启动命令展示
+            const runCommandText = row.run_command ? escapeHtml(row.run_command) : '';
+            const runCommandHtml = runCommandText ? `
+                <details class="detail-command-accordion" ontoggle="handleDetailCommandToggle(this)">
+                    <summary>
+                        <span style="display:inline-flex; align-items:center; gap:8px;">
+                            <span class="detail-command-arrow">▶</span>
+                            <span style="color:var(--accent-yellow);">⚡</span>
+                            <span data-translate-skip="true" data-detail-command-label="true">${isEn ? 'Run Command' : '启动命令'}</span>
+                            <span style="font-size:12px; color:var(--text-muted); font-weight:normal;" data-detail-command-hint="true">${isEn ? '(Click to expand)' : '(点击展开)'}</span>
+                        </span>
+                        <button type="button" class="btn-run-command" onclick="copyDetailRunCommand(event, this)" data-copy-command-btn="true" data-run-command="${encodeURIComponent(row.run_command)}" style="font-size:11px; padding:2px 8px;">${isEn ? 'Copy Command' : '复制命令'}</button>
+                    </summary>
+                    <div class="detail-command-body">
+                        <pre class="run-command-block" data-translate-skip="true">${runCommandText}</pre>
+                    </div>
+                </details>
+            ` : '';
+
+            // 2. 多场景矩阵判定与 Tab 选项卡准备
+            const allMatrices = row.all_matrices || row.results_json?.all_matrices || null;
+            let displayTasks = [];
+            if (allMatrices && typeof allMatrices === 'object' && Object.keys(allMatrices).length > 0) {
+                const taskKeys = Object.keys(allMatrices);
+                const orderedTasks = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
+                displayTasks = orderedTasks.filter(k => allMatrices[k]).concat(taskKeys.filter(k => !orderedTasks.includes(k)));
+            }
+
+            if (displayTasks.length > 0) {
+                if (!window.activeLeaderboardMatrixTask || !allMatrices[window.activeLeaderboardMatrixTask]) {
+                    window.activeLeaderboardMatrixTask = displayTasks[0];
+                }
+            } else {
+                window.activeLeaderboardMatrixTask = extractRowTaskType(row) || 'general';
+                displayTasks = [window.activeLeaderboardMatrixTask];
+            }
+
+            const currentTask = window.activeLeaderboardMatrixTask;
+            const currentTaskData = (allMatrices && allMatrices[currentTask]) ? allMatrices[currentTask] : row.results_json;
+            const currentTaskBadge = getTaskTypeBadgeHtml(currentTask, isEn);
+            const currentTaskMeta = TASK_TYPE_META[currentTask] || TASK_TYPE_META.general;
+            const currentTaskName = isEn ? currentTaskMeta.fullEn : currentTaskMeta.fullZh;
+
+            // 更新副标题栏的任务类型徽标
+            const detailVerif = getVerificationBadgeInfo(row);
+            const modeSubtitleLabel = `<span style="background:rgba(142,68,173,0.25); color:#c678dd; border:1px solid rgba(142,68,173,0.5); padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:600;">${isEn ? '🧊 2D Concurrency × Context Matrix Benchmark' : '🧊 2D 并发×上下文矩阵测试'}</span>`;
+            document.getElementById('modalSubtitle').innerHTML = isEn
+                ? `Hardware: ${escapeHtml(row.hardware)} | Engine: ${escapeHtml(row.framework || '-')} | Concurrency: ${row.concurrency} | Timestamp: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${currentTaskBadge}`
+                : `硬件: ${escapeHtml(row.hardware)} | 框架: ${escapeHtml(row.framework || '-')} | 并发: ${row.concurrency} | 记录时间: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${currentTaskBadge}`;
+
+            // Tab 选项卡栏
+            let tabsBarHtml = '';
+            if (displayTasks.length > 1 || allMatrices) {
+                const isStacked = (window.leaderboardMatrixViewMode === 'stacked');
+                const tabsButtonsHtml = displayTasks.map(taskKey => {
+                    const meta = TASK_TYPE_META[taskKey] || TASK_TYPE_META.general;
+                    const tName = isEn ? meta.fullEn : meta.fullZh;
+                    const taskData = allMatrices ? allMatrices[taskKey] : null;
+                    const taskPeakTps = Number(taskData?.peakTps || taskData?.peak_decode_tps || 0);
+                    const isActive = (taskKey === currentTask && !isStacked);
+
+                    return `
+                        <button type="button" class="lb-matrix-tab-btn" 
+                            onclick="switchLeaderboardMatrixTask('${taskKey}')"
+                            style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.2s ease; border:1px solid ${isActive ? '#3b82f6' : 'rgba(255,255,255,0.12)'}; background:${isActive ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.04)'}; color:${isActive ? '#60a5fa' : '#cbd5e1'}; font-weight:${isActive ? '600' : 'normal'};">
+                            <span>${getTaskTypeBadgeHtml(taskKey, isEn)}</span>
+                            <span>${tName}</span>
+                            ${taskPeakTps > 0 ? `<span style="font-size:10px; background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; margin-left:2px;">⚡ ${taskPeakTps.toFixed(1)} t/s</span>` : ''}
+                        </button>
+                    `;
+                }).join('');
+
+                tabsBarHtml = `
+                    <div id="leaderboardMatrixTabsBar" style="margin-bottom:16px; padding:12px; background:rgba(30, 41, 59, 0.6); border:1px solid rgba(255,255,255,0.1); border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                            <span style="font-size:13px; font-weight:600; color:#93c5fd; display:flex; align-items:center; gap:6px;">
+                                🔲 ${isEn ? 'Scenario Matrices Navigation & Multi-Round Comparison:' : '场景矩阵切换与多轮对比 (Scenario Matrices Navigation):'}
+                            </span>
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" onclick="toggleLeaderboardMatrixView('tabs')" style="background:${!isStacked ? '#2563eb' : 'rgba(255,255,255,0.06)'}; color:${!isStacked ? '#fff' : '#cbd5e1'}; border:1px solid ${!isStacked ? '#60a5fa' : 'rgba(255,255,255,0.15)'}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">📑 ${isEn ? 'Tabs View' : '标签切换'}</button>
+                                <button type="button" onclick="toggleLeaderboardMatrixView('stacked')" style="background:${isStacked ? '#2563eb' : 'rgba(255,255,255,0.06)'}; color:${isStacked ? '#fff' : '#cbd5e1'}; border:1px solid ${isStacked ? '#60a5fa' : 'rgba(255,255,255,0.15)'}; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">🔲 ${isEn ? 'Expand All Matrices' : '展开全部矩阵'}</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            ${tabsButtonsHtml}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 3. 构建视图主体内容 (Stacked 或 Tabs)
+            let mainViewHtml = '';
+            if (window.leaderboardMatrixViewMode === 'stacked' && displayTasks.length > 1 && allMatrices) {
+                mainViewHtml = displayTasks.map((tKey, idx) => {
+                    const tData = allMatrices[tKey];
+                    const tCells = extractMatrixCells(tData, row);
+                    const tMeta = TASK_TYPE_META[tKey] || TASK_TYPE_META.general;
+                    const tName = isEn ? tMeta.fullEn : tMeta.fullZh;
+                    const tBadge = getTaskTypeBadgeHtml(tKey, isEn);
+                    const tPeak = Number(tData?.peakTps || tData?.peak_decode_tps || 0);
+
+                    const cardHeader = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span style="background:rgba(255,255,255,0.1); color:#cbd5e1; font-size:11px; padding:2px 6px; border-radius:4px;">${isEn ? `Matrix ${idx+1}/${displayTasks.length}` : `矩阵 ${idx+1}/${displayTasks.length}`}</span>
+                                ${tBadge}
+                                <span style="font-weight:600; color:#f8fafc; font-size:14px;">${tName}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                ${tPeak > 0 ? `<span style="font-size:12px; color:#10b981; font-weight:600;">⚡ ${isEn ? 'Peak' : '峰值'}: ${tPeak.toFixed(1)} t/s</span>` : ''}
+                                <button type="button" style="background:#2563eb; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;" onclick="switchLeaderboardMatrixTask('${tKey}')">${isEn ? 'View Single Tab' : '查看详情'}</button>
+                            </div>
+                        </div>
+                    `;
+
+                    return `
+                        <div style="background:rgba(20, 28, 40, 0.9); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:16px; margin-bottom:20px;">
+                            ${cardHeader}
+                            ${renderLeaderboardSingleMatrixTable(tCells, tKey, isEn, tPeak)}
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                // 单场景 Tabs 视图
+                const cells = extractMatrixCells(currentTaskData, row);
+                const concurrencies = Array.from(new Set(cells.map(c => Number(c.concurrency)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
+                const contexts = Array.from(new Set(cells.map(c => Number(c.context ?? c.prompt_length ?? c.promptLength)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
+
+                let peakTps = Number(currentTaskData?.peakTps || currentTaskData?.peak_decode_tps || 0);
+                let peakCell = currentTaskData?.peakPoint || null;
+                let saturationCell = currentTaskData?.saturationPoint || null;
+                cells.forEach(cell => {
+                    const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
+                    if (tps > peakTps) {
+                        peakTps = tps;
+                        peakCell = cell;
+                    }
+                    const isSat = cell.is_saturated || (typeof cell.effective_concurrency === 'string' && cell.effective_concurrency.includes('*'));
+                    if (isSat && !saturationCell) {
+                        saturationCell = cell;
+                    }
+                });
+
+                // 分位数统计
+                const validTtfts = cells.map(c => Number(c.ttft_ms ?? c.avg_ttft_ms ?? c.prefill_time_ms)).filter(n => Number.isFinite(n) && n > 0).sort((a,b) => a-b);
+                const validItls = cells.map(c => Number(c.p50_itl ?? c.avg_itl_mean)).filter(n => Number.isFinite(n) && n > 0).sort((a,b) => a-b);
+                const q = currentTaskData?.quantiles || row.results_json?.quantiles || {};
+                const ttftP50 = validTtfts.length > 0 ? validTtfts[Math.floor(validTtfts.length * 0.5)].toFixed(1) : (Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) : '-');
+                const ttftP90 = validTtfts.length > 0 ? validTtfts[Math.floor(validTtfts.length * 0.9)].toFixed(1) : (Number.isFinite(Number(q?.ttft?.p90)) ? Number(q.ttft.p90).toFixed(1) : '-');
+                const ttftP99 = validTtfts.length > 0 ? validTtfts[Math.floor(validTtfts.length * 0.99)].toFixed(1) : (Number.isFinite(Number(q?.ttft?.p99)) ? Number(q.ttft.p99).toFixed(1) : '-');
+                const itlP50 = validItls.length > 0 ? validItls[Math.floor(validItls.length * 0.5)].toFixed(1) : (Number.isFinite(Number(q?.itl?.p50)) ? Number(q.itl.p50).toFixed(1) : '-');
+                const itlP90 = validItls.length > 0 ? validItls[Math.floor(validItls.length * 0.9)].toFixed(1) : (Number.isFinite(Number(q?.itl?.p90)) ? Number(q.itl.p90).toFixed(1) : '-');
+                const itlP99 = validItls.length > 0 ? validItls[Math.floor(validItls.length * 0.99)].toFixed(1) : (Number.isFinite(Number(q?.itl?.p99)) ? Number(q.itl.p99).toFixed(1) : '-');
+
+                // 看门狗状态
+                const hasLoop = cells.some(c => c.loop_detected || c.hasConfirmedLoop || String(c.status || '').includes('loop'));
+                const watchdog = currentTaskData?.watchdog || row.results_json?.watchdog || {};
+                const loopDetected = hasLoop || watchdog.loop_detected;
+                const loopText = loopDetected 
+                    ? (isEn ? '<span style="color:#e06c75;">⚠️ Loop Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出死循环</span>') 
+                    : (isEn ? '<span style="color:#98c379;">✅ No Loop Detected</span>' : '<span style="color:#98c379;">✅ 未检出死循环</span>');
+                const driftText = watchdog.cjk_drift_detected 
+                    ? (isEn ? '<span style="color:#e06c75;">⚠️ CJK Drift Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出中文退化漂移</span>') 
+                    : (isEn ? '<span style="color:#98c379;">✅ Language Output Normal</span>' : '<span style="color:#98c379;">✅ 语言输出正常</span>');
+
+                // 热力图表格
+                const heatmapHtml = renderLeaderboardSingleMatrixTable(cells, currentTask, isEn, peakTps);
+
+                // 2D 矩阵综合特征卡片
+                const matrixProfileTitle = isEn ? '📊 2D Matrix Comprehensive Profile' : '📊 2D 矩阵综合特征分析 (Matrix Profile)';
+                const peakLabel = isEn ? '⚡ Peak Decode Throughput' : '⚡ 峰值解码吞吐 (Peak Decode)';
+                const satLabel = isEn ? '🚨 Saturation Onset' : '🚨 排队饱和拐点 (Saturation Onset)';
+                const satVal = saturationCell 
+                    ? `${saturationCell.concurrency}x (${saturationCell.effective_concurrency || (isEn ? 'Saturated' : '饱和')})` 
+                    : (isEn ? '✅ No Saturation Detected' : '✅ 全并发无排队饱和');
+                const ttftProfileLabel = isEn ? '⏱️ TTFT Quantiles' : '⏱️ 首字时延分位数 (TTFT)';
+                const itlProfileLabel = isEn ? '📊 ITL Jitter Quantiles' : '📊 单字时延分位数 (ITL Jitter)';
+                const watchdogLabel = isEn ? '🛡️ Watchdog Safeguards: ' : '🛡️ 异常防御看门狗：';
+
+                const profileHtml = `
+                    <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:18px; font-size:13px;">
+                        <h3 style="color:var(--accent-blue); margin-top:0; margin-bottom:12px; font-size:15px;">${matrixProfileTitle}</h3>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="color:var(--text-muted); font-size:11px;">${peakLabel}</div>
+                                <div style="color:var(--accent-green); font-size:18px; font-weight:bold; margin-top:4px;">
+                                    ${peakTps.toFixed(1)} <span style="font-size:12px; font-weight:normal;">tokens/s</span>
+                                    <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">${peakCell ? `(${peakCell.concurrency}x @ ${peakCell.context ?? peakCell.prompt_length ?? peakCell.promptLength} ctx)` : ''}</span>
+                                </div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="color:var(--text-muted); font-size:11px;">${satLabel}</div>
+                                <div style="color:#f59e0b; font-size:15px; font-weight:bold; margin-top:4px;">
+                                    ${satVal}
+                                </div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="color:var(--text-muted); font-size:11px;">${ttftProfileLabel}</div>
+                                <div style="color:#61afef; font-size:13px; font-weight:bold; margin-top:4px;">
+                                    P50: ${ttftP50}ms | P90: ${ttftP90}ms | P99: ${ttftP99}ms
+                                </div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="color:var(--text-muted); font-size:11px;">${itlProfileLabel}</div>
+                                <div style="color:#e5c07b; font-size:13px; font-weight:bold; margin-top:4px;">
+                                    P50: ${itlP50}ms | P90: ${itlP90}ms | P99: ${itlP99}ms
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color); font-size:12px; color:var(--text-muted);">
+                            ${watchdogLabel}${loopText} ｜ ${driftText}
+                        </div>
+                    </div>
+                `;
+
+                // 详细测试明细折叠表
+                const sortedCells = [...cells].sort((a, b) => {
+                    const ca = Number(a.concurrency) || 0, cb = Number(b.concurrency) || 0;
+                    if (ca !== cb) return ca - cb;
+                    const ctxA = Number(a.context ?? a.prompt_length ?? a.promptLength) || 0;
+                    const ctxB = Number(b.context ?? b.prompt_length ?? b.promptLength) || 0;
+                    return ctxA - ctxB;
+                });
+
+                let tableRowsHtml = sortedCells.map(pt => {
+                    const c = Number(pt.concurrency) || 1;
+                    const ctx = Number(pt.context ?? pt.prompt_length ?? pt.promptLength) || 0;
+                    const dSpeed = Number(pt.decode_tps ?? pt.output_speed ?? pt.outputSpeed);
+                    const pSpeed = Number(pt.prefill_speed ?? pt.prefillSpeed);
+                    const ttft = Number(pt.ttft_ms ?? pt.avg_ttft_ms ?? pt.prefill_time_ms);
+                    const itl = Number(pt.p50_itl ?? pt.avg_itl_mean);
+                    const itl90 = Number(pt.p90_itl);
+                    const eff = pt.effective_concurrency || `${c}/${c}`;
+                    const isSat = pt.is_saturated || (typeof eff === 'string' && eff.includes('*'));
+                    const satBadge = isSat ? `<span class="matrix-eff-badge">${escapeHtml(eff)}</span>` : `<span style="color:#98c379; font-size:11px;">${escapeHtml(eff)}</span>`;
+
+                    return `
+                        <tr id="matrix_row_${c}_${ctx}" style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:8px 10px; text-align:center; font-weight:bold; color:#c678dd;">${c}x</td>
+                            <td style="padding:8px 10px; text-align:center; color:var(--accent-blue);">${ctx}</td>
+                            <td style="padding:8px 10px; text-align:right; font-weight:bold; color:#c678dd;">${Number.isFinite(dSpeed) ? dSpeed.toFixed(1) : '-'}</td>
+                            <td style="padding:8px 10px; text-align:right; color:#98c379;">${Number.isFinite(pSpeed) ? pSpeed.toFixed(1) : '-'}</td>
+                            <td style="padding:8px 10px; text-align:right; color:#61afef; font-family:monospace;">${Number.isFinite(ttft) ? ttft.toFixed(0) : '-'}</td>
+                            <td style="padding:8px 10px; text-align:right; color:#e5c07b; font-family:monospace;">${Number.isFinite(itl) ? itl.toFixed(1) : '-'}</td>
+                            <td style="padding:8px 10px; text-align:right; color:#e5c07b; font-family:monospace;">${Number.isFinite(itl90) ? itl90.toFixed(1) : '-'}</td>
+                            <td style="padding:8px 10px; text-align:center;">${satBadge}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const accordionSummary = isEn 
+                    ? `📋 Click to view detailed test metrics table (Total ${cells.length} cells)` 
+                    : `📋 点击展开各单元格详细测试指标明细表 (共 ${cells.length} 个测试单元格)`;
+                const thConc = isEn ? 'Concurrency' : '并发';
+                const thCtx = isEn ? 'Context (tokens)' : '上下文 (tokens)';
+                const thDecodeTps = isEn ? 'Decode TPS (t/s)' : '解码吞吐 (t/s)';
+                const thPrefillTps = isEn ? 'Prefill Speed (t/s)' : '预填充速度 (t/s)';
+                const thEffConc = isEn ? 'Effective Conc.' : '有效并发';
+
+                const accordionHtml = `
+                    <details id="detailMatrixAccordion" class="detail-matrix-accordion" style="margin-bottom:20px; border:1px solid var(--border-color); border-radius:6px; background:rgba(0,0,0,0.15);">
+                        <summary style="padding:10px 14px; cursor:pointer; font-weight:bold; color:var(--text-main); font-size:13px; user-select:none;">
+                            ${accordionSummary}
+                        </summary>
+                        <div style="overflow-x:auto; padding:10px;">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                                <thead>
+                                    <tr style="background:var(--bg-panel); border-bottom:1px solid var(--border-color);">
+                                        <th style="padding:8px; text-align:center; color:#c678dd;">${thConc}</th>
+                                        <th style="padding:8px; text-align:center; color:var(--accent-blue);">${thCtx}</th>
+                                        <th style="padding:8px; text-align:right; color:var(--accent-purple);">${thDecodeTps}</th>
+                                        <th style="padding:8px; text-align:right; color:var(--accent-green);">${thPrefillTps}</th>
+                                        <th style="padding:8px; text-align:right; color:var(--accent-yellow);">TTFT (ms)</th>
+                                        <th style="padding:8px; text-align:right; color:#e5c07b;">ITL P50 (ms)</th>
+                                        <th style="padding:8px; text-align:right; color:#e5c07b;">ITL P90 (ms)</th>
+                                        <th style="padding:8px; text-align:center;">${thEffConc}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                `;
+
+                mainViewHtml = heatmapHtml + profileHtml + accordionHtml;
+            }
+
+            // 4. 全场景对比表 (若有 all_tasks_comparison 或 all_tasks_results)
+            const comparisonList = row.results_json?.all_tasks_comparison || row.results_json?.all_tasks_results || row.all_tasks_comparison || row.all_tasks_results;
+            const comparisonHtml = buildAllTasksComparisonHtml(comparisonList, isEn, row.concurrency || 1);
+
+            dataContainer.innerHTML = notesHtml + runCommandHtml + tabsBarHtml + mainViewHtml + comparisonHtml;
+            if (radarSection) radarSection.style.display = 'block';
+            renderModalRadarChart(row);
+
+            if (currentPageLanguage === PAGE_LANGUAGE.EN) {
+                schedulePageTranslation();
+            }
+        }
 
         async function viewDetails(id) {
             let row = resultsDataMap[id];
@@ -8627,13 +9210,44 @@
                 modeSubtitleLabel = `<span style="background:rgba(26,115,232,0.25); color:#61afef; border:1px solid rgba(26,115,232,0.5); padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:600;">${isEn ? '📊 Standard Prompt Ladder Benchmark' : '📊 标准提示词阶梯测试'}</span>`;
             }
 
+            // 计算用于详情模态框顶部副标题的准确并发数 (Calculate accurate concurrency for modal subtitle)
+            let displayConcurrency = `${row.concurrency}`;
+            if (mode === 'sustained_decode') {
+                const sPoint = (Array.isArray(row.results_json?.points) && row.results_json.points.length > 0)
+                    ? row.results_json.points[0]
+                    : (Array.isArray(row.results_json) && row.results_json.length > 0 ? row.results_json[0] : (row.results_json?.sustained_summary || {}));
+                const poolConc = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+                displayConcurrency = `${poolConc}x (${isEn ? 'Stream Pool' : '并发流池'})`;
+            } else if (mode === '2d_matrix') {
+                const mPoints = Array.isArray(row.results_json?.points) ? row.results_json.points : [];
+                const concs = mPoints.map(p => parseInt(p.concurrency, 10)).filter(n => Number.isFinite(n) && n > 0);
+                if (concs.length > 0) {
+                    const minC = Math.min(...concs);
+                    const maxC = Math.max(...concs);
+                    displayConcurrency = minC === maxC ? `${maxC}x` : `${minC}-${maxC}x`;
+                }
+            }
+
             document.getElementById('modalSubtitle').innerHTML = isEn
-                ? `Hardware: ${escapeHtml(row.hardware)} | Engine: ${escapeHtml(row.framework || '-')} | Concurrency: ${row.concurrency} | Timestamp: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${taskBadge}`
-                : `硬件: ${escapeHtml(row.hardware)} | 框架: ${escapeHtml(row.framework || '-')} | 并发: ${row.concurrency} | 记录时间: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${taskBadge}`;
+                ? `Hardware: ${escapeHtml(row.hardware)} | Engine: ${escapeHtml(row.framework || '-')} | Concurrency: ${displayConcurrency} | Timestamp: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${taskBadge}`
+                : `硬件: ${escapeHtml(row.hardware)} | 框架: ${escapeHtml(row.framework || '-')} | 并发: ${displayConcurrency} | 记录时间: ${new Date(row.created_at).toLocaleString()} <span class="${detailVerif.badgeClass}" style="margin-left:8px;" title="${escapeHtml(detailVerif.tooltip)}">${detailVerif.badgeLabel}</span>${modeSubtitleLabel}${taskBadge}`;
 
             const dataContainer = document.getElementById('modalDataContainer');
             const chartsGrid = document.querySelector('.charts-grid');
             const radarSection = document.getElementById('modalRadarSection');
+
+            // 测速备注展示卡片 (Notes Banner)
+            const notesText = row.notes ? escapeHtml(row.notes) : (isEn ? 'No notes provided' : '无用户备注');
+            const notesHtml = `
+                <div class="modal-notes-banner" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); padding:10px 14px; border-radius:6px; color:#98c379; font-size:13px; font-weight:500; margin-bottom:16px; display:flex; align-items:flex-start; gap:8px;">
+                    <span style="font-size:16px; line-height:1;">📝</span>
+                    <div style="flex:1;">
+                        <strong style="color:#61afef;">${isEn ? 'Benchmark Notes / Configuration:' : '测速备注 / 配置说明:'}</strong>
+                        <span style="color:#e2e8f0; margin-left:6px; word-break:break-word;">${notesText}</span>
+                    </div>
+                </div>
+            `;
+
             const runCommandText = row.run_command ? escapeHtml(row.run_command) : '';
             const runCommandHtml = runCommandText ? `
                 <details class="detail-command-accordion" ontoggle="handleDetailCommandToggle(this)">
@@ -8656,241 +9270,15 @@
             // Mode Branch 1: 2D Matrix (并发 × 上下文 2D 矩阵测试)
             // =========================================================================
             if (mode === '2d_matrix') {
-                if (chartsGrid) chartsGrid.style.display = 'none';
-                ['prefill', 'decode', 'ttft', 'itl'].forEach(k => {
-                    if (charts[k]) { charts[k].destroy(); delete charts[k]; }
-                });
-
-                let rawMatrix = row.results_json?.matrix;
-                let rawPoints = row.results_json?.points;
-                let cells = [];
-                if (Array.isArray(rawPoints) && rawPoints.length > 0) {
-                    cells = rawPoints;
-                } else if (Array.isArray(rawMatrix) && rawMatrix.length > 0) {
-                    cells = rawMatrix.flat().filter(Boolean);
-                } else if (Array.isArray(row.results_json)) {
-                    cells = row.results_json;
-                }
-
-                const concurrencies = Array.from(new Set(cells.map(c => Number(c.concurrency)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
-                const contexts = Array.from(new Set(cells.map(c => Number(c.context ?? c.prompt_length ?? c.promptLength)).filter(n => Number.isFinite(n) && n > 0))).sort((a, b) => a - b);
-
-                let peakTps = 0;
-                let peakCell = null;
-                let saturationCell = null;
-                cells.forEach(cell => {
-                    const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
-                    if (tps > peakTps) {
-                        peakTps = tps;
-                        peakCell = cell;
-                    }
-                    const isSat = cell.is_saturated || (typeof cell.effective_concurrency === 'string' && cell.effective_concurrency.includes('*'));
-                    if (isSat && !saturationCell) {
-                        saturationCell = cell;
-                    }
-                });
-
-                const q = row.results_json?.quantiles || {};
-                const ttftP50 = Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) : '-';
-                const ttftP90 = Number.isFinite(Number(q?.ttft?.p90)) ? Number(q.ttft.p90).toFixed(1) : '-';
-                const ttftP99 = Number.isFinite(Number(q?.ttft?.p99)) ? Number(q.ttft.p99).toFixed(1) : '-';
-                const itlP50 = Number.isFinite(Number(q?.itl?.p50)) ? Number(q.itl.p50).toFixed(1) : '-';
-                const itlP90 = Number.isFinite(Number(q?.itl?.p90)) ? Number(q.itl.p90).toFixed(1) : '-';
-                const itlP99 = Number.isFinite(Number(q?.itl?.p99)) ? Number(q.itl.p99).toFixed(1) : '-';
-
-                const watchdog = row.results_json?.watchdog || {};
-                const loopText = watchdog.loop_detected 
-                    ? (isEn ? '<span style="color:#e06c75;">⚠️ Loop Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出死循环</span>') 
-                    : (isEn ? '<span style="color:#98c379;">✅ No Loop Detected</span>' : '<span style="color:#98c379;">✅ 未检出死循环</span>');
-                const driftText = watchdog.cjk_drift_detected 
-                    ? (isEn ? '<span style="color:#e06c75;">⚠️ CJK Drift Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出中文退化漂移</span>') 
-                    : (isEn ? '<span style="color:#98c379;">✅ Language Output Normal</span>' : '<span style="color:#98c379;">✅ 语言输出正常</span>');
-
-                let heatmapRowsHtml = concurrencies.map(c => {
-                    const cellsHtml = contexts.map(ctx => {
-                        const cell = cells.find(x => Number(x.concurrency) === c && Number(x.context ?? x.prompt_length ?? x.promptLength) === ctx);
-                        if (!cell) {
-                            return `<td class="matrix-cell empty">--</td>`;
-                        }
-                        const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
-                        const ttft = Number(cell.ttft_ms ?? cell.avg_ttft_ms ?? cell.prefill_time_ms) || 0;
-                        const itl = Number(cell.p50_itl ?? cell.avg_itl_mean) || 0;
-                        const isSat = cell.is_saturated || (typeof cell.effective_concurrency === 'string' && cell.effective_concurrency.includes('*'));
-                        const eff = cell.effective_concurrency || `${c}/${c}`;
-                        const satBadge = isSat ? `<span class="matrix-eff-badge">${escapeHtml(eff)}</span>` : '';
-                        
-                        const ratio = peakTps > 0 ? Math.min(1, Math.max(0, tps / peakTps)) : 0;
-                        const bgR = Math.round(26 + ratio * (16 - 26));
-                        const bgG = Math.round(30 + ratio * (185 - 30));
-                        const bgB = Math.round(40 + ratio * (129 - 40));
-                        const bgOpacity = 0.15 + ratio * 0.45;
-                        const bgColor = `rgba(${bgR}, ${bgG}, ${bgB}, ${bgOpacity.toFixed(2)})`;
-                        const cellTooltip = isEn ? `Click for details: ${c}x concurrency @ ${ctx} context` : `点击查看详情: ${c}x并发 @ ${ctx}上下文`;
-
-                        return `
-                            <td class="matrix-cell" style="background:${bgColor};" onclick="highlightMatrixDetailRow(${c}, ${ctx})" title="${escapeHtml(cellTooltip)}">
-                                <div class="matrix-tps-val">${tps.toFixed(1)} <span style="font-size:10px; font-weight:normal; color:#8b949e;">t/s</span>${satBadge}</div>
-                                <div class="matrix-sub-val">TTFT: ${ttft.toFixed(0)}ms | ITL: ${itl.toFixed(1)}ms</div>
-                            </td>
-                        `;
-                    }).join('');
-                    return `<tr><th class="matrix-row-header">${c}x</th>${cellsHtml}</tr>`;
-                }).join('');
-
-                const sortedCells = [...cells].sort((a, b) => {
-                    const ca = Number(a.concurrency) || 0, cb = Number(b.concurrency) || 0;
-                    if (ca !== cb) return ca - cb;
-                    const ctxA = Number(a.context ?? a.prompt_length ?? a.promptLength) || 0;
-                    const ctxB = Number(b.context ?? b.prompt_length ?? b.promptLength) || 0;
-                    return ctxA - ctxB;
-                });
-
-                let tableRowsHtml = sortedCells.map(pt => {
-                    const c = Number(pt.concurrency) || 1;
-                    const ctx = Number(pt.context ?? pt.prompt_length ?? pt.promptLength) || 0;
-                    const dSpeed = Number(pt.decode_tps ?? pt.output_speed ?? pt.outputSpeed);
-                    const pSpeed = Number(pt.prefill_speed ?? pt.prefillSpeed);
-                    const ttft = Number(pt.ttft_ms ?? pt.avg_ttft_ms ?? pt.prefill_time_ms);
-                    const itl = Number(pt.p50_itl ?? pt.avg_itl_mean);
-                    const itl90 = Number(pt.p90_itl);
-                    const eff = pt.effective_concurrency || `${c}/${c}`;
-                    const isSat = pt.is_saturated || (typeof eff === 'string' && eff.includes('*'));
-                    const satBadge = isSat ? `<span class="matrix-eff-badge">${escapeHtml(eff)}</span>` : `<span style="color:#98c379; font-size:11px;">${escapeHtml(eff)}</span>`;
-
-                    return `
-                        <tr id="matrix_row_${c}_${ctx}" style="border-bottom:1px solid var(--border-color);">
-                            <td style="padding:8px 10px; text-align:center; font-weight:bold; color:#c678dd;">${c}x</td>
-                            <td style="padding:8px 10px; text-align:center; color:var(--accent-blue);">${ctx}</td>
-                            <td style="padding:8px 10px; text-align:right; font-weight:bold; color:#c678dd;">${Number.isFinite(dSpeed) ? dSpeed.toFixed(1) : '-'}</td>
-                            <td style="padding:8px 10px; text-align:right; color:#98c379;">${Number.isFinite(pSpeed) ? pSpeed.toFixed(1) : '-'}</td>
-                            <td style="padding:8px 10px; text-align:right; color:#61afef; font-family:monospace;">${Number.isFinite(ttft) ? ttft.toFixed(0) : '-'}</td>
-                            <td style="padding:8px 10px; text-align:right; color:#e5c07b; font-family:monospace;">${Number.isFinite(itl) ? itl.toFixed(1) : '-'}</td>
-                            <td style="padding:8px 10px; text-align:right; color:#e5c07b; font-family:monospace;">${Number.isFinite(itl90) ? itl90.toFixed(1) : '-'}</td>
-                            <td style="padding:8px 10px; text-align:center;">${satBadge}</td>
-                        </tr>
-                    `;
-                }).join('');
-
-                const matrixCornerLabel = isEn ? 'Concurrency \\ Context' : '并发 \\ 上下文';
-                const matrixHeatmapTitle = isEn ? '🧊 Concurrency × Context Heatmap' : '🧊 2D 并发×上下文实测热力矩阵 (Concurrency × Context Heatmap)';
-                const matrixHeatmapSub = isEn 
-                    ? `Total ${concurrencies.length} concurrency steps × ${contexts.length} context tiers` 
-                    : `共 ${concurrencies.length} 个并发梯度 × ${contexts.length} 个上下文阶梯`;
-                const matrixProfileTitle = isEn ? '📊 2D Matrix Comprehensive Profile' : '📊 2D 矩阵综合特征分析 (Matrix Profile)';
-                const peakLabel = isEn ? '⚡ Peak Decode Throughput' : '⚡ 峰值解码吞吐 (Peak Decode)';
-                const satLabel = isEn ? '🚨 Saturation Onset' : '🚨 排队饱和拐点 (Saturation Onset)';
-                const satVal = saturationCell 
-                    ? `${saturationCell.concurrency}x (${saturationCell.effective_concurrency || (isEn ? 'Saturated' : '饱和')})` 
-                    : (isEn ? '✅ No Saturation Detected' : '✅ 全并发无排队饱和');
-                const ttftProfileLabel = isEn ? '⏱️ TTFT Quantiles' : '⏱️ 首字时延分位数 (TTFT)';
-                const itlProfileLabel = isEn ? '📊 ITL Jitter Quantiles' : '📊 单字时延分位数 (ITL Jitter)';
-                const watchdogLabel = isEn ? '🛡️ Watchdog Safeguards: ' : '🛡️ 异常防御看门狗：';
-                const accordionSummary = isEn 
-                    ? `📋 Click to view detailed test metrics table (Total ${cells.length} cells)` 
-                    : `📋 点击展开各单元格详细测试指标明细表 (共 ${cells.length} 个测试单元格)`;
-                const thConc = isEn ? 'Concurrency' : '并发';
-                const thCtx = isEn ? 'Context (tokens)' : '上下文 (tokens)';
-                const thDecodeTps = isEn ? 'Decode TPS (t/s)' : '解码吞吐 (t/s)';
-                const thPrefillTps = isEn ? 'Prefill Speed (t/s)' : '预填充速度 (t/s)';
-                const thEffConc = isEn ? 'Effective Conc.' : '有效并发';
-
-                let matrixHtml = `
-                    ${runCommandHtml}
-                    <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:18px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                <h3 style="margin:0; color:var(--accent-blue); font-size:15px;">${matrixHeatmapTitle}</h3>
-                                ${taskBadge}
-                            </div>
-                            <div style="font-size:12px; color:var(--text-muted);">${matrixHeatmapSub}</div>
-                        </div>
-                        <div class="matrix-table-wrapper" style="margin-top:0;">
-                            <table class="matrix-table">
-                                <thead>
-                                    <tr>
-                                        <th class="matrix-corner">${matrixCornerLabel}</th>
-                                        ${contexts.map(ctx => `<th>${ctx} ctx</th>`).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${heatmapRowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:18px; font-size:13px;">
-                        <h3 style="color:var(--accent-blue); margin-top:0; margin-bottom:12px; font-size:15px;">${matrixProfileTitle}</h3>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="color:var(--text-muted); font-size:11px;">${peakLabel}</div>
-                                <div style="color:var(--accent-green); font-size:18px; font-weight:bold; margin-top:4px;">
-                                    ${peakTps.toFixed(1)} <span style="font-size:12px; font-weight:normal;">tokens/s</span>
-                                    <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">${peakCell ? `(${peakCell.concurrency}x @ ${peakCell.context ?? peakCell.prompt_length} ctx)` : ''}</span>
-                                </div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="color:var(--text-muted); font-size:11px;">${satLabel}</div>
-                                <div style="color:#f59e0b; font-size:15px; font-weight:bold; margin-top:4px;">
-                                    ${satVal}
-                                </div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="color:var(--text-muted); font-size:11px;">${ttftProfileLabel}</div>
-                                <div style="color:#61afef; font-size:13px; font-weight:bold; margin-top:4px;">
-                                    P50: ${ttftP50}ms | P90: ${ttftP90}ms | P99: ${ttftP99}ms
-                                </div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                                <div style="color:var(--text-muted); font-size:11px;">${itlProfileLabel}</div>
-                                <div style="color:#e5c07b; font-size:13px; font-weight:bold; margin-top:4px;">
-                                    P50: ${itlP50}ms | P90: ${itlP90}ms | P99: ${itlP99}ms
-                                </div>
-                            </div>
-                        </div>
-                        <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color); font-size:12px; color:var(--text-muted);">
-                            ${watchdogLabel}${loopText} ｜ ${driftText}
-                        </div>
-                    </div>
-
-                    <details id="detailMatrixAccordion" class="detail-matrix-accordion" style="margin-bottom:20px; border:1px solid var(--border-color); border-radius:6px; background:rgba(0,0,0,0.15);">
-                        <summary style="padding:10px 14px; cursor:pointer; font-weight:bold; color:var(--text-main); font-size:13px; user-select:none;">
-                            ${accordionSummary}
-                        </summary>
-                        <div style="overflow-x:auto; padding:10px;">
-                            <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                                <thead>
-                                    <tr style="background:var(--bg-panel); border-bottom:1px solid var(--border-color);">
-                                        <th style="padding:8px; text-align:center; color:#c678dd;">${thConc}</th>
-                                        <th style="padding:8px; text-align:center; color:var(--accent-blue);">${thCtx}</th>
-                                        <th style="padding:8px; text-align:right; color:var(--accent-purple);">${thDecodeTps}</th>
-                                        <th style="padding:8px; text-align:right; color:var(--accent-green);">${thPrefillTps}</th>
-                                        <th style="padding:8px; text-align:right; color:var(--accent-yellow);">TTFT (ms)</th>
-                                        <th style="padding:8px; text-align:right; color:#e5c07b;">ITL P50 (ms)</th>
-                                        <th style="padding:8px; text-align:right; color:#e5c07b;">ITL P90 (ms)</th>
-                                        <th style="padding:8px; text-align:center;">${thEffConc}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${tableRowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                `;
-
-                dataContainer.innerHTML = matrixHtml;
-                if (radarSection) radarSection.style.display = 'block';
-                renderModalRadarChart(row);
-
-                if (currentPageLanguage === PAGE_LANGUAGE.EN) {
-                    schedulePageTranslation();
-                }
+                window.activeLeaderboardRow = row;
+                window.activeLeaderboardMatrixTask = taskType || 'general';
+                window.leaderboardMatrixViewMode = 'tabs';
+                renderLeaderboardMatrixView(row);
                 return;
             }
 
             // =========================================================================
-            // Mode Branch 2: Sustained Decode (稳态持续解码压测)
+            // Mode Branch 2: Sustained Decode (稳态持续解码压测性能详报)
             // =========================================================================
             if (mode === 'sustained_decode') {
                 if (chartsGrid) chartsGrid.style.display = 'none';
@@ -8898,20 +9286,31 @@
                     if (charts[k]) { charts[k].destroy(); delete charts[k]; }
                 });
 
+                // 提取稳态测试汇总数据点 (sPoint)
                 const sPoint = (Array.isArray(row.results_json?.points) && row.results_json.points.length > 0)
                     ? row.results_json.points[0]
                     : (Array.isArray(row.results_json) && row.results_json.length > 0 ? row.results_json[0] : (row.results_json?.sustained_summary || {}));
                 
+                // 核心时长与速率指标解析
                 const durationSec = Number(sPoint?.output_time_ms ?? sPoint?.outputTimeMs) > 0 
                     ? (Number(sPoint.output_time_ms ?? sPoint.outputTimeMs) / 1000)
                     : (row.notes && row.notes.includes('s') ? parseFloat(row.notes) : 30);
                 const sustainedTps = Number(sPoint?.output_speed ?? sPoint?.outputSpeed ?? row.max_decode_speed ?? row.avg_decode_speed) || 0;
                 const prefillSpeed = Number(sPoint?.prefill_speed ?? sPoint?.prefillSpeed ?? row.max_prefill_speed ?? row.avg_prefill_speed) || 0;
                 const totalTokens = sPoint?.outputTokens ?? sPoint?.output_tokens ?? sPoint?.total_tokens ?? (Math.round(sustainedTps * durationSec) || '-');
-                const completedStreams = sPoint?.successful ?? sPoint?.completedStreams ?? row.concurrency;
-                const poolConcurrency = Number(sPoint?.concurrency ?? row.concurrency) || 1;
+                const completedStreams = Number(sPoint?.successful ?? sPoint?.completedStreams ?? row.concurrency) || 1;
+                const poolConcurrency = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
                 const effConc = sPoint?.effective_concurrency ?? row.results_json?.effective_concurrency ?? `${poolConcurrency}/${poolConcurrency}`;
                 
+                // 端到端总吞吐与纯解码时长计算
+                const e2eSpeed = Number(sPoint?.e2e_speed ?? sPoint?.e2eSpeed) 
+                    || (durationSec > 0 && Number(totalTokens) > 0 ? (Number(totalTokens) / durationSec) : sustainedTps);
+                const pureDecodeTimeSec = Number(sPoint?.pure_decode_time_sec ?? sPoint?.pureDecodeTimeSec) 
+                    || (Number(sPoint?.output_time_ms ?? sPoint?.outputTimeMs) > 0 ? (Number(sPoint.output_time_ms ?? sPoint.outputTimeMs) / 1000) : durationSec);
+                const avgStreamTps = Number(sPoint?.avg_stream_decode_speed ?? sPoint?.avgStreamDecodeSpeed) 
+                    || (poolConcurrency > 0 ? (sustainedTps / poolConcurrency) : sustainedTps);
+                
+                // 时延分位数与抖动统计 (Quantiles)
                 const q = row.results_json?.quantiles || {};
                 const ttftP50 = Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) : (Number(sPoint?.avg_ttft_ms ?? sPoint?.avgTtftMs) ? Number(sPoint.avg_ttft_ms ?? sPoint.avgTtftMs).toFixed(1) : '-');
                 const ttftP90 = Number.isFinite(Number(q?.ttft?.p90)) ? Number(q.ttft.p90).toFixed(1) : '-';
@@ -8922,6 +9321,7 @@
                 const itlP99 = Number.isFinite(Number(q?.itl?.p99)) ? Number(q.itl.p99).toFixed(1) : '-';
                 const itlStd = Number.isFinite(Number(sPoint?.avg_itl_std ?? sPoint?.avgItlStd)) ? Number(sPoint.avg_itl_std ?? sPoint.avgItlStd).toFixed(2) : '-';
                 
+                // 看门狗与防作弊签名状态 (Watchdogs & Signature)
                 const watchdog = row.results_json?.watchdog || {};
                 const loopText = watchdog.loop_detected 
                     ? (isEn ? '<span style="color:#e06c75;">⚠️ Loop Detected</span>' : '<span style="color:#e06c75;">⚠️ 检出死循环</span>') 
@@ -8934,26 +9334,119 @@
                     ? (isEn ? `<span style="color:var(--accent-blue);">Certified Signature (${escapeHtml(verifInfo.hash)})</span>` : `<span style="color:var(--accent-blue);">已签名认证 (${escapeHtml(verifInfo.hash)})</span>`)
                     : (isEn ? 'Standard Verification Passed' : '标准校验通过');
 
+                // 标题与卡片国际化标签
                 const sustainedProfileTitle = isEn ? '⏱️ Sustained Decode Profile' : '⏱️ 稳态持续解码压测性能卡 (Sustained Decode Profile)';
                 const windowDurationText = durationSec > 0 ? (isEn ? durationSec.toFixed(1) + 's Benchmark Window' : durationSec.toFixed(1) + 's 实测窗口') : '';
                 const cardDecodeTps = isEn ? 'Sustained Decode (TPS)' : '稳态解码吞吐 (TPS)';
+                const cardE2eTps = isEn ? 'E2E Throughput (TPS)' : '端到端总吞吐 (TPS)';
+                const cardPrefillTps = isEn ? 'Prefill Speed (TPS)' : '预填充吞吐 (TPS)';
                 const cardTotalTokens = isEn ? 'Total Tokens Produced' : '产出总 Token';
                 const cardCompletedStreams = isEn ? 'Completed Streams' : '完成流数量';
-                const cardStreamPool = isEn ? 'Concurrent Stream Pool' : '并发流池规模';
+                const cardStreamPool = isEn ? 'Stream Pool Size' : '并发流池规模';
                 const reportTitle = isEn ? '🎯 Sustained Decode Benchmark Report' : '🎯 稳态持续解码评测详报';
-                const reportDurationLabel = isEn ? '• <strong>Benchmark Window Duration: </strong>' : '• <strong>实测窗口时长：</strong>';
-                const reportDurationUnit = isEn ? 'seconds' : '秒';
-                const reportOutputLabel = isEn ? '• <strong>Sustained Output Throughput: </strong>' : '• <strong>稳态输出吞吐：</strong>';
-                const reportPrefillLabel = isEn ? '• <strong>Prefill Throughput: </strong>' : '• <strong>预填充吞吐 (Prefill)：</strong>';
-                const reportTtftLabel = isEn ? '• <strong>TTFT Quantiles (TTFT): </strong>' : '• <strong>首字时延分位数 (TTFT)：</strong>';
-                const reportItlLabel = isEn ? '• <strong>ITL Jitter Quantiles (ITL Jitter): </strong>' : '• <strong>单字抖动分位数 (ITL Jitter)：</strong>';
-                const reportEffConcLabel = isEn ? '• <strong>Effective Concurrency: </strong>' : '• <strong>有效并发：</strong>';
-                const reportPoolConfig = isEn ? `(${poolConcurrency}x concurrency pool configured)` : `(流池配置: ${poolConcurrency}x 并发)`;
-                const reportWatchdogLabel = isEn ? '• <strong>Anti-Cheating Watchdog: </strong>' : '• <strong>防作弊看门狗：</strong>';
-                const reportVerifLabel = isEn ? '• <strong>Verification Checksum Status: </strong>' : '• <strong>校验指纹状态：</strong>';
+
+                // 提取并发流明细列表 (Concurrent Streams Breakdown)
+                const rawStreams = Array.isArray(sPoint?.concurrent_details) && sPoint.concurrent_details.length > 0
+                    ? sPoint.concurrent_details
+                    : (Array.isArray(sPoint?.concurrentDetails) && sPoint.concurrentDetails.length > 0 
+                        ? sPoint.concurrentDetails 
+                        : (Array.isArray(row.results_json?.points) && row.results_json.points.length > 1 ? row.results_json.points : []));
+                
+                let streamRows = [];
+                if (rawStreams.length > 0) {
+                    streamRows = rawStreams.map((st, idx) => {
+                        const outTps = Number(st.output_speed ?? st.outputSpeed ?? st.decode_tps ?? avgStreamTps) || avgStreamTps;
+                        const prefTps = Number(st.prefill_speed ?? st.prefillSpeed) || (prefillSpeed > 0 ? prefillSpeed : '-');
+                        const tokens = Number(st.output_tokens ?? st.outputTokens ?? st.tokens) 
+                            || (completedStreams > 0 && Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-');
+                        const ttft = Number.isFinite(Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms)) 
+                            ? Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms).toFixed(1) 
+                            : ttftP50;
+                        const itl = Number.isFinite(Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean)) 
+                            ? Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean).toFixed(1) 
+                            : itlP50;
+                        const dur = Number(st.output_time_ms ?? st.outputTimeMs) > 0 
+                            ? (Number(st.output_time_ms ?? st.outputTimeMs) / 1000).toFixed(2) + 's' 
+                            : (durationSec > 0 ? durationSec.toFixed(1) + 's' : '-');
+                        return {
+                            id: st.stream_id || (idx + 1),
+                            outTps: typeof outTps === 'number' ? outTps.toFixed(1) : outTps,
+                            prefTps: typeof prefTps === 'number' ? prefTps.toFixed(1) : prefTps,
+                            tokens,
+                            ttft,
+                            itl,
+                            duration: dur,
+                            status: st.status || (isEn ? 'Passed' : '正常通过')
+                        };
+                    });
+                } else if (completedStreams > 0) {
+                    const perStreamTokens = Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-';
+                    const streamCount = Math.min(completedStreams, 16);
+                    for (let i = 0; i < streamCount; i++) {
+                        streamRows.push({
+                            id: i + 1,
+                            outTps: avgStreamTps > 0 ? avgStreamTps.toFixed(1) : sustainedTps.toFixed(1),
+                            prefTps: prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A',
+                            tokens: perStreamTokens,
+                            ttft: ttftP50,
+                            itl: itlP50,
+                            duration: durationSec.toFixed(1) + 's',
+                            status: isEn ? 'Passed' : '正常通过'
+                        });
+                    }
+                }
+
+                // 渲染并发流测试明细表格行
+                const streamTableRowsHtml = streamRows.map(st => `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:7px 10px; font-weight:600; color:#61afef;">#${st.id}</td>
+                        <td style="padding:7px 10px; font-weight:bold; color:#e5c07b;">${st.tokens}</td>
+                        <td style="padding:7px 10px; font-family:monospace; color:#61afef;">${st.ttft !== '-' ? `${st.ttft}ms` : '-'}</td>
+                        <td style="padding:7px 10px; font-family:monospace; color:#e5c07b;">${st.itl !== '-' ? `${st.itl}ms` : '-'}</td>
+                        <td style="padding:7px 10px; font-weight:bold; color:#c678dd;">${st.outTps} <span style="font-size:10px; font-weight:normal;">t/s</span></td>
+                        <td style="padding:7px 10px; color:#98c379;">${st.prefTps !== '-' && st.prefTps !== 'N/A' ? `${st.prefTps} t/s` : (st.prefTps || '-')}</td>
+                        <td style="padding:7px 10px; font-family:monospace; color:var(--text-muted);">${st.duration}</td>
+                        <td style="padding:7px 10px; color:#98c379;">${st.status.includes('Passed') || st.status.includes('通过') || st.status.includes('成功') ? '✅ ' + escapeHtml(st.status) : escapeHtml(st.status)}</td>
+                    </tr>
+                `).join('');
+
+                const streamAccordionHtml = streamRows.length > 0 ? `
+                    <details class="detail-matrix-accordion" open style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; margin-bottom:20px; overflow:hidden;">
+                        <summary style="padding:12px 16px; cursor:pointer; font-weight:600; color:var(--accent-blue); background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; user-select:none;">
+                            <span style="display:inline-flex; align-items:center; gap:8px;">
+                                <span class="detail-command-arrow">▶</span>
+                                <span style="color:var(--accent-green);">📋</span>
+                                <span>${isEn ? 'Concurrent Streams & Request Breakdown Table' : '并发流与请求测试明细表 (Streams Breakdown)'}</span>
+                            </span>
+                            <span style="font-size:12px; color:var(--text-muted); font-weight:normal;">${isEn ? `Total ${streamRows.length} streams` : `共 ${streamRows.length} 个流记录`}</span>
+                        </summary>
+                        <div style="padding:12px; overflow-x:auto;">
+                            <table class="leaderboard-table" style="width:100%; font-size:12px; text-align:center; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:rgba(255,255,255,0.04); color:var(--text-muted);">
+                                        <th style="padding:8px 10px;">${isEn ? 'Stream #' : '流序号'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'Tokens' : '产出 Token'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'TTFT (ms)' : '首字时延 (TTFT)'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'ITL Jitter (ms)' : '单字间隔 (ITL)'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'Decode TPS' : '纯解码吞吐'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'Prefill TPS' : '预填充吞吐'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'Duration' : '单流耗时'}</th>
+                                        <th style="padding:8px 10px;">${isEn ? 'Status' : '执行状态'}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${streamTableRowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                ` : '';
 
                 let sustainedHtml = `
+                    ${notesHtml}
                     ${runCommandHtml}
+                    
+                    <!-- 1. 顶部 6 项关键性能看板卡片 (Top 6 Metric Cards Dashboard) -->
                     <div class="sustained-live-dashboard" style="background:rgba(20,28,40,0.85); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:20px; margin-bottom:20px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -8966,37 +9459,116 @@
                             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:11px; color:var(--text-muted);">${cardDecodeTps}</div>
                                 <div style="font-size:24px; font-weight:bold; color:var(--accent-green); margin-top:4px;">${sustainedTps.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Excl. prefill' : '纯解码稳态'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardE2eTps}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#61afef; margin-top:4px;">${e2eSpeed.toFixed(1)} <span style="font-size:12px; font-weight:normal;">t/s</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Incl. prefill & queue' : '端到端总吞吐'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:11px; color:var(--text-muted);">${cardPrefillTps}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#98c379; margin-top:4px;">${prefillSpeed > 0 ? prefillSpeed.toFixed(1) : 'N/A'} <span style="font-size:12px; font-weight:normal;">${prefillSpeed > 0 ? 't/s' : ''}</span></div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Prompt prefill' : '提示词预填充'}</div>
                             </div>
                             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:11px; color:var(--text-muted);">${cardTotalTokens}</div>
-                                <div style="font-size:24px; font-weight:bold; color:#61afef; margin-top:4px;">${totalTokens}</div>
+                                <div style="font-size:24px; font-weight:bold; color:#e5c07b; margin-top:4px;">${totalTokens}</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Tokens generated' : '已产出 Token'}</div>
                             </div>
                             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:11px; color:var(--text-muted);">${cardCompletedStreams}</div>
                                 <div style="font-size:24px; font-weight:bold; color:#d19a66; margin-top:4px;">${completedStreams}</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Streams finished' : '已完成并发流'}</div>
                             </div>
                             <div style="background:rgba(255,255,255,0.03); padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:11px; color:var(--text-muted);">${cardStreamPool}</div>
                                 <div style="font-size:24px; font-weight:bold; color:#c678dd; margin-top:4px;">${poolConcurrency}x</div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${isEn ? 'Stream pool size' : '并发流池规模'}</div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- 2. 时延与单字抖动质量分析看板 (Latency & Jitter Quality Panels) -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:20px;">
+                        <!-- 首字时延 TTFT 分布卡片 -->
+                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(97,175,239,0.25); border-radius:8px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <strong style="color:#61afef; font-size:14px;">⏱️ ${isEn ? 'TTFT Latency Distribution' : '首字时延 (TTFT) 分布'}</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">${isEn ? 'Time to First Token' : '首字响应时延'}</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#61afef; margin-top:2px;">${ttftP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 单字间隔 ITL Jitter 抖动分布卡片 -->
+                        <div style="background:rgba(20,28,40,0.85); border:1px solid rgba(229,192,123,0.25); border-radius:8px; padding:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <strong style="color:#e5c07b; font-size:14px;">📊 ${isEn ? 'ITL Jitter Distribution' : '单字间隔抖动 (ITL Jitter)'}</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">${itlStd !== '-' ? `σ: ${itlStd}ms` : (isEn ? 'Inter-Token Latency' : '流式字间间隔')}</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; text-align:center;">
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P50 (中位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP50} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P90 (分位)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP90} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03); padding:8px 4px; border-radius:5px; border:1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-size:11px; color:var(--text-muted);">P99 (长尾)</div>
+                                    <div style="font-size:16px; font-weight:bold; color:#e5c07b; margin-top:2px;">${itlP99} <span style="font-size:10px; font-weight:normal;">ms</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. 并发流与请求测试明细表 (Streams Breakdown Table) -->
+                    ${streamAccordionHtml}
+
+                    <!-- 4. 稳态压测详报与防作弊看门狗卡片 (Benchmark Report & Watchdogs) -->
                     <div style="background:var(--bg-panel); border:1px solid var(--border-color); border-radius:8px; padding:18px; margin-bottom:20px; font-size:13px; line-height:1.9;">
-                        <h4 style="margin:0 0 12px 0; color:var(--accent-green); font-size:15px;">${reportTitle}</h4>
-                        <div style="color:var(--text-main);">
-                            ${isEn ? '• <strong>Benchmark Workload (Task Type): </strong>' : '• <strong>评测任务场景 (测试类型)：</strong>'}${taskBadge} <span style="color:var(--text-muted); font-size:12px;">(${escapeHtml(taskName)})</span><br>
-                            ${reportDurationLabel}${durationSec.toFixed(1)} ${reportDurationUnit}<br>
-                            ${reportOutputLabel}<strong style="color:var(--accent-green); font-size:16px;">${sustainedTps.toFixed(2)} tokens/s</strong><br>
-                            ${reportPrefillLabel}${prefillSpeed > 0 ? `${prefillSpeed.toFixed(1)} tokens/s` : 'N/A'}<br>
-                            ${reportTtftLabel}P50: <span style="color:#61afef; font-weight:bold;">${ttftP50}ms</span> | P90: <span style="color:#61afef;">${ttftP90}ms</span> | P99: <span style="color:#61afef;">${ttftP99}ms</span><br>
-                            ${reportItlLabel}P50: <span style="color:#e5c07b; font-weight:bold;">${itlP50}ms</span> | P90: <span style="color:#e5c07b;">${itlP90}ms</span> | P99: <span style="color:#e5c07b;">${itlP99}ms</span> ${itlStd !== '-' ? `(σ: ${itlStd}ms)` : ''}<br>
-                            ${reportEffConcLabel}<strong style="color:var(--accent-blue);">${effConc}</strong> ${reportPoolConfig}<br>
-                            ${reportWatchdogLabel}${loopText} ｜ ${driftText}<br>
-                            ${reportVerifLabel}${verifText}
+                        <h4 style="margin:0 0 14px 0; color:var(--accent-green); font-size:15px;">${reportTitle}</h4>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:10px; margin-bottom:14px;">
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Workload Scenario' : '评测任务场景'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${taskBadge} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(${escapeHtml(taskName)})</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Window & Pure Decode Time' : '实测窗口与纯解码耗时'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#e2e8f0;">${durationSec.toFixed(1)}s <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(纯解码: ${pureDecodeTimeSec.toFixed(2)}s)</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Effective Scheduling Concurrency' : '有效调度并发与流池规模'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:var(--accent-blue);">${effConc} <span style="font-size:12px; font-weight:normal; color:var(--text-muted);">(流池: ${poolConcurrency}x 并发)</span></div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:11px; color:var(--text-muted);">${isEn ? 'Single-Stream Pure Decode Rate' : '单流纯解码平均速率'}</div>
+                                <div style="margin-top:3px; font-weight:600; color:#98c379;">${avgStreamTps.toFixed(2)} tokens/s</div>
+                            </div>
+                        </div>
+                        <div style="color:var(--text-main); font-size:13px; line-height:1.9; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
+                            • <strong>${isEn ? 'Anti-Cheating Watchdogs: ' : '防作弊守卫看门狗：'}</strong>${loopText} ｜ ${driftText}<br>
+                            • <strong>${isEn ? 'Digital Verification Checksum: ' : '数字防伪指纹认证：'}</strong>${verifText}
                         </div>
                     </div>
                 `;
+
+                const allTasksList = row.results_json?.all_tasks_results || row.results_json?.all_tasks_comparison || row.all_tasks_comparison;
+                sustainedHtml += buildAllTasksComparisonHtml(allTasksList, isEn, poolConcurrency);
 
                 dataContainer.innerHTML = sustainedHtml;
                 if (radarSection) radarSection.style.display = 'none';
@@ -9083,7 +9655,7 @@
             ` : '';
 
             // ================== Build Detail Data Table ==================
-            let tableHtml = `${runCommandHtml}${anomalySummaryHtml}
+            let tableHtml = `${notesHtml}${runCommandHtml}${anomalySummaryHtml}
             <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:13px;">
                 <thead>
                     <tr style="background:var(--bg-panel);">

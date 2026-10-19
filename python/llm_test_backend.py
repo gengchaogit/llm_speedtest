@@ -36,6 +36,7 @@ SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 # 注意：只使用公开的 anon key，不在代码中保存 service key
 # RLS 策略负责权限控制（见 README 中的建表 SQL）
 SUPABASE_TABLE = "speed_results"
+PUBLIC_LEADERBOARD_URL = "https://gengchaogit.github.io/llm_speedtest/LLM_Speed_Test_v3_Leaderboard.html"
 
 # 单词库用于生成提示词（避免cache命中）
 WORD_LIST = [
@@ -235,6 +236,11 @@ class ResultPoint(BaseModel):
     ttft_stats: Optional[Dict[str, Any]] = None
     itl_stats: Optional[Dict[str, Any]] = None
     telemetry: Optional[Dict[str, Any]] = None
+    output_tokens: Optional[int] = None
+    e2e_speed: Optional[float] = None
+    pure_decode_time_sec: Optional[float] = None
+    avg_stream_decode_speed: Optional[float] = None
+    actual_duration_sec: Optional[float] = None
 
 class UploadPayload(BaseModel):
     user_code: str
@@ -258,6 +264,8 @@ class UploadPayload(BaseModel):
     benchmark_mode: Optional[str] = "1d_sweep"
     matrix_grid: Optional[Dict[str, Any]] = None
     matrix_summary: Optional[Dict[str, Any]] = None
+    all_matrices: Optional[Union[Dict[str, Any], List[Any]]] = None
+    all_tasks_comparison: Optional[List[Dict[str, Any]]] = None
     sustained_summary: Optional[Dict[str, Any]] = None
     results: Optional[List[ResultPoint]] = None
 
@@ -477,7 +485,7 @@ async def upload_benchmark_to_supabase(
         if resp.status_code in (200, 201):
             data = resp.json()
             record_id = data[0]["id"] if isinstance(data, list) else data.get("id")
-            share_url = f"{SUPABASE_URL}/leaderboard/{record_id}"
+            share_url = f"{PUBLIC_LEADERBOARD_URL}?id={record_id}"
             return {
                 "success": True,
                 "id": record_id,
@@ -521,9 +529,17 @@ async def upload_result(request: Request, payload: UploadPayload):
                     "decode_tps": r.output_speed,
                     "output_speed": r.output_speed,
                     "prefill_speed": r.prefill_speed,
+                    "prefill_time_ms": r.prefill_time_ms,
+                    "output_time_ms": r.output_time_ms,
                     "avg_ttft_ms": r.avg_ttft_ms,
                     "avg_itl_mean": r.avg_itl_mean,
                     "avg_itl_std": r.avg_itl_std,
+                    "output_tokens": getattr(r, "output_tokens", None),
+                    "e2e_speed": getattr(r, "e2e_speed", None),
+                    "pure_decode_time_sec": getattr(r, "pure_decode_time_sec", None),
+                    "avg_stream_decode_speed": getattr(r, "avg_stream_decode_speed", None),
+                    "actual_duration_sec": getattr(r, "actual_duration_sec", None),
+                    "concurrent_details": getattr(r, "concurrent_details", None),
                     "status": "成功",
                 }
                 for r in payload.results
@@ -532,6 +548,8 @@ async def upload_result(request: Request, payload: UploadPayload):
             "benchmark_mode": mode,
             "matrix": payload.matrix_grid or {},
             "matrix_summary": payload.matrix_summary or {},
+            "all_matrices": payload.all_matrices or {},
+            "all_tasks_comparison": payload.all_tasks_comparison or [],
             "sustained_summary": payload.sustained_summary or {},
             "points": points_data,
             "verification": {
@@ -670,8 +688,8 @@ async def upload_result(request: Request, payload: UploadPayload):
 
     data = resp.json()
     record_id = data[0]["id"] if isinstance(data, list) else data.get("id")
-    share_url = f"{SUPABASE_URL.replace('supabase.co', 'supabase.co')}/leaderboard/{record_id}"
-    return {"success": True, "id": record_id, "share_id": record_id, "verification_hash": vh}
+    share_url = f"{PUBLIC_LEADERBOARD_URL}?id={record_id}"
+    return {"success": True, "id": record_id, "share_id": record_id, "share_url": share_url, "verification_hash": vh}
 
 
 @app.get("/api/results")
@@ -1675,6 +1693,7 @@ DEFAULT_BENCHMARK_SUFFIX = (
 )
 
 TASK_TYPES = ["general", "code", "structured", "prose", "prefill_16k", "reasoning"]
+TASK_TYPE_CHOICES = TASK_TYPES + ["all"]
 
 TASK_SYSTEM_PROMPTS = {
     "general": DEFAULT_SYSTEM_PROMPT,
@@ -4176,9 +4195,9 @@ def build_cli_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--task-type", "--task",
         type=str,
-        choices=TASK_TYPES,
+        choices=TASK_TYPE_CHOICES,
         default="general",
-        help="Benchmark task workload type (general, code, structured, prose, prefill_16k, reasoning)"
+        help="Benchmark task workload type (general, code, structured, prose, prefill_16k, reasoning, all)"
     )
     parser.add_argument(
         "--matrix-concurrency",
@@ -4445,7 +4464,196 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                 print("✅ Cloud upload successful!")
                 print(f"  Record ID          : {share_id}")
                 print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
-                print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+                print(f"  Leaderboard Share  : {PUBLIC_LEADERBOARD_URL}?id={share_id}")
+            else:
+                print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
+
+        return 0
+
+    if task_type == "all":
+        sustained_concurrency = concurrency_list[0] if concurrency_list else 1
+        sustained_duration = getattr(args, "sustained_duration", 30.0) or 30.0
+        sustained_prompt_len = getattr(args, "sustained_prompt_length", 128) or 128
+
+        print("\n" + "=" * 90)
+        print("⚡ LLM All Tasks Sequence Benchmark (全场景自动化顺序测试)")
+        print("=" * 90)
+        print(f"Target API     : {api_url}")
+        print(f"Model          : {model_name}")
+        print(f"Hardware       : {hardware}")
+        print(f"Framework      : {framework} ({quantization})")
+        print(f"Workloads      : 6 Tasks ({', '.join(TASK_TYPES)})")
+        print(f"Concurrency    : {sustained_concurrency}")
+        print(f"Duration/Task  : {sustained_duration}s")
+        print(f"Prompt Length  : {sustained_prompt_len} tokens")
+        print(f"Output Tokens  : {max_tokens}")
+        print(f"Watchdogs      : {'Loop: ON' if enable_watchdog else 'Loop: OFF'}")
+        print("=" * 90 + "\n")
+
+        all_task_results = []
+        for idx, t_type in enumerate(TASK_TYPES, start=1):
+            print(f"\n--- [Task {idx}/6: {t_type.upper()}] Starting sustained benchmark ({sustained_duration}s)... ---")
+            t_res = await run_sustained_decode_benchmark(
+                api_url=api_url,
+                api_key=api_key,
+                api_type=api_type,
+                model_name=model_name,
+                concurrency=sustained_concurrency,
+                prompt_length=sustained_prompt_len,
+                output_length=max_tokens,
+                duration_seconds=sustained_duration,
+                timeout=timeout,
+                temperature=temperature,
+                top_p=top_p,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                metrics_url=metrics_url,
+                hardware=hardware,
+                framework=framework,
+                quantization=quantization,
+                enable_watchdog=enable_watchdog,
+                task_type=t_type,
+            )
+            all_task_results.append(t_res)
+            print(f"  ✔️ [{t_type}] Completed: {t_res.get('steady_decode_tps', 0):.2f} t/s, TTFT P50: {t_res.get('ttft_stats', {}).get('p50', 0):.1f}ms")
+
+        baseline = next((r for r in all_task_results if r.get("task_type") == "general"), all_task_results[0])
+        baseline_tps = baseline.get("steady_decode_tps", 0.0)
+
+        print("\n" + "=" * 105)
+        print(f"🏆 All Workloads Performance Comparison (全场景工作负载性能对比: {model_name})")
+        print("=" * 105)
+        print(f"{'Task Workload':<15} | {'Pure TPS':>10} | {'vs Base':>9} | {'E2E TPS':>9} | {'Stream TPS':>10} | {'TTFT P50':>9} | {'ITL P50':>9} | {'Eff Conc':>8} | {'Tokens':>7}")
+        print("-" * 15 + "-+-" + "-" * 10 + "-+-" + "-" * 9 + "-+-" + "-" * 9 + "-+-" + "-" * 10 + "-+-" + "-" * 9 + "-+-" + "-" * 9 + "-+-" + "-" * 8 + "-+-" + "-" * 7)
+
+        for r in all_task_results:
+            t = r.get("task_type", "general")
+            tps = r.get("steady_decode_tps", 0.0)
+            if baseline_tps > 0 and t != "general":
+                delta = ((tps - baseline_tps) / baseline_tps) * 100
+                delta_str = f"+{delta:.1f}%" if delta > 0 else f"{delta:.1f}%"
+            else:
+                delta_str = "0.0%"
+            e2e = r.get("e2e_throughput_tps", 0.0)
+            stream_tps = r.get("avg_stream_decode_tps", 0.0)
+            ttft_p50 = f"{r.get('ttft_stats', {}).get('p50', 0):.1f}ms"
+            itl_p50 = f"{r.get('itl_stats', {}).get('p50', 0):.1f}ms"
+            eff = r.get("effective_concurrency", f"{sustained_concurrency}/{sustained_concurrency}")
+            toks = r.get("total_tokens", 0)
+            print(f"{t:<15} | {tps:>10.2f} | {delta_str:>9} | {e2e:>9.2f} | {stream_tps:>10.2f} | {ttft_p50:>9} | {itl_p50:>9} | {eff:>8} | {toks:>7}")
+        print("=" * 105)
+
+        max_tps_item = max(all_task_results, key=lambda x: x.get("steady_decode_tps", 0))
+        min_tps_item = min(all_task_results, key=lambda x: x.get("steady_decode_tps", 0))
+        max_ttft_item = max(all_task_results, key=lambda x: x.get("ttft_stats", {}).get("p50", 0))
+        span_ratio = f"{max_tps_item.get('steady_decode_tps', 0) / min_tps_item.get('steady_decode_tps', 1):.2f}x" if min_tps_item.get("steady_decode_tps", 0) > 0 else "N/A"
+
+        print(f"🚀 Peak Pure Decode Task : {max_tps_item.get('task_type')} ({max_tps_item.get('steady_decode_tps', 0):.2f} t/s)")
+        print(f"🐢 Heavy Load / Min TPS   : {min_tps_item.get('task_type')} ({min_tps_item.get('steady_decode_tps', 0):.2f} t/s)")
+        print(f"⏱️ Peak TTFT Latency Task : {max_ttft_item.get('task_type')} ({max_ttft_item.get('ttft_stats', {}).get('p50', 0):.1f} ms)")
+        print(f"📊 Workload Span Ratio   : {span_ratio}")
+        print("=" * 105)
+
+        avg_decode_all = round(sum(r.get("steady_decode_tps", 0) for r in all_task_results) / len(all_task_results), 2)
+        max_decode_all = round(max(r.get("steady_decode_tps", 0) for r in all_task_results), 2)
+        avg_prefill_all = round(sum(r.get("avg_prefill_speed", 0) for r in all_task_results) / len(all_task_results), 2)
+        max_prefill_all = round(max(r.get("max_prefill_speed", 0) for r in all_task_results), 2)
+        all_points = [pt for r in all_task_results for pt in r.get("points", [])]
+
+        combined_vh = compute_verification_hash(
+            model_name=model_name,
+            hardware=hardware,
+            framework=framework,
+            quantization=quantization,
+            concurrency=sustained_concurrency,
+            max_decode_speed=max_decode_all,
+        )
+
+        report_data = {
+            "benchmark_mode": "sustained_decode",
+            "task_type": "all",
+            "model_name": model_name,
+            "hardware": hardware,
+            "framework": framework,
+            "quantization": quantization,
+            "notes": args.notes,
+            "run_command": args.run_command,
+            "concurrency": sustained_concurrency,
+            "avg_prefill_speed": avg_prefill_all,
+            "avg_decode_speed": avg_decode_all,
+            "max_prefill_speed": max_prefill_all,
+            "max_decode_speed": max_decode_all,
+            "verification_hash": combined_vh,
+            "source": "python_v3",
+            "timestamp": int(time.time()),
+            "sustained_duration": sustained_duration,
+            "sustained_prompt_length": sustained_prompt_len,
+            "all_tasks_results": all_task_results,
+            "points": all_points,
+            "quantiles": {
+                "ttft": max_ttft_item.get("ttft_stats", {}),
+                "itl": max_tps_item.get("itl_stats", {}),
+            },
+            "results": all_points,
+        }
+
+        output_path = args.output
+        if not output_path:
+            ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_model = re.sub(r'[^a-zA-Z0-9_\-]', '_', model_name)[:30]
+            output_path = f"benchmark_all_tasks_{safe_model}_{ts_str}.json"
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+        print(f"\n📁 Local all tasks benchmark report saved to: {os.path.abspath(output_path)}")
+
+        if args.upload:
+            print("\n☁️ Uploading benchmark to Supabase Leaderboard...")
+            user_code = args.user_code
+            if not user_code or len(user_code.strip()) < 8:
+                user_code = "CLI" + hashlib.sha256(f"{hardware}{model_name}{time.time()}".encode()).hexdigest()[:5].upper()
+                print(f"ℹ️ Auto-generated User Code: {user_code}")
+            else:
+                user_code = user_code.strip().upper()
+
+            upload_res = await upload_benchmark_to_supabase(
+                user_code=user_code,
+                model_name=model_name,
+                hardware=hardware,
+                concurrency=sustained_concurrency,
+                avg_prefill_speed=avg_prefill_all,
+                avg_decode_speed=avg_decode_all,
+                max_prefill_speed=max_prefill_all,
+                max_decode_speed=max_decode_all,
+                framework=framework,
+                quantization=quantization,
+                notes=args.notes,
+                nickname=args.nickname,
+                run_command=args.run_command,
+                record_tags=["source:python_v3", "verified", "mode:sustained_decode", "task:all"],
+                results_json={
+                    "benchmark_mode": "sustained_decode",
+                    "task_type": "all",
+                    "all_tasks_results": all_task_results,
+                    "points": all_points,
+                    "quantiles": report_data["quantiles"],
+                    "watchdog": {
+                        "loop_detected": any(r.get("loop_detected", False) for r in all_task_results),
+                    },
+                    "verification": {
+                        "hash": combined_vh,
+                        "status": "verified",
+                        "timestamp": int(time.time()),
+                    }
+                },
+                verification_hash=combined_vh,
+            )
+            if upload_res.get("success"):
+                share_id = upload_res.get("id")
+                print("✅ Cloud upload successful!")
+                print(f"  Record ID          : {share_id}")
+                print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
+                print(f"  Leaderboard Share  : {PUBLIC_LEADERBOARD_URL}?id={share_id}")
             else:
                 print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
 
@@ -4601,7 +4809,7 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                 print("✅ Cloud upload successful!")
                 print(f"  Record ID          : {share_id}")
                 print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
-                print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+                print(f"  Leaderboard Share  : {PUBLIC_LEADERBOARD_URL}?id={share_id}")
             else:
                 print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
 
@@ -4904,7 +5112,7 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
             print("✅ Cloud upload successful!")
             print(f"  Record ID          : {share_id}")
             print(f"  Verification Hash  : {upload_res.get('verification_hash')}")
-            print(f"  Leaderboard Share  : https://gengchao6.github.io/llm_speedtest2/LLM_Speed_Test_v3_Leaderboard.html?id={share_id}")
+            print(f"  Leaderboard Share  : {PUBLIC_LEADERBOARD_URL}?id={share_id}")
         else:
             print(f"⚠️ Cloud upload failed: {upload_res.get('error')}")
             print("  (Your local JSON report is safely saved above)")
