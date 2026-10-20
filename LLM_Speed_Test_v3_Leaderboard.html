@@ -764,8 +764,9 @@
             color: #fff;
         }
 
-        .leaderboard-tools-wrap.collapsed .leaderboard-tools {
-            display: none;
+        .leaderboard-tools-wrap.collapsed .leaderboard-tools,
+        .leaderboard-tools-wrap.collapsed .smart-filter-section {
+            display: none !important;
         }
 
         .tool-group {
@@ -1138,13 +1139,14 @@
 
             .col-rank,
             .col-time,
+            .col-verif,
             .col-share-id,
             .col-user,
             .col-notes,
             .col-command,
             .col-source-tags,
             .col-concurrency {
-                display: none;
+                display: none !important;
             }
 
             .col-model,
@@ -1520,13 +1522,14 @@
 
         body.force-mobile-view .col-rank,
         body.force-mobile-view .col-time,
+        body.force-mobile-view .col-verif,
         body.force-mobile-view .col-share-id,
         body.force-mobile-view .col-user,
         body.force-mobile-view .col-notes,
         body.force-mobile-view .col-command,
         body.force-mobile-view .col-source-tags,
         body.force-mobile-view .col-concurrency {
-            display: none;
+            display: none !important;
         }
 
         body.force-mobile-view .col-model,
@@ -1697,8 +1700,16 @@
             display: none !important;
         }
 
-        body.force-desktop-view .leaderboard-tools-wrap.collapsed .leaderboard-tools {
+        body.force-desktop-view .leaderboard-tools-wrap.collapsed .leaderboard-tools,
+        body.force-desktop-view .leaderboard-tools-wrap.collapsed .smart-filter-section {
             display: flex !important;
+        }
+
+        @media (min-width: 901px) {
+            body:not(.force-mobile-view) .leaderboard-tools-wrap.collapsed .leaderboard-tools,
+            body:not(.force-mobile-view) .leaderboard-tools-wrap.collapsed .smart-filter-section {
+                display: flex !important;
+            }
         }
 
         body.force-desktop-view .leaderboard-tools {
@@ -1778,6 +1789,7 @@
 
         body.force-desktop-view .col-rank,
         body.force-desktop-view .col-time,
+        body.force-desktop-view .col-verif,
         body.force-desktop-view .col-share-id,
         body.force-desktop-view .col-user,
         body.force-desktop-view .col-model,
@@ -3016,8 +3028,8 @@
             <div id="matrixCellDetailCard" style="display:none; margin-top:16px; background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:6px; padding:14px;"></div>
         </div>
 
-        <div id="leaderboardToolsWrap" class="leaderboard-tools-wrap">
-            <button id="mobileFilterToggle" class="mobile-filter-toggle" type="button" aria-expanded="true" onclick="toggleMobileFilters()">收起筛选条件</button>
+        <div id="leaderboardToolsWrap" class="leaderboard-tools-wrap collapsed">
+            <button id="mobileFilterToggle" class="mobile-filter-toggle" type="button" aria-expanded="false" onclick="toggleMobileFilters()">展开筛选条件</button>
             
             <!-- 智能硬件 / 精度 / 引擎 / 并发多维筛选药丸 -->
             <div id="smartFilterSection" class="smart-filter-section">
@@ -3298,7 +3310,7 @@
         let manualMobileView = isLikelyMobileClient;
         let forceDesktopView = !isLikelyMobileClient;
         let wasMobileViewport = manualMobileView;
-        let mobileFiltersCollapsed = false;
+        let mobileFiltersCollapsed = true;
         const PAGE_LANGUAGE = { ZH: 'zh-CN', EN: 'en' };
         const PAGE_LANGUAGE_STORAGE_KEY = 'llm_speedtest_page_language';
         const TRANSLATION_CACHE_STORAGE_KEY = 'llm_speedtest_translation_cache_v1';
