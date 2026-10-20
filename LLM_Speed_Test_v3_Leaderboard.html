@@ -873,6 +873,11 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .col-ttft,
+        .col-itl {
+            display: none !important;
+        }
+
         .col-actions {
             width: 90px;
             min-width: 90px;
@@ -3158,13 +3163,13 @@
                                 <span id="sortIndicator-max_decode_speed" class="sort-indicator">↕</span>
                             </button>
                         </th>
-                        <th id="sortHeader-avg_ttft_ms" class="sortable-header col-ttft" aria-sort="none">
+                        <th id="sortHeader-avg_ttft_ms" class="sortable-header col-ttft" aria-sort="none" style="display:none;">
                             <button type="button" class="sort-toggle" onclick="toggleSort('avg_ttft_ms')">
                                 <span class="sort-label" id="thTtft">首字延迟 TTFT<br>(ms)</span>
                                 <span id="sortIndicator-avg_ttft_ms" class="sort-indicator">↕</span>
                             </button>
                         </th>
-                        <th class="col-itl" id="thItl">词间抖动 ITL<br>(ms)</th>
+                        <th class="col-itl" id="thItl" style="display:none;">词间抖动 ITL<br>(ms)</th>
                         <th class="col-actions" id="thActions">操作</th>
                         <th class="col-compare"><span id="thCompareText" style="font-size: 11px; color: var(--text-muted);">对比</span></th>
                     </tr>
@@ -9216,8 +9221,8 @@
                         <td class="col-concurrency">${concurrencyCellDisplay}</td>
                         <td class="col-prefill" style="color:#98c379; font-weight:bold;">${prefillText}</td>
                         <td class="col-decode" style="color:#c678dd; font-weight:bold;">${decodeText}</td>
-                        <td class="col-ttft" style="color:#61afef; font-family:monospace;">${ttftText}</td>
-                        <td class="col-itl" style="color:#e5c07b; font-family:monospace;">${itlText}</td>
+                        <td class="col-ttft" style="display:none; color:#61afef; font-family:monospace;">${ttftText}</td>
+                        <td class="col-itl" style="display:none; color:#e5c07b; font-family:monospace;">${itlText}</td>
                         <td class="col-actions"><div class="row-actions"><button class="btn-detail" onclick="viewDetails('${row.id}')">${btnDetailLabel}</button><button class="btn-copy-link" onclick="copyShareUrl('${encodeURIComponent(row.id)}', this)">${btnShareLabel}</button></div></td>
                         <td class="col-compare" onclick="event.stopPropagation()">
                             <input type="checkbox" class="compare-checkbox" value="${row.id}" 
