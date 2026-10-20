@@ -8,3 +8,11 @@ python/.backend_port
 tests/adversarial_results.json
 python/test_cli*.json
 .agents/
+
+# Local docs & test suites
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
+tests/
+python/test_*.py
+
