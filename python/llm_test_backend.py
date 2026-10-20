@@ -241,6 +241,7 @@ class ResultPoint(BaseModel):
     pure_decode_time_sec: Optional[float] = None
     avg_stream_decode_speed: Optional[float] = None
     actual_duration_sec: Optional[float] = None
+    task_type: Optional[str] = None
 
 class UploadPayload(BaseModel):
     user_code: str
@@ -252,6 +253,7 @@ class UploadPayload(BaseModel):
     notes: Optional[str] = None
     run_command: Optional[str] = None
     concurrency: int
+    task_type: Optional[str] = None
     avg_prefill_speed: float
     avg_decode_speed: float
     max_prefill_speed: Optional[float] = None
@@ -444,8 +446,10 @@ async def upload_benchmark_to_supabase(
             elif isinstance(final_results_json.get("verification"), dict):
                 final_results_json["verification"].setdefault("hash", verification_hash)
     elif isinstance(final_results_json, list):
+        task_tag = next((t.split(":", 1)[1] for t in tags if t.startswith("task:")), "general")
         final_results_json = {
             "benchmark_mode": "1d_sweep",
+            "task_type": task_tag,
             "verification": {
                 "hash": verification_hash,
                 "status": "verified",
@@ -519,11 +523,13 @@ async def upload_result(request: Request, payload: UploadPayload):
 
     # 构造存储数据
     mode = payload.benchmark_mode or "1d_sweep"
+    resolved_task_type = payload.task_type or "general"
     if mode in ("2d_matrix", "sustained_decode"):
         points_data = []
         if payload.results:
             points_data = [
                 {
+                    "task_type": getattr(r, "task_type", None) or resolved_task_type,
                     "prompt_length": r.prompt_length,
                     "concurrency": r.concurrency,
                     "decode_tps": r.output_speed,
@@ -544,13 +550,46 @@ async def upload_result(request: Request, payload: UploadPayload):
                 }
                 for r in payload.results
             ]
+        raw_points = payload.results or []
+        all_ttft = [r.avg_ttft_ms for r in raw_points if r.avg_ttft_ms is not None and r.avg_ttft_ms > 0]
+        all_itl = [r.avg_itl_mean for r in raw_points if r.avg_itl_mean is not None and r.avg_itl_mean > 0]
+
+        sustained_summary = dict(payload.sustained_summary or {})
+        if mode == "sustained_decode":
+            p0 = points_data[0] if points_data else {}
+            if not sustained_summary and p0:
+                sustained_summary = {
+                    "steady_decode_tps": p0.get("output_speed") or payload.avg_decode_speed,
+                    "avg_decode_speed": p0.get("output_speed") or payload.avg_decode_speed,
+                    "prefill_speed": p0.get("prefill_speed") or payload.avg_prefill_speed,
+                    "avg_prefill_speed": p0.get("prefill_speed") or payload.avg_prefill_speed,
+                    "actual_duration_sec": p0.get("actual_duration_sec") or (p0.get("output_time_ms", 0) / 1000 if p0.get("output_time_ms") else 30.0),
+                    "pure_decode_time_s": p0.get("pure_decode_time_sec") or (p0.get("output_time_ms", 0) / 1000 if p0.get("output_time_ms") else 30.0),
+                    "pure_decode_time_sec": p0.get("pure_decode_time_sec") or (p0.get("output_time_ms", 0) / 1000 if p0.get("output_time_ms") else 30.0),
+                    "completed_streams": len(p0.get("concurrent_details") or []) or p0.get("concurrency") or payload.concurrency,
+                    "total_tokens": p0.get("output_tokens"),
+                    "avg_stream_decode_tps": p0.get("avg_stream_decode_speed"),
+                    "avg_stream_decode_speed": p0.get("avg_stream_decode_speed"),
+                    "e2e_throughput_tps": p0.get("e2e_speed"),
+                    "e2e_speed": p0.get("e2e_speed"),
+                    "concurrency": p0.get("concurrency") or payload.concurrency,
+                    "task_type": resolved_task_type,
+                    "completed_requests": p0.get("concurrent_details") or [],
+                }
+            else:
+                if "completed_requests" not in sustained_summary and p0.get("concurrent_details"):
+                    sustained_summary["completed_requests"] = p0["concurrent_details"]
+                if "completed_streams" not in sustained_summary:
+                    sustained_summary["completed_streams"] = len(sustained_summary.get("completed_requests") or []) or payload.concurrency
+
         results_json = {
             "benchmark_mode": mode,
+            "task_type": resolved_task_type,
             "matrix": payload.matrix_grid or {},
             "matrix_summary": payload.matrix_summary or {},
             "all_matrices": payload.all_matrices or {},
             "all_tasks_comparison": payload.all_tasks_comparison or [],
-            "sustained_summary": payload.sustained_summary or {},
+            "sustained_summary": sustained_summary,
             "points": points_data,
             "verification": {
                 "hash": vh,
@@ -558,8 +597,18 @@ async def upload_result(request: Request, payload: UploadPayload):
                 "timestamp": int(time.time()),
             },
             "quantiles": {
-                "ttft": {"avg": 0.0},
-                "itl": {"avg": 0.0},
+                "ttft": {
+                    "p50": compute_percentile(all_ttft, 50) if all_ttft else 0.0,
+                    "p90": compute_percentile(all_ttft, 90) if all_ttft else 0.0,
+                    "p99": compute_percentile(all_ttft, 99) if all_ttft else 0.0,
+                    "avg": round(sum(all_ttft) / len(all_ttft), 2) if all_ttft else 0.0,
+                },
+                "itl": {
+                    "p50": compute_percentile(all_itl, 50) if all_itl else 0.0,
+                    "p90": compute_percentile(all_itl, 90) if all_itl else 0.0,
+                    "p99": compute_percentile(all_itl, 99) if all_itl else 0.0,
+                    "avg": round(sum(all_itl) / len(all_itl), 2) if all_itl else 0.0,
+                },
             },
             "watchdog": {
                 "loop_detected": any(r.loop_detected for r in (payload.results or [])),
@@ -569,9 +618,35 @@ async def upload_result(request: Request, payload: UploadPayload):
         raw_points = payload.results or []
         all_ttft = [r.avg_ttft_ms for r in raw_points if r.avg_ttft_ms]
         all_itl = [r.avg_itl_mean for r in raw_points if r.avg_itl_mean]
+
+        is_all_tasks = (
+            resolved_task_type == "all"
+            or bool(payload.all_tasks_comparison)
+            or ("all_tasks" in (payload.record_tags or []))
+        )
+        ordered_tasks = ["general", "code", "structured", "prose", "prefill_16k", "reasoning"]
+        cycle = 0
+        last_len = -1
+        point_tasks = []
+        for r in raw_points:
+            pt = getattr(r, "task_type", None)
+            plen = getattr(r, "prompt_length", None)
+            if plen is not None and plen <= last_len and last_len > 0:
+                cycle += 1
+            if plen is not None:
+                last_len = plen
+            if pt and pt != "all" and pt in ordered_tasks:
+                point_tasks.append(pt)
+            elif is_all_tasks:
+                point_tasks.append(ordered_tasks[cycle % len(ordered_tasks)])
+            else:
+                point_tasks.append(pt or resolved_task_type)
+
         results_json = {
             "benchmark_mode": "1d_sweep",
+            "task_type": resolved_task_type,
             "matrix": [],
+            "all_tasks_comparison": payload.all_tasks_comparison or [],
             "verification": {
                 "hash": vh,
                 "status": "verified",
@@ -594,9 +669,11 @@ async def upload_result(request: Request, payload: UploadPayload):
             },
             "points": [
                 {
+                    "task_type": point_tasks[idx] if idx < len(point_tasks) else (getattr(r, "task_type", None) or resolved_task_type),
                     "prompt_length": r.prompt_length,
                     "prefill_speed": r.prefill_speed,
                     "output_speed": r.output_speed,
+                    "decode_tps": r.output_speed,
                     "prefill_time_ms": r.prefill_time_ms,
                     "output_time_ms": r.output_time_ms,
                     "avg_ttft_ms": r.avg_ttft_ms,
@@ -610,16 +687,27 @@ async def upload_result(request: Request, payload: UploadPayload):
                     "loop_detected": bool(r.loop_detected),
                     "ttft_stats": r.ttft_stats or {"avg": r.avg_ttft_ms},
                     "itl_stats": r.itl_stats or {"avg": r.avg_itl_mean, "std": r.avg_itl_std},
+                    "output_tokens": getattr(r, "output_tokens", None),
+                    "e2e_speed": getattr(r, "e2e_speed", None),
+                    "pure_decode_time_sec": getattr(r, "pure_decode_time_sec", None),
+                    "avg_stream_decode_speed": getattr(r, "avg_stream_decode_speed", None),
+                    "actual_duration_sec": getattr(r, "actual_duration_sec", None),
                     "concurrent_details": [
                         {
-                            "prefill_speed": d.get("prefill_speed"),
-                            "output_speed": d.get("output_speed"),
+                            "stream_id": d.get("stream_id", d_idx + 1),
+                            "prefill_speed": d.get("prefill_speed") or d.get("prefillSpeed"),
+                            "output_speed": d.get("output_speed") or d.get("outputSpeed"),
                             "boundary_source": d.get("boundary_source"),
+                            "ttft_ms": d.get("ttft_ms") or d.get("ttftMs"),
+                            "output_tokens": d.get("output_tokens") or d.get("outputTokens"),
+                            "output_time_ms": d.get("output_time_ms") or d.get("outputTimeMs"),
+                            "itl_mean": d.get("itl_mean") or d.get("itlMean"),
+                            "status": d.get("status"),
                         }
-                        for d in (r.concurrent_details or [])
+                        for d_idx, d in enumerate(r.concurrent_details or [])
                     ],
                 }
-                for r in raw_points
+                for idx, r in enumerate(raw_points)
             ],
         }
 
@@ -1935,8 +2023,9 @@ def generate_prefill_16k_prompt(target_length: int, seed: int = 0) -> str:
     needed_body_tokens = max(target_length - suffix_tokens, 64)
 
     sections = PREFILL_16K_DOC_SECTIONS
-    body_parts = []
-    current_tokens = 0
+    session_nonce = f"[Benchmark Session ID: {int(time.time() * 1000):x}-{random.randint(0, 100000):x}]\n"
+    body_parts = [session_nonce]
+    current_tokens = estimate_token_count(session_nonce)
     cycle = 0
     while current_tokens < needed_body_tokens:
         for idx, sec in enumerate(sections):
@@ -3053,6 +3142,34 @@ async def run_2d_matrix_benchmark(
             all_cell_results.append(cell_result)
 
             if progress_callback:
+                try:
+                    await progress_callback({
+                        "type": "progress",
+                        "benchmark_mode": "2d_matrix",
+                        "cell_current": idx + 1,
+                        "cell_total": total_cells,
+                        "concurrency": conc,
+                        "context": ctx,
+                        "tokens_needed": tokens_needed,
+                        "status": "SKIP_KV_LIMIT",
+                    })
+                except Exception as cb_err:
+                    print(f"[Matrix] Progress callback disconnected: {cb_err}")
+                    break
+            if result_callback:
+                msg = dict(cell_result)
+                msg["type"] = "result"
+                msg["benchmark_mode"] = "2d_matrix"
+                try:
+                    await result_callback(msg)
+                except Exception as cb_err:
+                    print(f"[Matrix] Result callback disconnected: {cb_err}")
+                    break
+            continue
+
+        print(f"[Matrix] Cell ({conc}x, {ctx}ctx): Running {conc} streams ({idx + 1}/{total_cells})...")
+        if progress_callback:
+            try:
                 await progress_callback({
                     "type": "progress",
                     "benchmark_mode": "2d_matrix",
@@ -3061,27 +3178,11 @@ async def run_2d_matrix_benchmark(
                     "concurrency": conc,
                     "context": ctx,
                     "tokens_needed": tokens_needed,
-                    "status": "SKIP_KV_LIMIT",
+                    "status": "testing",
                 })
-            if result_callback:
-                msg = dict(cell_result)
-                msg["type"] = "result"
-                msg["benchmark_mode"] = "2d_matrix"
-                await result_callback(msg)
-            continue
-
-        print(f"[Matrix] Cell ({conc}x, {ctx}ctx): Running {conc} streams ({idx + 1}/{total_cells})...")
-        if progress_callback:
-            await progress_callback({
-                "type": "progress",
-                "benchmark_mode": "2d_matrix",
-                "cell_current": idx + 1,
-                "cell_total": total_cells,
-                "concurrency": conc,
-                "context": ctx,
-                "tokens_needed": tokens_needed,
-                "status": "testing",
-            })
+            except Exception as cb_err:
+                print(f"[Matrix] Progress callback disconnected: {cb_err}")
+                break
 
         try:
             client_limits = httpx.Limits(
@@ -3217,7 +3318,20 @@ async def run_2d_matrix_benchmark(
                     "success_count": len(succ),
                     "failed_count": failed_count,
                     "verification_hash": cell_vh,
-                    "concurrent_details": succ,
+                    "concurrent_details": [
+                        {
+                            "concurrency": r.get("concurrency", 1),
+                            "output_speed": r.get("output_speed"),
+                            "prefill_speed": r.get("prefill_speed"),
+                            "ttft_ms": r.get("ttft_ms"),
+                            "avg_ttft_ms": r.get("ttft_ms"),
+                            "output_tokens": r.get("output_tokens"),
+                            "total_time_ms": r.get("total_time_ms"),
+                            "loop_detected": r.get("loop_detected", False),
+                            "status": r.get("status", "成功"),
+                        }
+                        for r in succ
+                    ],
                 }
 
         except Exception as e:
@@ -3251,7 +3365,11 @@ async def run_2d_matrix_benchmark(
             msg = dict(cell_result)
             msg["type"] = "result"
             msg["benchmark_mode"] = "2d_matrix"
-            await result_callback(msg)
+            try:
+                await result_callback(msg)
+            except Exception as cb_err:
+                print(f"[Matrix] Result callback disconnected: {cb_err}")
+                break
 
         # Cooldown between cells
         await asyncio.sleep(1.0)
@@ -3266,6 +3384,7 @@ async def run_2d_matrix_benchmark(
     overall_max_prefill = max((c.get("max_prefill_speed", 0.0) for c in all_cell_results if not c.get("skipped")), default=0.0)
 
     matrix_summary = {
+        "task_type": task_type,
         "peak_decode_tps": peak_decode_tps,
         "peak_point": peak_point or {},
         "saturation_onset": saturation_onset,
@@ -3282,6 +3401,7 @@ async def run_2d_matrix_benchmark(
 
     points = [
         {
+            "task_type": task_type,
             "concurrency": c.get("concurrency"),
             "context": c.get("context"),
             "prompt_length": c.get("context"),
@@ -3584,8 +3704,12 @@ async def run_sustained_decode_benchmark(
         "itl_stats": itl_stats,
         "effective_concurrency": eff_conc_label,
         "inferred_parallelism": round(inferred_parallelism, 2),
+        "pure_decode_time_sec": round(sum_stream_durations, 2),
+        "avg_stream_decode_speed": round(avg_stream_decode_speed, 2),
+        "e2e_speed": round(e2e_throughput_tps, 2),
         "is_saturated": is_saturated,
         "loop_detected": loop_detected,
+        "completed_requests": completed_requests,
         "verification_hash": overall_vh,
     }
 
@@ -3601,6 +3725,12 @@ async def run_sustained_decode_benchmark(
             "ttft_p50_ms": ttft_stats["p50"],
             "itl_p50_ms": itl_stats["p50"],
             "effective_concurrency": eff_conc_label,
+            "output_tokens": total_tokens_generated,
+            "actual_duration_sec": round(actual_duration_sec, 2),
+            "pure_decode_time_sec": round(sum_stream_durations, 2),
+            "avg_stream_decode_speed": round(avg_stream_decode_speed, 2),
+            "e2e_speed": round(e2e_throughput_tps, 2),
+            "concurrent_details": completed_requests,
             "status": "成功" if not loop_detected else "ERROR: loop",
             "skipped": False,
         }
@@ -3688,6 +3818,11 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 "matrix_summary": matrix_res.get("matrix_summary", {}),
                 "points": matrix_res.get("points", []),
             })
+            await asyncio.sleep(0.05)
+            try:
+                await websocket.close(code=1000)
+            except Exception:
+                pass
             return
 
         elif mode == "sustained_decode":
@@ -3742,6 +3877,11 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 "sustained_summary": sustained_res,
                 "points": sustained_res.get("points", []),
             })
+            await asyncio.sleep(0.05)
+            try:
+                await websocket.close(code=1000)
+            except Exception:
+                pass
             return
 
         # 1D Sweep Mode (Default)
@@ -3761,6 +3901,7 @@ async def websocket_test_endpoint(websocket: WebSocket):
             "type": "info",
             "message": f"开始测试，并发数: {config.concurrency}",
             "benchmark_mode": "1d_sweep",
+            "task_type": task_type,
         })
         total_tests = len(test_lengths)
         completed = 0
@@ -3820,6 +3961,8 @@ async def websocket_test_endpoint(websocket: WebSocket):
                 "current": completed,
                 "total": total_tests,
                 "testing_length": length,
+                "task_type": task_type,
+                "benchmark_mode": "1d_sweep",
                 "network_latency_ms": round(network_latency_ms, 2),
                 "network_latency_sample_count": len(latency_samples),
             })
@@ -4005,6 +4148,8 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "type": "result",
                     "prompt_length": get_resolved_prompt_length(length),
                     "requested_prompt_length": length,
+                    "task_type": task_type,
+                    "benchmark_mode": "1d_sweep",
                     "network_latency_ms": round(network_latency_ms, 2),
                     "network_latency_sample_count": len(latency_samples),
                     "avg_prompt_tokens": round(avg_prompt_tokens, 2),
@@ -4050,6 +4195,8 @@ async def websocket_test_endpoint(websocket: WebSocket):
                     "type": "result",
                     "prompt_length": get_resolved_prompt_length(length),
                     "requested_prompt_length": length,
+                    "task_type": task_type,
+                    "benchmark_mode": "1d_sweep",
                     "network_latency_ms": round(network_latency_ms, 2),
                     "network_latency_sample_count": len(latency_samples),
                     "status": "失败",
@@ -4072,17 +4219,26 @@ async def websocket_test_endpoint(websocket: WebSocket):
             "type": "complete",
             "message": "测试完成",
             "benchmark_mode": "1d_sweep",
+            "task_type": task_type,
             "all_results": all_results
         })
+        await asyncio.sleep(0.05)
+        try:
+            await websocket.close(code=1000)
+        except Exception:
+            pass
     
     except WebSocketDisconnect:
         print("[WebSocket] 客户端断开连接")
     except Exception as e:
         print(f"[Error] WebSocket异常: {str(e)}")
-        await websocket.send_json({
-            "type": "error",
-            "message": f"测试错误: {str(e)}"
-        })
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"测试错误: {str(e)}"
+            })
+        except Exception:
+            pass
 
 
 def find_free_port(preferred_port=18000):
@@ -4444,6 +4600,7 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                 record_tags=["source:python_v3", "verified", "mode:2d_matrix", f"task:{task_type}"],
                 results_json={
                     "benchmark_mode": "2d_matrix",
+                    "task_type": task_type,
                     "matrix": matrix_res["matrix_grid"],
                     "matrix_summary": matrix_res["matrix_summary"],
                     "points": matrix_res["points"],
@@ -4792,6 +4949,7 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                     "benchmark_mode": "sustained_decode",
                     "sustained_summary": sustained_res["sustained_summary"],
                     "points": sustained_res["points"],
+                    "completed_requests": sustained_res.get("completed_requests", []),
                     "quantiles": sustained_res["quantiles"],
                     "watchdog": {
                         "loop_detected": sustained_res.get("loop_detected", False),
@@ -4981,6 +5139,7 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                 )
 
                 cell_data = {
+                    "task_type": task_type,
                     "prompt_length": resolved_length,
                     "requested_prompt_length": length,
                     "concurrency": concurrency,
@@ -4992,6 +5151,9 @@ async def run_cli_benchmark(args: argparse.Namespace) -> int:
                     "avg_decode_speed": round(avg_decode, 2),
                     "max_prefill_speed": round(max_prefill, 2),
                     "max_decode_speed": round(max_decode, 2),
+                    "output_speed": round(avg_decode, 2),
+                    "decode_tps": round(avg_decode, 2),
+                    "prefill_speed": round(avg_prefill, 2),
                     "itl_p50_ms": round(itl_p50, 2),
                     "itl_p90_ms": round(itl_p90, 2),
                     "itl_p99_ms": round(itl_p99, 2),
@@ -5140,7 +5302,34 @@ def run_server(port: int, host: str = "0.0.0.0"):
         pass
 
     import uvicorn
-    uvicorn.run(app, host=host, port=port)
+    sockets = []
+    if host in ("0.0.0.0", "::"):
+        try:
+            import socket
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('::', port))
+            sock.listen(128)
+            sockets.append(sock)
+            print(f"[Server] IPv4/IPv6 双栈监听已启用 (支持 localhost, 127.0.0.1 及 [::1], 端口 {port})", flush=True)
+        except Exception as e:
+            print(f"[Server] 双栈监听绑定提示: {e}，回退至标准 host={host}", flush=True)
+            sockets = []
+
+    config = uvicorn.Config(
+        app,
+        host=host if not sockets else None,
+        port=port if not sockets else None,
+        ws_ping_interval=30.0,
+        ws_ping_timeout=30.0,
+        ws_max_size=33554432,
+    )
+    server = uvicorn.Server(config)
+    if sockets:
+        server.run(sockets=sockets)
+    else:
+        server.run()
 
 
 def main():

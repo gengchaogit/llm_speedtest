@@ -1438,7 +1438,7 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="backendUrl">Python后端地址</label>
-                    <input type="text" id="backendUrl" value="" placeholder="ws://localhost:18000">
+                    <input type="text" id="backendUrl" value="" placeholder="ws://127.0.0.1:18000">
                 </div>
             </div>
             <div class="form-row">
@@ -3041,15 +3041,25 @@
         const exportComparisonChartBtn = document.getElementById('exportComparisonChart'); // v1.8
         const screenshotComparisonBtn = document.getElementById('screenshotComparison'); // 截图功能 (底部原位)
         const screenshotComparisonTopBtn = document.getElementById('screenshotComparisonTop'); // 截图功能 (顶部联动)
+        const syncScreenshotTop = () => {
+            if (!screenshotComparisonTopBtn || !screenshotComparisonBtn) return;
+            const activeMode = (typeof window !== 'undefined' && window.currentBenchmarkMode)
+                ? window.currentBenchmarkMode
+                : (document.querySelector('.benchmark-mode-selector .mode-option.active')?.getAttribute('data-mode') || document.querySelector('.benchmark-mode-selector .mode-option.active')?.dataset?.mode || '1d_sweep');
+            // 标准提示词阶梯 (1d_sweep) 模式下，顶部操作栏不显示截图按钮（下方多结果对比或全场景已有原位截图），其它模式（2D矩阵、稳态持续解码等）保留显示
+            if (activeMode === '1d_sweep') {
+                screenshotComparisonTopBtn.style.display = 'none';
+            } else {
+                screenshotComparisonTopBtn.style.display = screenshotComparisonBtn.style.display;
+            }
+            if (screenshotComparisonBtn.textContent) {
+                screenshotComparisonTopBtn.textContent = screenshotComparisonBtn.textContent;
+            }
+        };
+        window.syncScreenshotTop = syncScreenshotTop;
         if (screenshotComparisonTopBtn && screenshotComparisonBtn) {
             screenshotComparisonTopBtn.onclick = () => {
                 screenshotComparisonBtn.click();
-            };
-            const syncScreenshotTop = () => {
-                screenshotComparisonTopBtn.style.display = screenshotComparisonBtn.style.display;
-                if (screenshotComparisonBtn.textContent) {
-                    screenshotComparisonTopBtn.textContent = screenshotComparisonBtn.textContent;
-                }
             };
             try {
                 const observer = new MutationObserver(syncScreenshotTop);
@@ -3210,7 +3220,7 @@
         };
 
         function getBackendHttpBase() {
-            const rawValue = document.getElementById('backendUrl')?.value?.trim() || 'ws://localhost:18000';
+            const rawValue = document.getElementById('backendUrl')?.value?.trim() || 'ws://127.0.0.1:18000';
             let candidate = rawValue;
 
             if (!/^[a-z]+:\/\//i.test(candidate)) {
@@ -5042,12 +5052,65 @@ async function processOllamaResponse(response, promptLength) {
 
             if (currentBenchmarkMode === '1d_sweep') {
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
+                window.allTasksComparisonData = window.allTasksComparison1dData || null;
+                if (window.allTasksComparison1dData && window.allTasksComparison1dData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparison1dData, resultsDiv);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
             } else if (currentBenchmarkMode === '2d_matrix') {
                 if (exportCombined) exportCombined.style.display = 'none';
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshot2dMatrix || (currentLang === 'zh' ? '📸 截图2D矩阵热力图' : '📸 Screenshot 2D Matrix');
+                window.allTasksComparisonData = window.allTasksComparisonMatrixData || null;
+                if (window.allTasksComparisonMatrixData && window.allTasksComparisonMatrixData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparisonMatrixData, matrixHeatmap);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    const btnComparisonBottom = document.getElementById('btnScreenshotComparisonBottom');
+                    if (btnComparisonBottom) btnComparisonBottom.style.display = 'inline-flex';
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
             } else if (currentBenchmarkMode === 'sustained_decode') {
                 if (exportCombined) exportCombined.style.display = 'none';
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotSustained || (currentLang === 'zh' ? '📸 截图稳态测试看板' : '📸 Screenshot Sustained Dashboard');
+                window.allTasksComparisonData = window.allTasksComparisonSustainedData || null;
+                if (window.allTasksComparisonSustainedData && window.allTasksComparisonSustainedData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparisonSustainedData, resultsDiv);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
+            }
+            if (typeof syncScreenshotTop === 'function') {
+                syncScreenshotTop();
             }
         }
 
@@ -5440,6 +5503,7 @@ async function processOllamaResponse(response, promptLength) {
 
                 cell.title = `并发: ${conc}, 上下文: ${ctx}\n解码吞吐: ${tps.toFixed(2)} tokens/s\n平均TTFT: ${ttftStr}\n有效并发: ${msg.effective_concurrency || `${conc}/${conc}`}`;
 
+                const activeCellTask = window.currentActiveTaskType || msg.task_type || 'general';
                 testResultsData.push({
                     promptLength: ctx,
                     context: ctx,
@@ -5465,9 +5529,12 @@ async function processOllamaResponse(response, promptLength) {
                     ttft_stats: msg.ttft_stats || null,
                     itl_stats: msg.itl_stats || null,
                     benchmarkMode: '2d_matrix',
-                    recordTags: ['mode:2d_matrix'],
+                    task_type: activeCellTask,
+                    taskType: activeCellTask,
+                    recordTags: ['mode:2d_matrix', `task:${activeCellTask}`],
                     concurrentDetails: msg.concurrent_details || []
                 });
+                window.testResultsData = testResultsData;
             }
 
             if (resultsDiv) resultsDiv.scrollTop = resultsDiv.scrollHeight;
@@ -6020,6 +6087,10 @@ async function processOllamaResponse(response, promptLength) {
                 avgTtftMs: (msg.avg_ttft_ms || 0).toFixed(2),
                 avgItlMean: msg.itl_stats?.avg ? Number(msg.itl_stats.avg).toFixed(2) : (msg.itl_stats?.p50 ? Number(msg.itl_stats.p50).toFixed(2) : null),
                 avgItlStd: msg.itl_stats?.p90 ? Number(msg.itl_stats.p90).toFixed(2) : (msg.itl_stats?.std ? Number(msg.itl_stats.std).toFixed(2) : null),
+                actualDurationSec: parseFloat(msg.actual_duration_sec || msg.target_duration_sec || 30),
+                pureDecodeTimeSec: parseFloat(msg.pure_decode_time_s || msg.pure_decode_time_sec || (msg.actual_duration_sec || 30)),
+                avgStreamDecodeSpeed: parseFloat(msg.avg_stream_decode_tps || msg.avg_stream_decode_speed || (decSpeed / (msg.concurrency || 1))),
+                e2eSpeed: parseFloat(msg.e2e_throughput_tps || msg.e2e_speed || (msg.actual_duration_sec > 0 ? (msg.total_tokens / msg.actual_duration_sec) : decSpeed)),
                 concurrency: msg.concurrency || 1,
                 effectiveConcurrency: msg.effective_concurrency || `${msg.concurrency || 1}/${msg.concurrency || 1}`,
                 effective_concurrency: msg.effective_concurrency || `${msg.concurrency || 1}/${msg.concurrency || 1}`,
@@ -6073,121 +6144,193 @@ async function processOllamaResponse(response, promptLength) {
         async function testWithBackend(apiType, apiUrl, modelName, minLength, maxLength, step, testLengths, outputLength, temperature, top_p, presence_penalty, frequency_penalty, concurrency, timeout, overrideTaskType = null) {
             const t = translations[currentLang];
 
-            // Connect to Python backend WebSocket
-            const backendUrl = document.getElementById('backendUrl').value.trim() || 'ws://localhost:18000';
-            const wsUrl = backendUrl.endsWith('/ws/test') ? backendUrl : `${backendUrl}/ws/test`;
-            console.log(`[WebSocket] Connecting to ${wsUrl}...`);
+            // Connect to Python backend WebSocket (prefer IPv4 loopback 127.0.0.1 on macOS to avoid Safari ::1 Connection Refused)
+            const rawBackendUrl = document.getElementById('backendUrl')?.value?.trim() || 'ws://127.0.0.1:18000';
+            const baseWsUrl = rawBackendUrl.endsWith('/ws/test') ? rawBackendUrl : `${rawBackendUrl}/ws/test`;
 
-            const ws = new WebSocket(wsUrl);
+            const runWsConnection = (wsUrl, isFallback = false) => {
+                return new Promise((resolve, reject) => {
+                    console.log(`[WebSocket] Connecting to ${wsUrl}...`);
+                    let ws;
+                    try {
+                        ws = new WebSocket(wsUrl);
+                    } catch (constructErr) {
+                        if (!isFallback && wsUrl.includes('localhost')) {
+                            const fallbackUrl = wsUrl.replace('localhost', '127.0.0.1');
+                            console.warn(`[WebSocket] WebSocket 构造失败，尝试回退到 IPv4 地址: ${fallbackUrl}`);
+                            return resolve(runWsConnection(fallbackUrl, true));
+                        }
+                        return reject(constructErr);
+                    }
 
-            return new Promise((resolve, reject) => {
-                ws.onopen = () => {
-                    console.log('[WebSocket] Connected successfully');
+                    let checkStop = null;
+                    let hasOpened = false;
+                    let isResolvedOrRejected = false;
 
-                    const rawTaskType = overrideTaskType || document.getElementById('taskTypeSelect')?.value || 'general';
-                    const taskType = rawTaskType === 'all' ? 'general' : rawTaskType;
-                    window.currentActiveTaskType = taskType;
-
-                    // Send test configuration to backend
-                    const config = {
-                        api_url: apiUrl,
-                        model_name: modelName,
-                        api_key: api_key,
-                        api_type: apiType,
-                        task_type: taskType,
-                        min_length: minLength,
-                        max_length: maxLength,
-                        step: step,
-                        test_lengths: testLengths,
-                        output_length: outputLength,
-                        concurrency: concurrency,
-                        timeout: timeout,
-                        temperature: temperature,
-                        top_p: top_p,
-                        presence_penalty: presence_penalty,
-                        frequency_penalty: frequency_penalty,
-                        benchmark_mode: currentBenchmarkMode
+                    const cleanup = () => {
+                        if (checkStop) {
+                            clearInterval(checkStop);
+                            checkStop = null;
+                        }
                     };
 
-                    if (currentBenchmarkMode === '2d_matrix') {
-                        const concLadderStr = document.getElementById('matrixConcurrencyLadder')?.value || '1, 2, 4, 8';
-                        const ctxLadderStr = document.getElementById('matrixContextLadder')?.value || '512, 1024, 2048, 4096';
-                        const maxKv = parseInt(document.getElementById('matrixMaxKvTokens')?.value, 10) || 0;
-                        config.matrix_concurrency_ladder = parseIntegerLadder(concLadderStr, [1, 2, 4, 8]);
-                        config.matrix_context_ladder = parseIntegerLadder(ctxLadderStr, [512, 1024, 2048, 4096]);
-                        config.matrix_max_kv_tokens = maxKv;
-                    } else if (currentBenchmarkMode === 'sustained_decode') {
-                        const dur = parseFloat(document.getElementById('sustainedDuration')?.value) || 30.0;
-                        const pLen = parseInt(document.getElementById('sustainedPromptLength')?.value, 10) || 128;
-                        config.sustained_duration = dur;
-                        config.sustained_prompt_length = pLen;
-                    }
+                    ws.onopen = () => {
+                        hasOpened = true;
+                        console.log(`[WebSocket] Connected successfully to ${wsUrl}`);
 
-                    console.log('[WebSocket] Sending config:', config);
-                    ws.send(JSON.stringify(config));
-                };
+                        const rawTaskType = overrideTaskType || document.getElementById('taskTypeSelect')?.value || 'general';
+                        const taskType = rawTaskType === 'all' ? 'general' : rawTaskType;
+                        window.currentActiveTaskType = taskType;
 
-                ws.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    console.log('[WebSocket] Received:', message.type, message);
+                        // Send test configuration to backend
+                        const config = {
+                            api_url: apiUrl,
+                            model_name: modelName,
+                            api_key: api_key,
+                            api_type: apiType,
+                            task_type: taskType,
+                            min_length: minLength,
+                            max_length: maxLength,
+                            step: step,
+                            test_lengths: testLengths,
+                            output_length: outputLength,
+                            concurrency: concurrency,
+                            timeout: timeout,
+                            temperature: temperature,
+                            top_p: top_p,
+                            presence_penalty: presence_penalty,
+                            frequency_penalty: frequency_penalty,
+                            benchmark_mode: currentBenchmarkMode
+                        };
 
-                    if (message.type === 'info') {
-                        console.log(`[Info] ${message.message}`);
-                    }
-                    else if (message.type === 'progress') {
-                        if (message.benchmark_mode === '2d_matrix') {
-                            handleMatrixProgress(message);
-                        } else if (message.benchmark_mode === 'sustained_decode') {
-                            handleSustainedProgress(message);
-                        } else {
-                            console.log(`[Progress] Testing length ${message.testing_length} (${message.current}/${message.total})`);
+                        if (currentBenchmarkMode === '2d_matrix') {
+                            const concLadderStr = document.getElementById('matrixConcurrencyLadder')?.value || (typeof d_matrixConcurrencyLadder !== 'undefined' ? d_matrixConcurrencyLadder : '1, 2, 4, 8');
+                            const ctxLadderStr = document.getElementById('matrixContextLadder')?.value || (typeof d_matrixContextLadder !== 'undefined' ? d_matrixContextLadder : '512, 1024, 2048, 4096');
+                            const maxKv = parseInt(document.getElementById('matrixMaxKvTokens')?.value ?? (typeof d_matrixMaxKvTokens !== 'undefined' ? d_matrixMaxKvTokens : 0), 10) || 0;
+                            config.matrix_concurrency_ladder = parseIntegerLadder(concLadderStr, [1, 2, 4, 8]);
+                            config.matrix_context_ladder = parseIntegerLadder(ctxLadderStr, [512, 1024, 2048, 4096]);
+                            config.matrix_max_kv_tokens = maxKv;
+                        } else if (currentBenchmarkMode === 'sustained_decode') {
+                            const dur = parseFloat(document.getElementById('sustainedDuration')?.value) || 30.0;
+                            const pLen = parseInt(document.getElementById('sustainedPromptLength')?.value, 10) || 128;
+                            config.sustained_duration = dur;
+                            config.sustained_prompt_length = pLen;
                         }
-                    }
-                    else if (message.type === 'result') {
-                        if (message.benchmark_mode === '2d_matrix') {
-                            handleMatrixCellResult(message);
-                        } else if (message.benchmark_mode === 'sustained_decode') {
-                            handleSustainedResult(message);
-                        } else {
-                            handleBackendResult(message);
+
+                        console.log('[WebSocket] Sending config:', config);
+                        ws.send(JSON.stringify(config));
+                    };
+
+                    ws.onmessage = (event) => {
+                        try {
+                            const message = JSON.parse(event.data);
+                            console.log('[WebSocket] Received:', message.type, message);
+
+                            if (message.type === 'info') {
+                                console.log(`[Info] ${message.message}`);
+                            }
+                            else if (message.type === 'progress') {
+                                if (message.benchmark_mode === '2d_matrix') {
+                                    handleMatrixProgress(message);
+                                } else if (message.benchmark_mode === 'sustained_decode') {
+                                    handleSustainedProgress(message);
+                                } else {
+                                    console.log(`[Progress] Testing length ${message.testing_length} (${message.current}/${message.total})`);
+                                    handleBackendProgress(message);
+                                }
+                            }
+                            else if (message.type === 'result') {
+                                if (message.benchmark_mode === '2d_matrix') {
+                                    handleMatrixCellResult(message);
+                                } else if (message.benchmark_mode === 'sustained_decode') {
+                                    handleSustainedResult(message);
+                                } else {
+                                    handleBackendResult(message);
+                                }
+                            }
+                            else if (message.type === 'complete') {
+                                console.log('[WebSocket] Test complete');
+                                cleanup();
+                                currentPendingRow = null;
+                                if (message.benchmark_mode === '2d_matrix') {
+                                    handleMatrixComplete(message);
+                                } else if (message.benchmark_mode === 'sustained_decode') {
+                                    handleSustainedComplete(message);
+                                }
+                                if (typeof showShareButton === 'function') showShareButton();
+                                if (!isResolvedOrRejected) {
+                                    isResolvedOrRejected = true;
+                                    resolve();
+                                }
+                                try { ws.close(); } catch (err) {}
+                            }
+                            else if (message.type === 'error') {
+                                console.error('[WebSocket] Error:', message.message);
+                                cleanup();
+                                if (currentPendingRow) {
+                                    const cells = currentPendingRow.querySelectorAll('td');
+                                    if (cells.length > 5) cells[5].textContent = message.message || t.statusFailed || '失败';
+                                    currentPendingRow.classList.remove('info');
+                                    currentPendingRow.classList.add('error');
+                                    currentPendingRow = null;
+                                }
+                                try { ws.close(); } catch (err) {}
+                                if (!isResolvedOrRejected) {
+                                    isResolvedOrRejected = true;
+                                    reject(new Error(message.message));
+                                }
+                            }
+                        } catch (handlerErr) {
+                            console.error('[WebSocket] onmessage handler error:', handlerErr);
                         }
-                    }
-                    else if (message.type === 'complete') {
-                        console.log('[WebSocket] Test complete');
-                        if (message.benchmark_mode === '2d_matrix') {
-                            handleMatrixComplete(message);
-                        } else if (message.benchmark_mode === 'sustained_decode') {
-                            handleSustainedComplete(message);
+                    };
+
+                    ws.onerror = (error) => {
+                        cleanup();
+                        if (isResolvedOrRejected || (hasOpened && ws.readyState === 3)) {
+                            return;
                         }
-                        ws.close();
-                        if (typeof showShareButton === 'function') showShareButton();
-                        resolve();
-                    }
-                    else if (message.type === 'error') {
-                        console.error('[WebSocket] Error:', message.message);
-                        ws.close();
-                        reject(new Error(message.message));
-                    }
-                };
+                        console.error('[WebSocket] Connection error:', error);
+                        // macOS/Safari 下 localhost 默认优先解析到 IPv6 [::1]，若此时尚未 open 且是 localhost，自动切换到 127.0.0.1 重试
+                        if (!hasOpened && !isFallback && wsUrl.includes('localhost')) {
+                            const fallbackUrl = wsUrl.replace('localhost', '127.0.0.1');
+                            console.warn(`[WebSocket] ${wsUrl} 连接异常 (可能是 macOS IPv6 解析问题)，正在自动回退尝试 IPv4 ${fallbackUrl}...`);
+                            try { ws.close(); } catch (err) {}
+                            return resolve(runWsConnection(fallbackUrl, true));
+                        }
+                        if (currentPendingRow) {
+                            const cells = currentPendingRow.querySelectorAll('td');
+                            if (cells.length > 5) cells[5].textContent = t.statusFailed || '失败';
+                            currentPendingRow.classList.remove('info');
+                            currentPendingRow.classList.add('error');
+                            currentPendingRow = null;
+                        }
+                        if (!isResolvedOrRejected) {
+                            isResolvedOrRejected = true;
+                            reject(new Error('WebSocket connection failed. Make sure the Python backend is running.'));
+                        }
+                    };
 
-                ws.onerror = (error) => {
-                    console.error('[WebSocket] Connection error:', error);
-                    reject(new Error('WebSocket connection failed. Make sure the Python backend is running.'));
-                };
+                    ws.onclose = () => {
+                        cleanup();
+                        console.log('[WebSocket] Connection closed');
+                    };
 
-                ws.onclose = () => {
-                    console.log('[WebSocket] Connection closed');
-                };
+                    // Handle test stop
+                    checkStop = setInterval(() => {
+                        if (!isTestingRunning) {
+                            cleanup();
+                            try { ws.close(); } catch (err) {}
+                            if (!isResolvedOrRejected) {
+                                isResolvedOrRejected = true;
+                                resolve();
+                            }
+                        }
+                    }, 100);
+                });
+            };
 
-                // Handle test stop
-                const checkStop = setInterval(() => {
-                    if (!isTestingRunning) {
-                        clearInterval(checkStop);
-                        ws.close();
-                        resolve();
-                    }
-                }, 100);
-            });
+            return await runWsConnection(baseWsUrl);
         }
 
         // Task Workload Characteristics for Analysis & Notes
@@ -6219,6 +6362,12 @@ async function processOllamaResponse(response, promptLength) {
         };
 
         let allTasksComparisonChartInstance = null;
+        let allTasksComparisonMatrixData = null;
+        let allTasksComparison1dData = null;
+        let allTasksComparisonSustainedData = null;
+        window.allTasksComparisonMatrixData = allTasksComparisonMatrixData;
+        window.allTasksComparison1dData = allTasksComparison1dData;
+        window.allTasksComparisonSustainedData = allTasksComparisonSustainedData;
 
         function generateAllTasksComparisonMarkdown(results, modelName) {
             const isEn = (currentLang === 'en');
@@ -6298,7 +6447,7 @@ async function processOllamaResponse(response, promptLength) {
 
         function renderAllTasksComparison(results, targetContainer = null) {
             if (!results || results.length === 0) return;
-            const container = targetContainer || document.getElementById('results');
+            const container = targetContainer || (currentBenchmarkMode === '2d_matrix' ? document.getElementById('matrixHeatmapContainer') : document.getElementById('results'));
             if (!container) return;
 
             const isEn = (currentLang === 'en');
@@ -6550,7 +6699,7 @@ async function processOllamaResponse(response, promptLength) {
                     allTasksComparisonChartInstance.destroy();
                     allTasksComparisonChartInstance = null;
                 }
-                const chartCanvas = document.getElementById('allTasksComparisonChart');
+                const chartCanvas = compDiv.querySelector('#allTasksComparisonChart') || compDiv.querySelector('canvas') || document.getElementById('allTasksComparisonChart');
                 if (chartCanvas && typeof Chart !== 'undefined') {
                     const labels = sortedResults.map(r => {
                         const k = r.task_type || r.taskType || 'general';
@@ -6753,6 +6902,13 @@ async function processOllamaResponse(response, promptLength) {
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'block';
             testResultsData.length = 0;
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparisonSustainedData = null;
+            window.allMatrixTasksData = null;
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = 'all';
 
             const sustainedNotesEl = document.createElement('div');
             sustainedNotesEl.id = 'sustainedNotesMessage';
@@ -6934,7 +7090,10 @@ async function processOllamaResponse(response, promptLength) {
                 }
 
                 if (sequenceResults.length > 0) {
+                    window.allTasksComparisonSustainedData = sequenceResults;
+                    window.allTasksComparisonData = sequenceResults;
                     renderAllTasksComparison(sequenceResults);
+                    window.activeSequenceTaskType = 'all';
 
                     // Save to history
                     const currentConfig = {
@@ -6958,6 +7117,7 @@ async function processOllamaResponse(response, promptLength) {
 
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                    if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
 
                     if (typeof showShareButton === 'function') {
                         showShareButton();
@@ -7032,6 +7192,13 @@ async function processOllamaResponse(response, promptLength) {
                 isTestingRunning = false;
                 stopTestBtn.disabled = true;
                 stopTestBtn.textContent = t.statusStopping || (currentLang === 'zh' ? '正在停止...' : 'Stopping...');
+                if (currentPendingRow) {
+                    const cells = currentPendingRow.querySelectorAll('td');
+                    if (cells.length > 5) cells[5].textContent = t.msgTestStopped || (currentLang === 'zh' ? '已停止' : 'Stopped');
+                    currentPendingRow.classList.remove('info');
+                    currentPendingRow.classList.add('error');
+                    currentPendingRow = null;
+                }
                 if (activeTestAbortController) {
                     try {
                         activeTestAbortController.abort('User stopped test sequence');
@@ -7053,6 +7220,16 @@ async function processOllamaResponse(response, promptLength) {
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'block';
             testResultsData.length = 0;
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparison1dData = null;
+            window.allMatrixTasksData = null;
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = 'all';
+            currentPendingRow = null;
+            completedTests = 0;
+            totalTests = testLengths.length * tasksToRun.length;
 
             const seqHeader = document.createElement('div');
             seqHeader.id = 'seqProgressContainer';
@@ -7257,8 +7434,9 @@ async function processOllamaResponse(response, promptLength) {
                 }
 
                 if (sequenceResults.length > 0) {
-                    renderAllTasksComparison(sequenceResults);
+                    window.allTasksComparison1dData = sequenceResults;
                     window.allTasksComparisonData = sequenceResults;
+                    renderAllTasksComparison(sequenceResults);
                     window.activeSequenceTaskType = 'all';
 
                     const currentConfig = {
@@ -7287,6 +7465,7 @@ async function processOllamaResponse(response, promptLength) {
                     exportCSVBtn.style.display = 'block';
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                    if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
                     if (typeof showShareButton === 'function') showShareButton();
                 }
             }
@@ -7308,9 +7487,12 @@ async function processOllamaResponse(response, promptLength) {
             const presence_penalty = parseFloat(document.getElementById('presencePenaltyInput').value);
             const frequency_penalty = parseFloat(document.getElementById('frequencyPenaltyInput').value);
 
-            const concLadderStr = document.getElementById('matrixConcurrencyLadder')?.value || '1, 2, 4, 8';
-            const ctxLadderStr = document.getElementById('matrixContextLadder')?.value || '512, 1024, 2048, 4096';
-            const maxKv = parseInt(document.getElementById('matrixMaxKvTokens')?.value, 10) || 0;
+            const concLadderStr = document.getElementById('matrixConcurrencyLadder')?.value || (typeof d_matrixConcurrencyLadder !== 'undefined' ? d_matrixConcurrencyLadder : '1, 2, 4, 8');
+            const ctxLadderStr = document.getElementById('matrixContextLadder')?.value || (typeof d_matrixContextLadder !== 'undefined' ? d_matrixContextLadder : '512, 1024, 2048, 4096');
+            const maxKv = parseInt(document.getElementById('matrixMaxKvTokens')?.value ?? (typeof d_matrixMaxKvTokens !== 'undefined' ? d_matrixMaxKvTokens : 0), 10) || 0;
+            const concurrencyStr = concLadderStr;
+            const contextStr = ctxLadderStr;
+            const maxKvTokens = maxKv;
 
             if (!apiUrl || !currentModelName || isNaN(outputLength) || isNaN(timeout)) {
                 alert(translations[currentLang].alertMissingParams || "请填写所有必填的配置参数 (API地址、模型名称、输出长度、超时时间)！");
@@ -7354,7 +7536,15 @@ async function processOllamaResponse(response, promptLength) {
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'none';
-            testResultsData = [];
+            testResultsData.length = 0;
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparisonMatrixData = null;
+            const oldMatrixComp = document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonContainer');
+            if (oldMatrixComp) oldMatrixComp.remove();
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = 'all';
 
             // Initialize multi-matrix store
             window.allMatrixTasksData = {};
@@ -7481,27 +7671,37 @@ async function processOllamaResponse(response, promptLength) {
                     const ctxLadder = parseIntegerLadder(ctxLadderStr, [512, 1024, 2048, 4096]);
                     renderMatrixHeatmapSkeleton(concLadder, ctxLadder);
 
+                    const taskStartIndex = testResultsData.length;
                     if (currentApiType === 'openai') {
                         await testOpenAI(apiUrl, currentModelName, 128, 128, 128, [128], outputLength, temperature, top_p, presence_penalty, frequency_penalty, 1, timeout, taskKey);
                     } else {
                         await testOllama(apiUrl, currentModelName, 128, 128, 128, [128], outputLength, temperature, top_p, presence_penalty, frequency_penalty, 1, timeout, taskKey);
                     }
 
+                    const currentTaskCells = testResultsData.slice(taskStartIndex).filter(c => !c.skipped && c.status !== 'SKIP_KV_LIMIT' && parseFloat(c.outputSpeed) > 0);
                     const taskSavedData = window.allMatrixTasksData[taskKey] || {};
-                    const peakTps = taskSavedData.peakTps || 0;
+                    const validTps = currentTaskCells.map(c => parseFloat(c.outputSpeed)).filter(n => Number.isFinite(n) && n > 0);
+                    const peakTps = validTps.length > 0 ? Math.max(...validTps) : (taskSavedData.peakTps || taskSavedData.peak_decode_tps || 0);
+                    const cellPeakTps = peakTps;
+                    const validTtfts = currentTaskCells.map(c => parseFloat(c.avgTtftMs || c.prefillTimeMs)).filter(n => Number.isFinite(n) && n > 0);
+                    const avgTtft = validTtfts.length > 0 ? (validTtfts.reduce((a,b)=>a+b,0)/validTtfts.length) : null;
+                    const validItls = currentTaskCells.map(c => parseFloat(c.avgItlMean || c.p50_itl)).filter(n => Number.isFinite(n) && n > 0);
+                    const avgItl = validItls.length > 0 ? (validItls.reduce((a,b)=>a+b,0)/validItls.length) : null;
+                    const totalTokens = currentTaskCells.reduce((sum, c) => sum + (parseInt(c.outputTokens, 10) || 0), 0);
+
                     const summaryItem = {
                         task_type: taskKey,
-                        outputSpeed: Number(peakTps).toFixed(2),
-                        peakSpeed: Number(peakTps).toFixed(2),
-                        prefillTimeMs: '100.00',
-                        ttft_stats: { p50: 100 },
-                        itl_stats: { p50: peakTps > 0 ? (1000/peakTps) : 10 },
-                        avgItlMean: peakTps > 0 ? (1000/peakTps).toFixed(1) : '10.0',
-                        outputTokens: 5000,
+                        outputSpeed: Number(cellPeakTps).toFixed(2),
+                        peakSpeed: Number(cellPeakTps).toFixed(2),
+                        prefillTimeMs: avgTtft !== null ? avgTtft.toFixed(2) : null,
+                        ttft_stats: avgTtft !== null ? { p50: avgTtft } : null,
+                        itl_stats: avgItl !== null ? { p50: avgItl } : null,
+                        avgItlMean: avgItl !== null ? avgItl.toFixed(1) : null,
+                        outputTokens: totalTokens > 0 ? totalTokens : null,
                         effectiveConcurrency: '2D-Matrix',
                         concurrency: 'Ladder',
-                        e2eSpeed: Number(peakTps).toFixed(2),
-                        e2e_throughput_tps: Number(peakTps).toFixed(2),
+                        e2eSpeed: null,
+                        e2e_throughput_tps: null,
                         benchmarkMode: '2d_matrix'
                     };
                     sequenceResults.push(summaryItem);
@@ -7528,6 +7728,7 @@ async function processOllamaResponse(response, promptLength) {
                     renderMatrixTaskTabsBar();
 
                     // 即时渐进式渲染已完成场景对比看板与快捷截图按钮
+                    window.allTasksComparisonMatrixData = sequenceResults;
                     window.allTasksComparisonData = sequenceResults;
                     renderAllTasksComparison(sequenceResults);
                     screenshotComparisonBtn.style.display = 'block';
@@ -7569,6 +7770,7 @@ async function processOllamaResponse(response, promptLength) {
                 }
 
                 if (sequenceResults.length > 0) {
+                    window.allTasksComparisonMatrixData = sequenceResults;
                     window.allTasksComparisonData = sequenceResults;
                     renderAllTasksComparison(sequenceResults);
 
@@ -7616,25 +7818,65 @@ async function processOllamaResponse(response, promptLength) {
         window.renderAllTasksComparison = renderAllTasksComparison;
         window.runAllTasksBenchmarkSequence = runAllTasksBenchmarkSequence;
 
-        function handleBackendResult(message) {
-            const t = translations[currentLang];
+        let currentPendingRow = null;
 
-            // Find or create table row for this prompt length
-            const tbody = resultsDiv.querySelector('tbody');
-            let row = Array.from(tbody.querySelectorAll('tr')).find(r => {
-                const firstCell = r.querySelector('td');
-                return firstCell && firstCell.textContent == message.prompt_length;
-            });
+        function handleBackendProgress(message) {
+            try {
+                if (progressBar && totalTests > 0) {
+                    progressBar.style.width = `${(completedTests / totalTests) * 100}%`;
+                }
+                const tbody = resultsDiv.querySelector('tbody');
+                if (!tbody) return;
+                const t = translations[currentLang];
+                const conc = document.getElementById('concurrency')?.value || 1;
+                const testLen = message.testing_length;
 
-            if (!row) {
-                row = document.createElement('tr');
-                tbody.appendChild(row);
+                // Create a new pending row for this test step
+                const row = document.createElement('tr');
+                row.className = 'info';
+                row.dataset.testingLength = String(testLen);
+
                 for (let i = 0; i < 7; i++) {
+                    const td = document.createElement('td');
+                    row.appendChild(td);
+                }
+                const cells = row.querySelectorAll('td');
+                cells[0].textContent = testLen;
+                cells[1].textContent = t.msgTesting || (currentLang === 'zh' ? '测试中...' : 'Testing...');
+                cells[2].textContent = t.msgTesting || (currentLang === 'zh' ? '测试中...' : 'Testing...');
+                cells[3].textContent = t.msgTesting || (currentLang === 'zh' ? '测试中...' : 'Testing...');
+                cells[4].textContent = t.msgTesting || (currentLang === 'zh' ? '测试中...' : 'Testing...');
+                cells[5].textContent = `${conc} ${t.msgConcurrentTesting || (currentLang === 'zh' ? '并发测试中' : 'Concurrent Testing')}`;
+                cells[6].textContent = '-';
+
+                tbody.appendChild(row);
+                currentPendingRow = row;
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            } catch (e) {
+                console.error('[handleBackendProgress] Error:', e);
+            }
+        }
+
+        function handleBackendResult(message) {
+            try {
+                const t = translations[currentLang];
+                const tbody = resultsDiv.querySelector('tbody');
+
+                let row = currentPendingRow;
+                currentPendingRow = null;
+
+                if (!row || !row.parentNode || (tbody && row.parentNode !== tbody)) {
+                    row = document.createElement('tr');
+                    if (tbody) tbody.appendChild(row);
+                    for (let i = 0; i < 7; i++) {
+                        row.appendChild(document.createElement('td'));
+                    }
+                }
+                while (row.children.length < 7) {
                     row.appendChild(document.createElement('td'));
                 }
-            }
 
-            const cells = row.querySelectorAll('td');
+                const cells = row.querySelectorAll('td');
 
             if (message.status === '成功' || message.status === 'Success') {
                 // Calculate true total throughput based on timestamps
@@ -7766,9 +8008,14 @@ async function processOllamaResponse(response, promptLength) {
                 const localTotalSpeed = (localEstimatedPromptTotal + localEstimatedOutputTotal) > 0 && clientTotalDurationMs
                     ? (localEstimatedPromptTotal + localEstimatedOutputTotal) / (clientTotalDurationMs / 1000)
                     : null;
+                const resolvedTaskType = message.task_type
+                    || (typeof overrideTaskType !== 'undefined' ? overrideTaskType : null)
+                    || window.currentActiveTaskType
+                    || document.getElementById('taskTypeSelect')?.value
+                    || 'general';
                 const resultEntry = {
-                    taskType: message.task_type || overrideTaskType || document.getElementById('taskTypeSelect')?.value || 'general',
-                    task_type: message.task_type || overrideTaskType || document.getElementById('taskTypeSelect')?.value || 'general',
+                    taskType: resolvedTaskType,
+                    task_type: resolvedTaskType,
                     promptLength: resolvedPromptLength,
                     requestedPromptLength: Number.isFinite(Number(message.requested_prompt_length)) ? Number(message.requested_prompt_length) : resolvedPromptLength,
                     prefillTimeMs: (prefillDurationSec * 1000).toFixed(2),
@@ -7822,7 +8069,9 @@ async function processOllamaResponse(response, promptLength) {
                     // 新增ITL和TTFT相关字段
                     avgTtftMs: avgTtftMs.toFixed ? avgTtftMs.toFixed(2) : avgTtftMs,
                     avgItlMean: avgItlMean,
-                    avgItlStd: avgItlStd
+                    avgItlStd: avgItlStd,
+                    benchmarkMode: '1d_sweep',
+                    recordTags: ['mode:1d_sweep']
                 };
 
                 detailButton.onclick = () => showTestDetail(resultEntry);
@@ -7867,8 +8116,13 @@ async function processOllamaResponse(response, promptLength) {
             }
 
             completedTests++;
-            progressBar.style.width = `${(completedTests / totalTests) * 100}%`;
+            if (totalTests > 0) {
+                progressBar.style.width = `${(completedTests / totalTests) * 100}%`;
+            }
             resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            } catch (err) {
+                console.error('[handleBackendResult] Unexpected error:', err);
+            }
         }
 
         // 显示测试详情弹窗
@@ -8066,6 +8320,11 @@ async function processOllamaResponse(response, promptLength) {
                                 <span class="detail-label">${t.detailConcurrency}:</span>
                                 <span class="detail-value">${testData.concurrency}</span>
                             </div>
+                            ${(testData.taskType || testData.task_type) ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.labelTaskType || (currentLang === 'zh' ? '评测场景:' : 'Workload Task:')}</span>
+                                <span class="detail-value">${getTaskTypeBadgeHtml(testData.taskType || testData.task_type, currentLang === 'en')}</span>
+                            </div>` : ''}
                             <div class="detail-info-item">
                                 <span class="detail-label">${t.detailTimestamp}:</span>
                                 <span class="detail-value">${new Date(testData.timestamp).toLocaleString()}</span>
@@ -8273,7 +8532,11 @@ async function processOllamaResponse(response, promptLength) {
             const frequency_penalty = parseFloat(document.getElementById('frequencyPenaltyInput').value);
 
             if (document.getElementById('taskTypeSelect')?.value === 'all') {
-                await runAllTasksBenchmarkSequence();
+                try {
+                    await runAllTasksBenchmarkSequence();
+                } catch (seqErr) {
+                    console.error('[Benchmark Sequence] Execution error:', seqErr);
+                }
                 return;
             }
 
@@ -8330,6 +8593,7 @@ async function processOllamaResponse(response, promptLength) {
             }
 
             completedTests = 0;
+            currentPendingRow = null;
 
             concurrencyStats = {
                 minPrefillSpeed: Infinity,
@@ -8349,7 +8613,22 @@ async function processOllamaResponse(response, promptLength) {
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
             testResultsData.length = 0; // Fix reference so window.testResultsData reflects this
+            window.testResultsData = testResultsData;
+            window.matrixGridData = null;
+            window.matrixSummaryData = null;
             window.sustainedSummaryData = null;
+            window.allTasksComparisonData = null;
+            if (currentBenchmarkMode === '2d_matrix') {
+                window.allTasksComparisonMatrixData = null;
+                const oldComp = document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonContainer');
+                if (oldComp) oldComp.remove();
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                window.allTasksComparisonSustainedData = null;
+            } else {
+                window.allTasksComparison1dData = null;
+            }
+            window.allMatrixTasksData = null;
+            window.activeSequenceTaskType = null;
             if (typeof closeCellDetailModal === 'function') closeCellDetailModal();
             if (currentBenchmarkMode === '2d_matrix') {
                 resultsDiv.style.display = 'none';
@@ -8467,6 +8746,13 @@ async function processOllamaResponse(response, promptLength) {
                 isTestingRunning = false;
                 stopTestBtn.disabled = true;
                 stopTestBtn.textContent = translations[currentLang].statusStopping;
+                if (currentPendingRow) {
+                    const cells = currentPendingRow.querySelectorAll('td');
+                    if (cells.length > 5) cells[5].textContent = translations[currentLang].msgTestStopped || (currentLang === 'zh' ? '已停止' : 'Stopped');
+                    currentPendingRow.classList.remove('info');
+                    currentPendingRow.classList.add('error');
+                    currentPendingRow = null;
+                }
             };
 
             try {
@@ -8580,6 +8866,7 @@ async function processOllamaResponse(response, promptLength) {
             } else {
                 screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
             }
+            if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
             stopTestBtn.style.display = 'none';
             if (window._onTestComplete) window._onTestComplete();
         });
@@ -8962,7 +9249,7 @@ async function processOllamaResponse(response, promptLength) {
                 }
 
                 // 重点修复：高保真复制 allTasksComparisonChart (横向柱线图) 像素缓冲并转为静态图片嵌入克隆DOM，消除 html2canvas 离屏渲染黑屏/空白缺陷
-                const origCompChart = document.getElementById('allTasksComparisonChart');
+                const origCompChart = (activeMode === '2d_matrix' ? (document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonChart') || document.getElementById('allTasksComparisonChart')) : (document.getElementById('results')?.querySelector('#allTasksComparisonChart') || document.getElementById('allTasksComparisonChart')));
                 const cloneCompChart = tempContainer.querySelector('#allTasksComparisonChart');
                 if (origCompChart && cloneCompChart) {
                     cloneCompChart.width = origCompChart.width;
@@ -9015,7 +9302,17 @@ async function processOllamaResponse(response, promptLength) {
                         alert(t.alertScreenshotSuccess || '截图已复制到剪贴板！');
                     } catch (clipboardError) {
                         console.error('复制到剪贴板失败:', clipboardError);
-                        alert(t.alertScreenshotFailed || '截图失败，请重试！');
+                        // 当浏览器剪贴板权限受限 (如 Safari 用户激活过期等)，自动回退为触发图片下载
+                        try {
+                            const link = document.createElement('a');
+                            link.download = `llm_speedtest_${Date.now()}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            alert(currentLang === 'zh' ? '剪贴板权限受限，已自动将截图保存为图片文件下载！' : 'Clipboard access denied/restricted. The screenshot has been automatically downloaded as an image file!');
+                        } catch (downloadErr) {
+                            console.error('下载截图失败:', downloadErr);
+                            alert(t.alertScreenshotFailed || '截图失败，请重试！');
+                        }
                     }
                 }, 'image/png', 0.95);
             } catch (error) {
@@ -10721,7 +11018,8 @@ async function processOllamaResponse(response, promptLength) {
                     renderMatrixTaskFromData(firstTask);
 
                     if (record.all_tasks_comparison || (Array.isArray(record.results) && record.results.some(r => r.task_type))) {
-                        window.allTasksComparisonData = record.all_tasks_comparison || record.results;
+                        window.allTasksComparisonMatrixData = record.all_tasks_comparison || record.results;
+                        window.allTasksComparisonData = window.allTasksComparisonMatrixData;
                         renderAllTasksComparison(window.allTasksComparisonData);
                     }
                 } else {
@@ -10840,6 +11138,8 @@ async function processOllamaResponse(response, promptLength) {
                     (testResultsData.length > 1 && (new Set(testResultsData.map(r => r.task_type || r.taskType)).size > 1));
 
                 if (isAllTasksRecord) {
+                    window.allTasksComparisonSustainedData = testResultsData;
+                    window.allTasksComparisonData = testResultsData;
                     renderAllTasksComparison(testResultsData);
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
@@ -11008,6 +11308,8 @@ async function processOllamaResponse(response, promptLength) {
                 screenshotComparisonBtn.textContent = translations[currentLang].btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
                 exportCombinedChartBtn.style.display = 'block';
             }
+
+            if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
 
             // 关闭历史记录面板
             closeHistoryModal();
@@ -11309,7 +11611,8 @@ async function processOllamaResponse(response, promptLength) {
         async function loadBackendConfig() {
             // 方法1: 从当前页面的location获取主机和端口（如果是从后端served）
             if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-                const host = window.location.hostname;
+                let host = window.location.hostname;
+                if (host === 'localhost') host = '127.0.0.1';
                 const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
                 console.log(`[Init] Backend from window.location: ${host}:${port}`);
                 return { host, port };
@@ -11321,25 +11624,25 @@ async function processOllamaResponse(response, promptLength) {
 
             if (port) {
                 console.log(`[Init] Backend port from URL parameter: ${port}`);
-                return { host: 'localhost', port };
+                return { host: '127.0.0.1', port };
             }
 
             // 方法3: 尝试从后端API获取端口
             try {
-                const response = await fetch('http://localhost:18000/api/port');
+                const response = await fetch('http://127.0.0.1:18000/api/port');
                 if (response.ok) {
                     const data = await response.json();
                     port = data.port.toString();
                     console.log(`[Init] Backend port from API: ${port}`);
-                    return { host: 'localhost', port };
+                    return { host: '127.0.0.1', port };
                 }
             } catch (e) {
                 console.log('[Init] Failed to fetch port from API:', e);
             }
 
-            // 方法4: 使用默认配置
-            console.log('[Init] Using default: localhost:18000');
-            return { host: 'localhost', port: '18000' };
+            // 方法4: 使用默认配置 (优先使用 127.0.0.1 避免 macOS/Safari IPv6 ::1 拒绝连接)
+            console.log('[Init] Using default: 127.0.0.1:18000');
+            return { host: '127.0.0.1', port: '18000' };
         }
 
         window.onload = async function () {
@@ -11928,15 +12231,64 @@ async function processOllamaResponse(response, promptLength) {
 
         function buildUploadPayload(hardware, framework, quantization, nickname, notes, runCommand) {
             const userCode = getOrCreateUserCode();
-            const validPoints = (window.testResultsData || []).filter(r =>
+            const currentMode = currentBenchmarkMode || '1d_sweep';
+            const allCandidatePoints = (window.testResultsData || []).filter(r =>
                 r.prefillSpeed !== 'N/A' && r.outputSpeed !== 'N/A'
             );
+
+            // Filter points strictly belonging to current active benchmark mode to prevent cross-mode pollution
+            let validPoints = allCandidatePoints.filter(r => {
+                const ptMode = r.benchmarkMode || (Array.isArray(r.recordTags) ? r.recordTags.find(t => t.startsWith('mode:'))?.replace('mode:', '') : null);
+                if (currentMode === '1d_sweep') {
+                    return !ptMode || ptMode === '1d_sweep';
+                }
+                return ptMode === currentMode;
+            });
+
+            // If 2D Matrix has no raw points in testResultsData, but has multi-matrix or grid data in memory, construct representative points
+            if (currentMode === '2d_matrix' && validPoints.length === 0) {
+                if (window.allMatrixTasksData && Object.keys(window.allMatrixTasksData).length > 0) {
+                    Object.entries(window.allMatrixTasksData).forEach(([tKey, tData]) => {
+                        const summary = tData.matrix_summary || {};
+                        const peakPt = summary.peak_point || {};
+                        validPoints.push({
+                            task_type: tKey,
+                            promptLength: peakPt.context || 512,
+                            prefillSpeed: summary.overall_avg_prefill || summary.overall_max_prefill || 0,
+                            outputSpeed: summary.peak_decode_tps || tData.peakTps || 0,
+                            concurrency: peakPt.concurrency || 1,
+                            benchmarkMode: '2d_matrix',
+                            recordTags: ['mode:2d_matrix', `task:${tKey}`]
+                        });
+                    });
+                } else if (window.matrixSummaryData && window.matrixSummaryData.peak_decode_tps) {
+                    const summary = window.matrixSummaryData;
+                    const peakPt = summary.peak_point || {};
+                    validPoints.push({
+                        task_type: summary.task_type || 'general',
+                        promptLength: peakPt.context || 512,
+                        prefillSpeed: summary.overall_avg_prefill || summary.overall_max_prefill || 0,
+                        outputSpeed: summary.peak_decode_tps || 0,
+                        concurrency: peakPt.concurrency || 1,
+                        benchmarkMode: '2d_matrix',
+                        recordTags: ['mode:2d_matrix']
+                    });
+                }
+            }
+
+            // Fallback for 1D sweep if none were explicitly tagged
+            if (currentMode === '1d_sweep' && validPoints.length === 0 && allCandidatePoints.length > 0) {
+                if (!allCandidatePoints.some(r => r.benchmarkMode && r.benchmarkMode !== '1d_sweep')) {
+                    validPoints = allCandidatePoints;
+                }
+            }
+
             if (validPoints.length === 0) return null;
 
-            const maxPrefill = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.prefillSpeed)), 0);
-            const maxDecode = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.outputSpeed)), 0);
-            const avgPrefill = validPoints.reduce((sum, r) => sum + parseFloat(r.prefillSpeed), 0) / validPoints.length;
-            const avgDecode = validPoints.reduce((sum, r) => sum + parseFloat(r.outputSpeed), 0) / validPoints.length;
+            let maxPrefill = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.prefillSpeed) || 0), 0);
+            let maxDecode = validPoints.reduce((max, r) => Math.max(max, parseFloat(r.outputSpeed) || 0), 0);
+            let avgPrefill = validPoints.length > 0 ? (validPoints.reduce((sum, r) => sum + (parseFloat(r.prefillSpeed) || 0), 0) / validPoints.length) : 0;
+            let avgDecode = validPoints.length > 0 ? (validPoints.reduce((sum, r) => sum + (parseFloat(r.outputSpeed) || 0), 0) / validPoints.length) : 0;
             const modelName = document.getElementById('shareModelName')?.value?.trim() || '未知模型';
             const inputConcurrency = parseInt(document.getElementById('concurrency')?.value) || 1;
             // 稳态解码模式下使用流池规模作为真实并发数，2D矩阵模式下使用最大并发
@@ -11971,6 +12323,7 @@ async function processOllamaResponse(response, promptLength) {
                 results: validPoints.map(r => {
                     const pointStats = resolveUploadPointStats(r, concurrency);
                     return {
+                        task_type: r.task_type || r.taskType || r.task || null,
                         prompt_length: parseFloat(r.promptLength),
                         prefill_speed: parseFloat(r.prefillSpeed),
                         output_speed: parseFloat(r.outputSpeed),
@@ -12008,9 +12361,65 @@ async function processOllamaResponse(response, promptLength) {
                     payload.all_matrices = window.allMatrixTasksData;
                     recordTags.push('multi_matrix');
                 }
+                const mSum = window.matrixSummaryData || {};
+                const peakDec = parseFloat(mSum.peak_decode_tps || mSum.overall_max_decode);
+                if (Number.isFinite(peakDec) && peakDec > 0) {
+                    payload.max_decode_speed = parseFloat(peakDec.toFixed(2));
+                }
+                const avgDec = parseFloat(mSum.overall_avg_decode);
+                if (Number.isFinite(avgDec) && avgDec > 0) {
+                    payload.avg_decode_speed = parseFloat(avgDec.toFixed(2));
+                }
+                const maxPref = parseFloat(mSum.overall_max_prefill);
+                if (Number.isFinite(maxPref) && maxPref > 0) {
+                    payload.max_prefill_speed = parseFloat(maxPref.toFixed(2));
+                }
+                const avgPref = parseFloat(mSum.overall_avg_prefill);
+                if (Number.isFinite(avgPref) && avgPref > 0) {
+                    payload.avg_prefill_speed = parseFloat(avgPref.toFixed(2));
+                }
             } else if (currentBenchmarkMode === 'sustained_decode') {
                 payload.benchmark_mode = 'sustained_decode';
-                payload.sustained_summary = window.sustainedSummaryData || null;
+                let sustainedSummary = window.sustainedSummaryData || null;
+                if (!sustainedSummary && validPoints.length > 0) {
+                    const firstP = validPoints[0];
+                    sustainedSummary = {
+                        steady_decode_tps: parseFloat(firstP.outputSpeed) || 0,
+                        avg_decode_speed: parseFloat(firstP.outputSpeed) || 0,
+                        prefill_speed: parseFloat(firstP.prefillSpeed) || 0,
+                        avg_prefill_speed: parseFloat(firstP.prefillSpeed) || 0,
+                        avg_ttft_ms: parseFloat(firstP.avgTtftMs) || 0,
+                        actual_duration_sec: parseFloat(firstP.actualDurationSec) || (firstP.outputTimeMs ? parseFloat(firstP.outputTimeMs) / 1000 : 30),
+                        pure_decode_time_s: parseFloat(firstP.pureDecodeTimeSec) || (firstP.outputTimeMs ? parseFloat(firstP.outputTimeMs) / 1000 : 30),
+                        pure_decode_time_sec: parseFloat(firstP.pureDecodeTimeSec) || (firstP.outputTimeMs ? parseFloat(firstP.outputTimeMs) / 1000 : 30),
+                        completed_streams: parseInt(firstP.completedStreams || firstP.successful, 10) || concurrency,
+                        total_tokens: parseInt(firstP.outputTokens, 10) || 0,
+                        avg_stream_decode_tps: parseFloat(firstP.avgStreamDecodeSpeed) || 0,
+                        avg_stream_decode_speed: parseFloat(firstP.avgStreamDecodeSpeed) || 0,
+                        e2e_throughput_tps: parseFloat(firstP.e2eSpeed) || 0,
+                        e2e_speed: parseFloat(firstP.e2eSpeed) || 0,
+                        concurrency: concurrency,
+                        effective_concurrency: firstP.effectiveConcurrency || `${concurrency}/${concurrency}`,
+                        task_type: firstP.task_type || firstP.taskType || 'general',
+                        completed_requests: firstP.concurrentDetails || []
+                    };
+                }
+                if (sustainedSummary) {
+                    const steadyTps = parseFloat(sustainedSummary.steady_decode_tps || sustainedSummary.avg_decode_speed);
+                    if (Number.isFinite(steadyTps) && steadyTps > 0) {
+                        payload.max_decode_speed = parseFloat(steadyTps.toFixed(2));
+                        payload.avg_decode_speed = parseFloat(steadyTps.toFixed(2));
+                    }
+                    const avgPref = parseFloat(sustainedSummary.avg_prefill_speed || sustainedSummary.max_prefill_speed);
+                    if (Number.isFinite(avgPref) && avgPref > 0) {
+                        payload.max_prefill_speed = parseFloat(avgPref.toFixed(2));
+                        payload.avg_prefill_speed = parseFloat(avgPref.toFixed(2));
+                    }
+                    if (hardware) {
+                        sustainedSummary.hardware = hardware;
+                    }
+                }
+                payload.sustained_summary = sustainedSummary;
                 recordTags.push('mode:sustained_decode');
             } else {
                 payload.benchmark_mode = '1d_sweep';

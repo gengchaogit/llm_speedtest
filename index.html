@@ -4004,15 +4004,25 @@
         const exportCombinedChartBtn = document.getElementById('exportCombinedChart'); // v1.8
         const screenshotComparisonBtn = document.getElementById('screenshotComparison'); // 截图按钮 (底部原位)
         const screenshotComparisonTopBtn = document.getElementById('screenshotComparisonTop'); // 截图按钮 (顶部联动)
+        const syncScreenshotTop = () => {
+            if (!screenshotComparisonTopBtn || !screenshotComparisonBtn) return;
+            const activeMode = (typeof window !== 'undefined' && window.currentBenchmarkMode)
+                ? window.currentBenchmarkMode
+                : (document.querySelector('.benchmark-mode-selector .mode-option.active')?.getAttribute('data-mode') || document.querySelector('.benchmark-mode-selector .mode-option.active')?.dataset?.mode || '1d_sweep');
+            // 标准提示词阶梯 (1d_sweep) 模式下，顶部操作栏不显示截图按钮（下方多结果对比或全场景已有原位截图），其它模式（2D矩阵、稳态持续解码等）保留显示
+            if (activeMode === '1d_sweep') {
+                screenshotComparisonTopBtn.style.display = 'none';
+            } else {
+                screenshotComparisonTopBtn.style.display = screenshotComparisonBtn.style.display;
+            }
+            if (screenshotComparisonBtn.textContent) {
+                screenshotComparisonTopBtn.textContent = screenshotComparisonBtn.textContent;
+            }
+        };
+        window.syncScreenshotTop = syncScreenshotTop;
         if (screenshotComparisonTopBtn && screenshotComparisonBtn) {
             screenshotComparisonTopBtn.onclick = () => {
                 screenshotComparisonBtn.click();
-            };
-            const syncScreenshotTop = () => {
-                screenshotComparisonTopBtn.style.display = screenshotComparisonBtn.style.display;
-                if (screenshotComparisonBtn.textContent) {
-                    screenshotComparisonTopBtn.textContent = screenshotComparisonBtn.textContent;
-                }
             };
             try {
                 const observer = new MutationObserver(syncScreenshotTop);
@@ -7077,6 +7087,11 @@
                                 <span class="detail-label">${t.detailConcurrency}:</span>
                                 <span class="detail-value">${testData.concurrency}</span>
                             </div>
+                            ${(testData.taskType || testData.task_type) ? `
+                            <div class="detail-info-item">
+                                <span class="detail-label">${t.labelTaskType || (currentLang === 'zh' ? '评测场景:' : 'Workload Task:')}</span>
+                                <span class="detail-value">${getTaskTypeBadgeHtml(testData.taskType || testData.task_type, currentLang === 'en')}</span>
+                            </div>` : ''}
                             <div class="detail-info-item">
                                 <span class="detail-label">${t.detailTimestamp}:</span>
                                 <span class="detail-value">${new Date(testData.timestamp).toLocaleString()}</span>
@@ -7263,6 +7278,24 @@
                 if (lblConcurrency) lblConcurrency.textContent = t?.lblConcurrency1d || '并发数';
                 if (tipConcurrency) tipConcurrency.textContent = t?.tipConcurrency1d || '单次测试阶梯的并发数';
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
+
+                // 恢复 1D 模式下历史全场景对比看板与图表
+                window.allTasksComparisonData = window.allTasksComparison1dData || null;
+                if (window.allTasksComparison1dData && window.allTasksComparison1dData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparison1dData, resultsDiv);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
             } else if (mode === '2d_matrix') {
                 if (matrixPanel) matrixPanel.style.display = 'block';
                 if (sustainedPanel) sustainedPanel.style.display = 'none';
@@ -7276,6 +7309,26 @@
                 if (comparisonChartCont) comparisonChartCont.style.display = 'none';
                 if (resultsDiv) resultsDiv.style.display = 'none';
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshot2dMatrix || (currentLang === 'zh' ? '📸 截图2D矩阵热力图' : '📸 Screenshot 2D Matrix');
+
+                // 恢复 2D 矩阵全场景对比看板与横向柱线图
+                window.allTasksComparisonData = window.allTasksComparisonMatrixData || null;
+                if (window.allTasksComparisonMatrixData && window.allTasksComparisonMatrixData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparisonMatrixData, matrixHeatmap);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    const btnComparisonBottom = document.getElementById('btnScreenshotComparisonBottom');
+                    if (btnComparisonBottom) btnComparisonBottom.style.display = 'inline-flex';
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
             } else if (mode === 'sustained_decode') {
                 if (matrixPanel) matrixPanel.style.display = 'none';
                 if (sustainedPanel) sustainedPanel.style.display = 'block';
@@ -7290,6 +7343,27 @@
                 if (chartCont) chartCont.style.display = 'none';
                 if (exportCombined) exportCombined.style.display = 'none';
                 if (screenshotBtn) screenshotBtn.textContent = t?.btnScreenshotSustained || (currentLang === 'zh' ? '📸 截图稳态测试看板' : '📸 Screenshot Sustained Dashboard');
+
+                // 恢复稳态解码全场景对比看板与图表
+                window.allTasksComparisonData = window.allTasksComparisonSustainedData || null;
+                if (window.allTasksComparisonSustainedData && window.allTasksComparisonSustainedData.length > 0) {
+                    renderAllTasksComparison(window.allTasksComparisonSustainedData, resultsDiv);
+                    if (screenshotBtn) {
+                        screenshotBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                        screenshotBtn.style.display = 'block';
+                    }
+                    setTimeout(() => {
+                        if (allTasksComparisonChartInstance) {
+                            try {
+                                allTasksComparisonChartInstance.resize();
+                                allTasksComparisonChartInstance.update();
+                            } catch (e) {}
+                        }
+                    }, 60);
+                }
+            }
+            if (typeof syncScreenshotTop === 'function') {
+                syncScreenshotTop();
             }
         }
         window.setBenchmarkMode = setBenchmarkMode;
@@ -8512,6 +8586,12 @@
         };
 
         let allTasksComparisonChartInstance = null;
+        let allTasksComparisonMatrixData = null;
+        let allTasksComparison1dData = null;
+        let allTasksComparisonSustainedData = null;
+        window.allTasksComparisonMatrixData = allTasksComparisonMatrixData;
+        window.allTasksComparison1dData = allTasksComparison1dData;
+        window.allTasksComparisonSustainedData = allTasksComparisonSustainedData;
 
         function generateAllTasksComparisonMarkdown(results, modelName) {
             const isEn = (currentLang === 'en');
@@ -8843,7 +8923,7 @@
                     allTasksComparisonChartInstance.destroy();
                     allTasksComparisonChartInstance = null;
                 }
-                const chartCanvas = document.getElementById('allTasksComparisonChart');
+                const chartCanvas = compDiv.querySelector('#allTasksComparisonChart') || compDiv.querySelector('canvas') || document.getElementById('allTasksComparisonChart');
                 if (chartCanvas && typeof Chart !== 'undefined') {
                     const labels = sortedResults.map(r => {
                         const k = r.task_type || r.taskType || 'general';
@@ -9046,6 +9126,13 @@
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'block';
             testResultsData = [];
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparisonSustainedData = null;
+            window.allMatrixTasksData = null;
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = 'all';
 
             const sustainedNotesEl = document.createElement('div');
             sustainedNotesEl.id = 'sustainedNotesMessage';
@@ -9256,6 +9343,7 @@
 
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                    if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
 
                     if (typeof showShareButton === 'function') {
                         showShareButton();
@@ -9347,6 +9435,12 @@
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'block';
             testResultsData = [];
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparison1dData = null;
+            window.allMatrixTasksData = null;
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
             window.activeSequenceTaskType = 'all';
             const taskTypeSelectorEl = document.getElementById('taskTypeSelect');
             if (taskTypeSelectorEl) taskTypeSelectorEl.value = 'all';
@@ -9590,6 +9684,7 @@
                     exportCSVBtn.style.display = 'block';
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
+                    if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
                     if (typeof showShareButton === 'function') showShareButton();
                 }
             }
@@ -9658,6 +9753,14 @@
             resultsDiv.innerHTML = "";
             resultsDiv.style.display = 'none';
             testResultsData = [];
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            window.allTasksComparisonMatrixData = null;
+            const oldMatrixComp = document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonContainer');
+            if (oldMatrixComp) oldMatrixComp.remove();
+            window.matrixGridData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = 'all';
 
             // Initialize multi-matrix store
             window.allMatrixTasksData = {};
@@ -9794,9 +9897,9 @@
                     const avgSpeed = validSpeeds.length > 0 ? (validSpeeds.reduce((a,b)=>a+b,0)/validSpeeds.length) : 0;
                     const peakSpeed = taskSavedData.peakTps || avgSpeed;
                     const validTtfts = cells.map(r => r.ttft_ms).filter(n => Number.isFinite(n) && n > 0);
-                    const avgTtft = validTtfts.length > 0 ? (validTtfts.reduce((a,b)=>a+b,0)/validTtfts.length) : 0;
+                    const avgTtft = validTtfts.length > 0 ? (validTtfts.reduce((a,b)=>a+b,0)/validTtfts.length) : null;
                     const validItls = cells.map(r => r.p50_itl).filter(n => Number.isFinite(n) && n > 0);
-                    const avgItl = validItls.length > 0 ? (validItls.reduce((a,b)=>a+b,0)/validItls.length) : (avgSpeed > 0 ? 1000/avgSpeed : 0);
+                    const avgItl = validItls.length > 0 ? (validItls.reduce((a,b)=>a+b,0)/validItls.length) : null;
                     let totalTokens = 0;
                     try {
                         totalTokens = cells.reduce((sum, r) => {
@@ -9813,15 +9916,15 @@
                         task_type: taskKey,
                         outputSpeed: avgSpeed.toFixed(2),
                         peakSpeed: peakSpeed.toFixed(2),
-                        prefillTimeMs: avgTtft.toFixed(2),
-                        ttft_stats: { p50: avgTtft },
-                        itl_stats: { p50: avgItl },
-                        avgItlMean: avgItl.toFixed(1),
-                        outputTokens: totalTokens,
+                        prefillTimeMs: avgTtft !== null ? avgTtft.toFixed(2) : null,
+                        ttft_stats: avgTtft !== null ? { p50: avgTtft } : null,
+                        itl_stats: avgItl !== null ? { p50: avgItl } : null,
+                        avgItlMean: avgItl !== null ? avgItl.toFixed(1) : null,
+                        outputTokens: totalTokens > 0 ? totalTokens : null,
                         effectiveConcurrency: '2D-Matrix',
                         concurrency: 'Ladder',
-                        e2eSpeed: avgSpeed.toFixed(2),
-                        e2e_throughput_tps: avgSpeed.toFixed(2),
+                        e2eSpeed: null,
+                        e2e_throughput_tps: null,
                         benchmarkMode: '2d_matrix'
                     };
                     sequenceResults.push(summaryItem);
@@ -10089,6 +10192,20 @@
             progressBar.style.width = '0%';
             resultsDiv.innerHTML = "";
             testResultsData = [];
+            window.testResultsData = testResultsData;
+            window.allTasksComparisonData = null;
+            if (currentBenchmarkMode === '2d_matrix') {
+                window.allTasksComparisonMatrixData = null;
+                const oldComp = document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonContainer');
+                if (oldComp) oldComp.remove();
+            } else if (currentBenchmarkMode === 'sustained_decode') {
+                window.allTasksComparisonSustainedData = null;
+            } else {
+                window.allTasksComparison1dData = null;
+            }
+            window.allMatrixTasksData = null;
+            window.sustainedSummaryData = null;
+            window.activeSequenceTaskType = null;
             if (typeof closeCellDetailModal === 'function') closeCellDetailModal();
             if (currentBenchmarkMode === '2d_matrix') {
                 resultsDiv.style.display = 'none';
@@ -10315,6 +10432,7 @@
                     } else {
                         screenshotComparisonBtn.textContent = t.btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
                     }
+                    if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
                 }
             }
         });
@@ -10571,7 +10689,7 @@
                 }
 
                 // 重点修复：高保真复制 allTasksComparisonChart (横向柱线图) 像素缓冲并转为静态图片嵌入克隆DOM，消除 html2canvas 离屏渲染黑屏/空白缺陷
-                const origCompChart = document.getElementById('allTasksComparisonChart');
+                const origCompChart = (activeMode === '2d_matrix' ? (document.getElementById('matrixHeatmapContainer')?.querySelector('#allTasksComparisonChart') || document.getElementById('allTasksComparisonChart')) : (document.getElementById('results')?.querySelector('#allTasksComparisonChart') || document.getElementById('allTasksComparisonChart')));
                 const cloneCompChart = tempContainer.querySelector('#allTasksComparisonChart');
                 if (origCompChart && cloneCompChart) {
                     cloneCompChart.width = origCompChart.width;
@@ -10624,7 +10742,17 @@
                         alert(t.alertScreenshotSuccess || '截图已复制到剪贴板！');
                     } catch (clipboardError) {
                         console.error('复制到剪贴板失败:', clipboardError);
-                        alert(t.alertScreenshotFailed || '截图失败，请重试！');
+                        // 当浏览器剪贴板权限受限 (如 Safari 用户激活过期等)，自动回退为触发图片下载
+                        try {
+                            const link = document.createElement('a');
+                            link.download = `llm_speedtest_${Date.now()}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            alert(currentLang === 'zh' ? '剪贴板权限受限，已自动将截图保存为图片文件下载！' : 'Clipboard access denied/restricted. The screenshot has been automatically downloaded as an image file!');
+                        } catch (downloadErr) {
+                            console.error('下载截图失败:', downloadErr);
+                            alert(t.alertScreenshotFailed || '截图失败，请重试！');
+                        }
                     }
                 }, 'image/png', 0.95);
             } catch (error) {
@@ -11721,7 +11849,8 @@
                     renderMatrixTaskFromData(firstTask);
 
                     if (record.all_tasks_comparison || (Array.isArray(record.results) && record.results.some(r => r.task_type))) {
-                        window.allTasksComparisonData = record.all_tasks_comparison || record.results;
+                        window.allTasksComparisonMatrixData = record.all_tasks_comparison || record.results;
+                        window.allTasksComparisonData = window.allTasksComparisonMatrixData;
                         renderAllTasksComparison(window.allTasksComparisonData);
                     }
                 } else {
@@ -11837,6 +11966,8 @@
                     (testResultsData.length > 1 && (new Set(testResultsData.map(r => r.task_type || r.taskType)).size > 1));
 
                 if (isAllTasksRecord) {
+                    window.allTasksComparisonSustainedData = testResultsData;
+                    window.allTasksComparisonData = testResultsData;
                     renderAllTasksComparison(testResultsData);
                     screenshotComparisonBtn.style.display = 'block';
                     screenshotComparisonBtn.textContent = (currentLang === 'zh' ? '📸 截图全场景对比' : '📸 Screenshot All Tasks Comparison');
@@ -12001,6 +12132,8 @@
                 screenshotComparisonBtn.textContent = t.btnScreenshotComparison || (currentLang === 'zh' ? '📸 截图Prefill&Decode结果' : '📸 Screenshot Prefill&Decode');
                 exportCombinedChartBtn.style.display = 'block';
             }
+
+            if (typeof syncScreenshotTop === 'function') syncScreenshotTop();
 
             // 关闭历史记录面板
             closeHistoryModal();
@@ -12889,6 +13022,7 @@
                 vp.forEach(r => {
                     if (Number.isFinite(parseFloat(r.avgTtftMs))) allTtft.push(parseFloat(r.avgTtftMs));
                     if (Number.isFinite(parseFloat(r.ttftMs))) allTtft.push(parseFloat(r.ttftMs));
+                    if (Number.isFinite(parseFloat(r.avgItlMean))) allItl.push(parseFloat(r.avgItlMean));
                     if (Array.isArray(r.concurrentDetails)) {
                         r.concurrentDetails.forEach(d => {
                             if (Number.isFinite(parseFloat(d.ttftMs))) allTtft.push(parseFloat(d.ttftMs));
@@ -12976,6 +13110,32 @@
                     points: pointsData
                 };
 
+                if (activeBenchmarkMode === 'sustained_decode') {
+                    const firstP = pointsData[0] || {};
+                    resultsJsonObj.sustained_summary = {
+                        steady_decode_tps: firstP.output_speed,
+                        avg_decode_speed: firstP.output_speed,
+                        prefill_speed: firstP.prefill_speed,
+                        avg_prefill_speed: firstP.prefill_speed,
+                        avg_ttft_ms: firstP.avg_ttft_ms,
+                        actual_duration_sec: firstP.actual_duration_sec || (firstP.output_time_ms ? firstP.output_time_ms / 1000 : 30),
+                        pure_decode_time_s: firstP.pure_decode_time_sec || (firstP.output_time_ms ? firstP.output_time_ms / 1000 : 30),
+                        pure_decode_time_sec: firstP.pure_decode_time_sec || (firstP.output_time_ms ? firstP.output_time_ms / 1000 : 30),
+                        completed_streams: firstP.successful || concurrency,
+                        total_tokens: firstP.output_tokens,
+                        avg_stream_decode_tps: firstP.avg_stream_decode_speed,
+                        avg_stream_decode_speed: firstP.avg_stream_decode_speed,
+                        e2e_throughput_tps: firstP.e2e_speed,
+                        e2e_speed: firstP.e2e_speed,
+                        concurrency: firstP.concurrency,
+                        effective_concurrency: resultsJsonObj.effective_concurrency,
+                        task_type: selectedTask,
+                        ttft_stats: quantilesData.ttft,
+                        itl_stats: quantilesData.itl,
+                        completed_requests: firstP.concurrent_details || [],
+                        verification_hash: vHash
+                    };
+                }
                 if (window.allMatrixTasksData && Object.keys(window.allMatrixTasksData).length > 0) {
                     resultsJsonObj.all_matrices = window.allMatrixTasksData;
                     if (!recordTags.includes('multi_matrix')) {

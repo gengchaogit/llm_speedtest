@@ -4974,26 +4974,68 @@
                 const itlP50 = Number(q.itl?.p50);
                 const itlP90 = Number(q.itl?.p90);
                 const itlP99 = Number(q.itl?.p99);
-                return {
-                    ttft: {
-                        p50: Number.isFinite(ttftP50) ? ttftP50 : NaN,
-                        p90: Number.isFinite(ttftP90) ? ttftP90 : NaN,
-                        p99: Number.isFinite(ttftP99) ? ttftP99 : NaN,
-                        avg: Number.isFinite(ttftP50) ? ttftP50 : NaN
-                    },
-                    itl: {
-                        p50: Number.isFinite(itlP50) ? itlP50 : NaN,
-                        p90: Number.isFinite(itlP90) ? itlP90 : NaN,
-                        p99: Number.isFinite(itlP99) ? itlP99 : NaN,
-                        avg: Number.isFinite(itlP50) ? itlP50 : NaN,
-                        jitter: (Number.isFinite(itlP90) && Number.isFinite(itlP50) && itlP50 > 0)
-                            ? (Math.abs(itlP90 - itlP50) / itlP50) * 100
-                            : 0
-                    }
-                };
+                if ((Number.isFinite(ttftP50) && ttftP50 > 0) || (Number.isFinite(itlP50) && itlP50 > 0)) {
+                    return {
+                        ttft: {
+                            p50: Number.isFinite(ttftP50) ? ttftP50 : NaN,
+                            p90: Number.isFinite(ttftP90) ? ttftP90 : NaN,
+                            p99: Number.isFinite(ttftP99) ? ttftP99 : NaN,
+                            avg: Number.isFinite(ttftP50) ? ttftP50 : NaN
+                        },
+                        itl: {
+                            p50: Number.isFinite(itlP50) ? itlP50 : NaN,
+                            p90: Number.isFinite(itlP90) ? itlP90 : NaN,
+                            p99: Number.isFinite(itlP99) ? itlP99 : NaN,
+                            avg: Number.isFinite(itlP50) ? itlP50 : NaN,
+                            jitter: (Number.isFinite(itlP90) && Number.isFinite(itlP50) && itlP50 > 0)
+                                ? (Math.abs(itlP90 - itlP50) / itlP50) * 100
+                                : 0
+                        }
+                    };
+                }
+            }
+
+            // Check sustained_summary for quantiles/ttft_stats/itl_stats
+            const sQuant = rj?.sustained_summary?.quantiles || rj?.sustained_summary;
+            if (sQuant && typeof sQuant === 'object') {
+                const sTtftP50 = Number(sQuant.ttft?.p50 ?? sQuant.ttft_stats?.p50 ?? sQuant.avg_ttft_ms);
+                const sItlP50 = Number(sQuant.itl?.p50 ?? sQuant.itl_stats?.p50 ?? sQuant.itl_p50_ms ?? sQuant.avg_itl_mean);
+                if ((Number.isFinite(sTtftP50) && sTtftP50 > 0) || (Number.isFinite(sItlP50) && sItlP50 > 0)) {
+                    const sTtftP90 = Number(sQuant.ttft?.p90 ?? sQuant.ttft_stats?.p90 ?? sTtftP50);
+                    const sTtftP99 = Number(sQuant.ttft?.p99 ?? sQuant.ttft_stats?.p99 ?? sTtftP50);
+                    const sItlP90 = Number(sQuant.itl?.p90 ?? sQuant.itl_stats?.p90 ?? sItlP50);
+                    const sItlP99 = Number(sQuant.itl?.p99 ?? sQuant.itl_stats?.p99 ?? sItlP50);
+                    return {
+                        ttft: {
+                            p50: Number.isFinite(sTtftP50) ? sTtftP50 : NaN,
+                            p90: Number.isFinite(sTtftP90) ? sTtftP90 : NaN,
+                            p99: Number.isFinite(sTtftP99) ? sTtftP99 : NaN,
+                            avg: sTtftP50
+                        },
+                        itl: {
+                            p50: Number.isFinite(sItlP50) ? sItlP50 : NaN,
+                            p90: Number.isFinite(sItlP90) ? sItlP90 : NaN,
+                            p99: Number.isFinite(sItlP99) ? sItlP99 : NaN,
+                            avg: sItlP50,
+                            jitter: (Number.isFinite(sItlP90) && Number.isFinite(sItlP50) && sItlP50 > 0)
+                                ? (Math.abs(sItlP90 - sItlP50) / sItlP50) * 100
+                                : 0
+                        }
+                    };
+                }
             }
 
             let details = Array.isArray(rj) ? rj : (rj?.points || (Array.isArray(rj?.matrix) ? rj.matrix.flat().filter(Boolean) : []));
+            if ((!details || details.length === 0) && rj?.all_matrices && typeof rj.all_matrices === 'object') {
+                details = [];
+                Object.values(rj.all_matrices).forEach(m => {
+                    if (m && m.matrix_grid) {
+                        Object.values(m.matrix_grid).forEach(row => {
+                            if (row) Object.values(row).forEach(cell => { if (cell) details.push(cell); });
+                        });
+                    }
+                });
+            }
             if (!Array.isArray(details)) details = [];
 
             const ttftList = [];
@@ -9163,7 +9205,7 @@
                         <td class="col-verif">${verifBadgeHtml}</td>
                         <td class="col-share-id" style="font-family:monospace; font-size:12px; color:#5c6370; user-select:all;">${escapeHtml(row.id)}</td>
                         <td class="col-user">${userDisplay}</td>
-                        <td class="col-model" style="font-weight:bold;">${modelDisplay}${modeBadgeHtml}${taskBadgeHtml}${anomalyBadge}</td>
+                        <td class="col-model" style="font-weight:bold;"><div style="display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px;">${modelDisplay}${modeBadgeHtml ? ` ${modeBadgeHtml}` : ''}${taskBadgeHtml ? ` ${taskBadgeHtml}` : ''}${anomalyBadge ? ` ${anomalyBadge}` : ''}</div></td>
                         <td class="col-config" style="font-size:12px;">${configText}</td>
                         <td class="notes-cell col-notes">
                             <span class="notes-text">${notesText}</span>
@@ -9346,8 +9388,12 @@
                 const tps = Number(r.steady_decode_tps ?? r.outputSpeed ?? r.peakSpeed) || 0;
                 const e2e = Number(r.e2e_throughput_tps ?? r.e2eSpeed) || 0;
                 const streamTps = Number(r.avg_stream_decode_tps ?? r.avgStreamDecodeSpeed) || 0;
-                const ttft = r.ttft_stats?.p50 !== undefined ? `${Number(r.ttft_stats.p50).toFixed(1)}ms` : (r.avg_ttft_ms ? `${Number(r.avg_ttft_ms).toFixed(1)}ms` : (r.prefillTimeMs ? `${Number(r.prefillTimeMs).toFixed(1)}ms` : '-'));
-                const itl = r.itl_stats?.p50 !== undefined ? `${Number(r.itl_stats.p50).toFixed(1)}ms` : (r.avg_itl_mean ? `${Number(r.avg_itl_mean).toFixed(1)}ms` : '-');
+                const ttftRaw = r.ttft_stats?.p50 ?? (r.avg_ttft_ms ?? r.prefillTimeMs);
+                const ttftNum = parseFloat(ttftRaw);
+                const ttft = Number.isFinite(ttftNum) && ttftNum > 0 ? `${ttftNum.toFixed(1)}ms` : '-';
+                const itlRaw = r.itl_stats?.p50 ?? r.avg_itl_mean;
+                const itlNum = parseFloat(itlRaw);
+                const itl = Number.isFinite(itlNum) && itlNum > 0 ? `${itlNum.toFixed(1)}ms` : '-';
                 const eff = r.effective_concurrency || r.effectiveConcurrency || `${poolConcurrency}/${poolConcurrency}`;
                 const tokens = r.total_tokens || r.outputTokens || '-';
 
@@ -9751,7 +9797,7 @@
 
                 let peakTps = Number(currentTaskData?.peakTps || currentTaskData?.peak_decode_tps || 0);
                 let peakCell = currentTaskData?.peakPoint || null;
-                let saturationCell = currentTaskData?.saturationPoint || null;
+                let saturationCell = (currentTaskData?.saturationPoint && typeof currentTaskData.saturationPoint === 'object') ? currentTaskData.saturationPoint : null;
                 cells.forEach(cell => {
                     const tps = Number(cell.decode_tps ?? cell.output_speed ?? cell.outputSpeed) || 0;
                     if (tps > peakTps) {
@@ -9793,9 +9839,12 @@
                 const matrixProfileTitle = isEn ? '📊 2D Matrix Comprehensive Profile' : '📊 2D 矩阵综合特征分析 (Matrix Profile)';
                 const peakLabel = isEn ? '⚡ Peak Decode Throughput' : '⚡ 峰值解码吞吐 (Peak Decode)';
                 const satLabel = isEn ? '🚨 Saturation Onset' : '🚨 排队饱和拐点 (Saturation Onset)';
-                const satVal = saturationCell 
-                    ? `${saturationCell.concurrency}x (${saturationCell.effective_concurrency || (isEn ? 'Saturated' : '饱和')})` 
-                    : (isEn ? '✅ No Saturation Detected' : '✅ 全并发无排队饱和');
+                let satVal = (isEn ? '✅ No Saturation Detected' : '✅ 全并发无排队饱和');
+                if (saturationCell && Number.isFinite(Number(saturationCell.concurrency))) {
+                    satVal = `${saturationCell.concurrency}x (${saturationCell.effective_concurrency || saturationCell.ratio || (isEn ? 'Saturated' : '饱和')})`;
+                } else if (typeof currentTaskData?.saturationPoint === 'string' && currentTaskData.saturationPoint !== 'None' && currentTaskData.saturationPoint.trim() !== '') {
+                    satVal = currentTaskData.saturationPoint;
+                }
                 const ttftProfileLabel = isEn ? '⏱️ TTFT Quantiles' : '⏱️ 首字时延分位数 (TTFT)';
                 const itlProfileLabel = isEn ? '📊 ITL Jitter Quantiles' : '📊 单字时延分位数 (ITL Jitter)';
                 const watchdogLabel = isEn ? '🛡️ Watchdog Safeguards: ' : '🛡️ 异常防御看门狗：';
@@ -9957,26 +10006,29 @@
 
             // 核心时长与速率指标解析
             const rawDurMs = Number(taskData?.output_time_ms ?? taskData?.outputTimeMs);
-            const durationSec = rawDurMs > 0 
-                ? (rawDurMs / 1000)
-                : (row.notes && row.notes.includes('s') ? parseFloat(row.notes) : 30);
+            const explicitDurSec = Number(taskData?.actual_duration_sec ?? taskData?.actualDurationSec ?? taskData?.target_duration_sec ?? taskData?.duration_s ?? taskData?.duration_sec);
+            const durationSec = Number.isFinite(explicitDurSec) && explicitDurSec > 0
+                ? explicitDurSec
+                : (rawDurMs > 0 ? (rawDurMs / 1000) : (row.notes && row.notes.includes('s') ? parseFloat(row.notes) : 30));
             const sustainedTps = Number(taskData?.steady_decode_tps ?? taskData?.output_speed ?? taskData?.outputSpeed ?? row.max_decode_speed ?? row.avg_decode_speed) || 0;
-            const prefillSpeed = Number(taskData?.prefill_speed ?? taskData?.prefillSpeed ?? row.max_prefill_speed ?? row.avg_prefill_speed) || 0;
+            const prefillSpeed = Number(taskData?.avg_prefill_speed ?? taskData?.prefill_speed ?? taskData?.prefillSpeed ?? row.max_prefill_speed ?? row.avg_prefill_speed) || 0;
             const totalTokens = taskData?.total_tokens ?? taskData?.outputTokens ?? taskData?.output_tokens ?? (Math.round(sustainedTps * durationSec) || '-');
             const poolConcurrency = Number(taskData?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
-            const completedStreams = Number(taskData?.successful ?? taskData?.completedStreams ?? poolConcurrency) || 1;
+            const completedStreams = Number(taskData?.completed_streams ?? taskData?.completedStreams ?? taskData?.successful ?? poolConcurrency) || 1;
             const effConc = taskData?.effective_concurrency ?? taskData?.effectiveConcurrency ?? row.results_json?.effective_concurrency ?? `${poolConcurrency}/${poolConcurrency}`;
 
             // 端到端总吞吐与纯解码时长计算
             const e2eSpeed = Number(taskData?.e2e_throughput_tps ?? taskData?.e2e_speed ?? taskData?.e2eSpeed) 
                 || (durationSec > 0 && Number(totalTokens) > 0 ? (Number(totalTokens) / durationSec) : sustainedTps);
-            const pureDecodeTimeSec = Number(taskData?.pure_decode_time_sec ?? taskData?.pureDecodeTimeSec) 
-                || (rawDurMs > 0 ? (rawDurMs / 1000) : durationSec);
+            const explicitPureSec = Number(taskData?.pure_decode_time_sec ?? taskData?.pureDecodeTimeSec ?? taskData?.pure_decode_time_s);
+            const pureDecodeTimeSec = Number.isFinite(explicitPureSec) && explicitPureSec > 0
+                ? explicitPureSec
+                : (rawDurMs > 0 ? (rawDurMs / 1000) : durationSec);
             const avgStreamTps = Number(taskData?.avg_stream_decode_tps ?? taskData?.avg_stream_decode_speed ?? taskData?.avgStreamDecodeSpeed) 
                 || (poolConcurrency > 0 ? (sustainedTps / poolConcurrency) : sustainedTps);
 
             // 时延分位数与抖动统计 (Quantiles)
-            const q = taskData?.quantiles || row.results_json?.quantiles || {};
+            const q = taskData?.quantiles || (taskKey === 'all' ? row.results_json?.quantiles : {}) || {};
             const tStats = taskData?.ttft_stats || {};
             const ttftP50 = Number.isFinite(Number(tStats?.p50)) ? Number(tStats.p50).toFixed(1) 
                 : (Number.isFinite(Number(q?.ttft?.p50)) ? Number(q.ttft.p50).toFixed(1) 
@@ -10022,28 +10074,45 @@
             const reportTitle = isEn ? '🎯 Sustained Decode Benchmark Report' : '🎯 稳态持续解码评测详报';
 
             // 提取并发流明细列表 (Concurrent Streams Breakdown)
-            const rawStreams = Array.isArray(taskData?.concurrent_details) && taskData.concurrent_details.length > 0
+            const rawStreams = (Array.isArray(taskData?.concurrent_details) && taskData.concurrent_details.length > 0)
                 ? taskData.concurrent_details
-                : (Array.isArray(taskData?.concurrentDetails) && taskData.concurrentDetails.length > 0 
+                : ((Array.isArray(taskData?.concurrentDetails) && taskData.concurrentDetails.length > 0)
                     ? taskData.concurrentDetails 
-                    : (Array.isArray(row.results_json?.points) && row.results_json.points.length > 1 ? row.results_json.points : []));
+                    : ((Array.isArray(taskData?.completed_requests) && taskData.completed_requests.length > 0)
+                        ? taskData.completed_requests
+                        : ((taskKey === 'all')
+                            ? ((Array.isArray(row.results_json?.sustained_summary?.completed_requests) && row.results_json.sustained_summary.completed_requests.length > 0)
+                                ? row.results_json.sustained_summary.completed_requests
+                                : ((Array.isArray(row.results_json?.points?.[0]?.concurrent_details) && row.results_json.points[0].concurrent_details.length > 0)
+                                    ? row.results_json.points[0].concurrent_details
+                                    : ((Array.isArray(row.results_json?.points?.[0]?.concurrentDetails) && row.results_json.points[0].concurrentDetails.length > 0)
+                                        ? row.results_json.points[0].concurrentDetails
+                                        : ((Array.isArray(row.results_json?.completed_requests) && row.results_json.completed_requests.length > 0)
+                                            ? row.results_json.completed_requests
+                                            : ((Array.isArray(row.results_json?.sustained_samples) && row.results_json.sustained_samples.length > 0)
+                                                ? row.results_json.sustained_samples
+                                                : ((Array.isArray(row.results_json?.points) && row.results_json.points.length > 1) ? row.results_json.points : []))))))
+                            : [])));
             
             let streamRows = [];
             if (rawStreams.length > 0) {
                 streamRows = rawStreams.map((st, idx) => {
-                    const outTps = Number(st.output_speed ?? st.outputSpeed ?? st.decode_tps ?? avgStreamTps) || avgStreamTps;
+                    const outTps = Number(st.output_speed ?? st.outputSpeed ?? st.decode_tps ?? st.tokens_per_second ?? avgStreamTps) || avgStreamTps;
                     const prefTps = Number(st.prefill_speed ?? st.prefillSpeed) || (prefillSpeed > 0 ? prefillSpeed : '-');
                     const tokens = Number(st.output_tokens ?? st.outputTokens ?? st.tokens) 
                         || (completedStreams > 0 && Number(totalTokens) > 0 ? Math.round(Number(totalTokens) / completedStreams) : '-');
-                    const ttft = Number.isFinite(Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms)) 
-                        ? Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms).toFixed(1) 
+                    const ttft = Number.isFinite(Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms ?? st.prefillTimeMs)) 
+                        ? Number(st.ttft_ms ?? st.ttftMs ?? st.avg_ttft_ms ?? st.prefillTimeMs).toFixed(1) 
                         : ttftP50;
                     const itl = Number.isFinite(Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean)) 
                         ? Number(st.itl_mean ?? st.itlMean ?? st.avg_itl_mean).toFixed(1) 
                         : itlP50;
+                    const durSecVal = Number(st.duration_sec ?? st.durationSec);
                     const dur = Number(st.output_time_ms ?? st.outputTimeMs) > 0 
                         ? (Number(st.output_time_ms ?? st.outputTimeMs) / 1000).toFixed(2) + 's' 
-                        : (durationSec > 0 ? durationSec.toFixed(1) + 's' : '-');
+                        : (Number.isFinite(durSecVal) && durSecVal > 0 
+                            ? durSecVal.toFixed(2) + 's' 
+                            : (durationSec > 0 ? durationSec.toFixed(1) + 's' : '-'));
                     return {
                         id: st.stream_id || (idx + 1),
                         outTps: typeof outTps === 'number' ? outTps.toFixed(1) : outTps,
@@ -10308,27 +10377,88 @@
                 || row.all_tasks_comparison 
                 || null;
 
+            const points = Array.isArray(row.results_json?.points)
+                ? row.results_json.points
+                : (Array.isArray(row.results_json) ? row.results_json : []);
+            const sustainedSummary = row.results_json?.sustained_summary || {};
+            const p0 = points[0] || {};
+            const baseMergedSustained = {
+                ...sustainedSummary,
+                ...p0,
+                concurrent_details: p0.concurrent_details || p0.concurrentDetails || sustainedSummary.completed_requests || row.results_json?.completed_requests || row.results_json?.sustained_samples || []
+            };
+
             const tasksMap = {};
             if (Array.isArray(allTasksList) && allTasksList.length > 0) {
                 allTasksList.forEach(t => {
                     const k = (t.task_type || t.taskType || 'general').toLowerCase();
-                    tasksMap[k] = t;
+                    const taskSteadyTps = Number(t.steady_decode_tps ?? t.output_speed ?? t.outputSpeed ?? t.peakSpeed ?? t.avg_decode_speed ?? t.avgSpeed ?? t.decode_tps) || 0;
+                    const taskTotalTokens = t.total_tokens ?? t.output_tokens ?? t.outputTokens;
+                    const taskActualDuration = Number(t.actual_duration_sec ?? t.actualDurationSec ?? t.target_duration_sec ?? t.duration_s ?? t.duration_sec);
+                    const taskPureDuration = Number(t.pure_decode_time_sec ?? t.pureDecodeTimeSec ?? t.pure_decode_time_s);
+                    const taskPrefill = Number(t.avg_prefill_speed ?? t.prefill_speed ?? t.prefillSpeed ?? t.max_prefill_speed);
+                    const taskE2e = Number(t.e2e_throughput_tps ?? t.e2e_speed ?? t.e2eSpeed);
+                    const taskCompletedStreams = Number(t.completed_streams ?? t.completedStreams ?? t.successful);
+                    const taskStreamTps = Number(t.avg_stream_decode_tps ?? t.avg_stream_decode_speed ?? t.avgStreamDecodeSpeed);
+                    const taskStreams = (Array.isArray(t.concurrent_details) && t.concurrent_details.length > 0)
+                        ? t.concurrent_details
+                        : ((Array.isArray(t.concurrentDetails) && t.concurrentDetails.length > 0)
+                            ? t.concurrentDetails
+                            : ((Array.isArray(t.completed_requests) && t.completed_requests.length > 0) ? t.completed_requests : []));
+
+                    tasksMap[k] = {
+                        ...baseMergedSustained,
+                        ...t,
+                        task_type: k,
+                        steady_decode_tps: taskSteadyTps > 0 ? taskSteadyTps : (Number(baseMergedSustained.steady_decode_tps) || 0),
+                        output_speed: taskSteadyTps > 0 ? taskSteadyTps : baseMergedSustained.output_speed,
+                        outputSpeed: taskSteadyTps > 0 ? taskSteadyTps : baseMergedSustained.outputSpeed,
+                        total_tokens: taskTotalTokens !== undefined ? taskTotalTokens : baseMergedSustained.total_tokens,
+                        output_tokens: taskTotalTokens !== undefined ? taskTotalTokens : baseMergedSustained.output_tokens,
+                        outputTokens: taskTotalTokens !== undefined ? taskTotalTokens : baseMergedSustained.outputTokens,
+                        actual_duration_sec: Number.isFinite(taskActualDuration) && taskActualDuration > 0 ? taskActualDuration : baseMergedSustained.actual_duration_sec,
+                        actualDurationSec: Number.isFinite(taskActualDuration) && taskActualDuration > 0 ? taskActualDuration : baseMergedSustained.actualDurationSec,
+                        pure_decode_time_sec: Number.isFinite(taskPureDuration) && taskPureDuration > 0 ? taskPureDuration : baseMergedSustained.pure_decode_time_sec,
+                        pureDecodeTimeSec: Number.isFinite(taskPureDuration) && taskPureDuration > 0 ? taskPureDuration : baseMergedSustained.pureDecodeTimeSec,
+                        avg_prefill_speed: Number.isFinite(taskPrefill) && taskPrefill > 0 ? taskPrefill : baseMergedSustained.avg_prefill_speed,
+                        prefill_speed: Number.isFinite(taskPrefill) && taskPrefill > 0 ? taskPrefill : baseMergedSustained.prefill_speed,
+                        prefillSpeed: Number.isFinite(taskPrefill) && taskPrefill > 0 ? taskPrefill : baseMergedSustained.prefillSpeed,
+                        e2e_throughput_tps: Number.isFinite(taskE2e) && taskE2e > 0 ? taskE2e : baseMergedSustained.e2e_throughput_tps,
+                        e2e_speed: Number.isFinite(taskE2e) && taskE2e > 0 ? taskE2e : baseMergedSustained.e2e_speed,
+                        completed_streams: Number.isFinite(taskCompletedStreams) && taskCompletedStreams > 0 ? taskCompletedStreams : baseMergedSustained.completed_streams,
+                        avg_stream_decode_tps: Number.isFinite(taskStreamTps) && taskStreamTps > 0 ? taskStreamTps : baseMergedSustained.avg_stream_decode_tps,
+                        avg_stream_decode_speed: Number.isFinite(taskStreamTps) && taskStreamTps > 0 ? taskStreamTps : baseMergedSustained.avg_stream_decode_speed,
+                        ttft_stats: t.ttft_stats || (Number.isFinite(Number(t.avg_ttft_ms ?? t.avgTtftMs ?? t.prefillTimeMs)) ? { p50: Number(t.avg_ttft_ms ?? t.avgTtftMs ?? t.prefillTimeMs), avg: Number(t.avg_ttft_ms ?? t.avgTtftMs ?? t.prefillTimeMs) } : baseMergedSustained.ttft_stats),
+                        itl_stats: t.itl_stats || (Number.isFinite(Number(t.avg_itl_mean ?? t.avgItlMean)) ? { p50: Number(t.avg_itl_mean ?? t.avgItlMean), avg: Number(t.avg_itl_mean ?? t.avgItlMean) } : baseMergedSustained.itl_stats),
+                        effective_concurrency: t.effective_concurrency || t.effectiveConcurrency || baseMergedSustained.effective_concurrency,
+                        concurrent_details: taskStreams.length > 0 ? taskStreams : (k === 'all' ? (baseMergedSustained.concurrent_details || []) : [])
+                    };
                 });
             }
 
-            const points = Array.isArray(row.results_json?.points)
-                ? row.results_json.points
-                : (Array.isArray(row.results_json) ? row.results_json : []);
             points.forEach((p, idx) => {
                 const k = (p.task_type || p.taskType || (idx === 0 ? extractRowTaskType(row) : null))?.toLowerCase();
                 if (k && !tasksMap[k]) {
-                    tasksMap[k] = p;
+                    const pTps = Number(p.steady_decode_tps ?? p.output_speed ?? p.outputSpeed ?? p.decode_tps) || 0;
+                    tasksMap[k] = {
+                        ...baseMergedSustained,
+                        ...p,
+                        task_type: k,
+                        steady_decode_tps: pTps > 0 ? pTps : (Number(baseMergedSustained.steady_decode_tps) || 0),
+                        output_speed: pTps > 0 ? pTps : baseMergedSustained.output_speed,
+                        outputSpeed: pTps > 0 ? pTps : baseMergedSustained.outputSpeed
+                    };
                 }
             });
 
             const rowTaskType = (extractRowTaskType(row) || 'general').toLowerCase();
-            if (rowTaskType !== 'all' && !tasksMap[rowTaskType]) {
-                tasksMap[rowTaskType] = points[0] || row.results_json?.sustained_summary || {};
+            if (rowTaskType === 'all' && !tasksMap['all']) {
+                tasksMap['all'] = {
+                    ...baseMergedSustained,
+                    task_type: 'all'
+                };
+            } else if (rowTaskType !== 'all' && !tasksMap[rowTaskType]) {
+                tasksMap[rowTaskType] = baseMergedSustained;
             }
 
             const ORDERED_TASKS = ['general', 'code', 'structured', 'prose', 'prefill_16k', 'reasoning'];
@@ -10337,7 +10467,7 @@
             if (availableTasks.length === 0) {
                 availableTasks = [rowTaskType || 'general'];
                 if (!tasksMap[availableTasks[0]]) {
-                    tasksMap[availableTasks[0]] = points[0] || row.results_json?.sustained_summary || {};
+                    tasksMap[availableTasks[0]] = baseMergedSustained;
                 }
             }
 
@@ -10351,7 +10481,8 @@
             const detailVerif = getVerificationBadgeInfo(row);
             const currentTaskBadge = getTaskTypeBadgeHtml(currentTask, isEn);
             const sPoint = points[0] || row.results_json?.sustained_summary || currentTaskData;
-            const poolConc = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+            const poolConcurrency = Number(sPoint?.concurrency ?? row.results_json?.pool_concurrency ?? row.concurrency) || 1;
+            const poolConc = poolConcurrency;
             const displayConcurrency = `${poolConc}x (${isEn ? 'Stream Pool' : '并发流池'})`;
             const modeSubtitleLabel = `<span style="background:rgba(16,185,129,0.25); color:#10b981; border:1px solid rgba(16,185,129,0.5); padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:600;">${isEn ? '⏱️ Sustained Decode Benchmark' : '⏱️ 稳态持续解码压测'}</span>`;
 
@@ -10601,6 +10732,8 @@
             const isAllTasks = (taskType === 'all')
                 || (Array.isArray(row.results_json?.all_tasks_comparison) && row.results_json.all_tasks_comparison.length > 0)
                 || (Array.isArray(row.results_json?.all_tasks_results) && row.results_json.all_tasks_results.length > 0)
+                || (Array.isArray(row.record_tags) && row.record_tags.includes('all_tasks'))
+                || (Array.isArray(row.results_json?.record_tags) && row.results_json.record_tags.includes('all_tasks'))
                 || (Array.isArray(rawResults) && rawResults.length >= 12);
 
             let allTasksList = row.results_json?.all_tasks_comparison || row.results_json?.all_tasks_results || null;
@@ -10653,7 +10786,10 @@
                     currentCycle++;
                 }
                 lastLen = Number.isFinite(promptLength) ? promptLength : lastLen;
-                const pointTask = (item?.task_type || item?.taskType || (isAllTasks ? ORDERED_TASKS[currentCycle % ORDERED_TASKS.length] : taskType) || 'general').toLowerCase();
+                const rawTask = (item?.task_type || item?.taskType || '').toLowerCase();
+                const pointTask = (isAllTasks && (!rawTask || rawTask === 'all' || !ORDERED_TASKS.includes(rawTask)))
+                    ? ORDERED_TASKS[currentCycle % ORDERED_TASKS.length]
+                    : (rawTask || taskType || 'general');
 
                 return {
                     ...item,
