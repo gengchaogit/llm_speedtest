@@ -146,10 +146,10 @@ Authoritative benchmark scores require uncompromising mathematical precision and
 
 **Definition**: The true physical elapsed duration between the exact microsecond the client dispatches the HTTP request payload and the arrival of the first non-empty streaming chunk (including reasoning/thinking markers).
 
-For the $i$-th concurrent request ($i \in [1, C]$) in a test cell:
+For the $i$-th concurrent request ($`i \in [1, C]`$) in a test cell:
 
 $$
-\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}
+\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}, \quad i \in [1, C]
 $$
 
 The average TTFT across all streams in the test cell:
@@ -158,7 +158,7 @@ $$
 \text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i
 $$
 
-Percentiles are calculated via **continuous linear interpolation**: for sorted observations $Y = [y_1, y_2, \dots, y_N]$, the $p$-th percentile rank is:
+Percentiles are calculated via **continuous linear interpolation**: for sorted observations $`Y = [y_1, y_2, \dots, y_N]`$, the $p$-th percentile rank is:
 
 $$
 k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f
@@ -176,7 +176,7 @@ $$
 
 ### 4.2 Inter-Token Latency (ITL) & Latency Jitter
 
-**Definition**: The inter-arrival duration between successive emitted tokens during the autoregressive Decode phase: $\Delta t_j = t_j - t_{j-1}$. ITL jitter directly impacts streaming reading comfort and reflects serving memory scheduling turbulence.
+**Definition**: The inter-arrival duration between successive emitted tokens during the autoregressive Decode phase: $`\Delta t_j = t_j - t_{j-1}`$. ITL jitter directly impacts streaming reading comfort and reflects serving memory scheduling turbulence.
 
 Across a population of $M$ inter-token intervals in a benchmark cell, the mean and standard deviation are:
 
@@ -198,7 +198,7 @@ This rigorously captures garbage collection stutters, PagedAttention block swapp
 
 ### 4.3 True Wall-Clock Throughput (Eradicating Arithmetic Sums)
 
-> ⚠️ **The Deceptive Summation Fallacy**: Under concurrent benchmarking, summing individual stream speeds ($\sum \text{TPS}_i$) is fundamentally erroneous whenever stream start/end times do not perfectly overlap. Naive arithmetic summation inflates reported throughput by 30% to 80%!
+> ⚠️ **The Deceptive Summation Fallacy**: Under concurrent benchmarking, summing individual stream speeds ($`\sum \text{TPS}_i`$) is fundamentally erroneous whenever stream start/end times do not perfectly overlap. Naive arithmetic summation inflates reported throughput by 30% to 80%!
 
 This platform computes system-level throughput strictly over the **physical wall-clock span union**:
 
@@ -224,8 +224,8 @@ $$
 
 ### 4.4 Sustained Decode vs. Burst Decode Benchmark Modes
 
-- **Sustained Steady-State Decode**: Operates over an invariant physical duration window $T_{\text{duration}}$ (e.g., 30s or 60s) maintaining a steady concurrent worker pool. When any stream completes, a replacement request is dispatched immediately, measuring sustained saturation throughput under continuous backpressure.
-- **Burst / E2E Decode**: Dispatches an instant batch of $N = C \times K$ requests simultaneously (e.g., a burst of 64 requests), measuring queue scheduling contention, P99 TTFT spikes, and cold-start tail latencies.
+- **Sustained Steady-State Decode**: Operates over an invariant physical duration window $`T_{\text{duration}}`$ (e.g., 30s or 60s) maintaining a steady concurrent worker pool. When any stream completes, a replacement request is dispatched immediately, measuring sustained saturation throughput under continuous backpressure.
+- **Burst / E2E Decode**: Dispatches an instant batch of $`N = C \times K`$ requests simultaneously (e.g., a burst of 64 requests), measuring queue scheduling contention, P99 TTFT spikes, and cold-start tail latencies.
 
 ### 4.5 Effective Concurrency Ratio `(X/Y)*` & Server Queue Saturation
 
@@ -237,22 +237,22 @@ $$
 P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}
 $$
 
-- If $P_{\text{inferred}} < 0.80 \times C$ and $C > 1$: The server failed to execute streams concurrently. The benchmark cell and leaderboard record are tagged with the warning badge **`(X/Y)*`** (e.g., `(1/8)*` indicates 8 requests were dispatched, but the backend executed them serialized 1 at a time).
+- If $`P_{\text{inferred}} < 0.80 \times C`$ and $`C > 1`$: The server failed to execute streams concurrently. The benchmark cell and leaderboard record are tagged with the warning badge **`(X/Y)*`** (e.g., `(1/8)*` indicates 8 requests were dispatched, but the backend executed them serialized 1 at a time).
 
 ### 4.6 Repetition Watchdog Guard & Loop Abort
 
 Deep reasoning models (e.g., DeepSeek-R1 series) and low-precision quantized models (e.g., INT4 / GGUF-Q2) are prone to entering runaway infinite generation loops upon encountering adversarial or edge prompts.
 
 This platform implements a dual-channel real-time circuit breaker:
-* **Periodic Suffix Detection (`exact_periodic_tail`)**: Reblocks incoming text in 256-character slices. Within the most recent 128 KiB history, it locates a 64-character suffix anchor and scans backward for candidate repeating periods $P \in [1, 32768]$. Binary search determines maximal contiguous repeating span $L^*$.
-   - When cycle count $C_{\text{cycles}} \ge 4$ and span $L^* \ge 4096$ characters, a **`CONFIRMED_LOOP`** is triggered;
+* **Periodic Suffix Detection (`exact_periodic_tail`)**: Reblocks incoming text in 256-character slices. Within the most recent 128 KiB history, it locates a 64-character suffix anchor and scans backward for candidate repeating periods $`P \in [1, 32768]`$. Binary search determines maximal contiguous repeating span $`L^*`$.
+   - When cycle count $`C_{\text{cycles}} \ge 4`$ and span $`L^* \ge 4096`$ characters, a **`CONFIRMED_LOOP`** is triggered;
    - Action: Immediately fires `reader.cancel()` or `AbortController.abort()`, tags the cell with `ERROR: loop`, and assigns sentinel throughput `TPS = -3.0`, protecting GPU VRAM and preventing corrupted entries from contaminating the leaderboard;
    - **Dual-Channel Isolation**: Monitors reasoning traces (`reasoning_content` / `<think>`) and visible content channels independently to prevent cross-channel interference.
 
 ### 4.7 Pareto Frontier & Tamper-Evident Verification Hash (`vh_...`)
 
-- **Throughput vs. Latency Pareto Frontier**: Balances competing performance objectives: maximize Throughput $T$ while minimizing Latency $L$. Point $p_a$ strictly dominates $p_b$ if $T(a) \ge T(b) \land L(a) \le L(b) \land (T(a) > T(b) \lor L(a) < L(b))$. Using $O(N \log N)$ sorting and monotonic scanning, non-dominated points are identified and rendered as an optimal stepped efficiency frontier curve.
-- **Client Verification Hash (`vh_xxxxxxxx`)**: Combines client hardware concurrency, screen resolution, and canvas fingerprint $F_{\text{env}}$ with canonical benchmark parameters to compute a SHA-256 digest:
+- **Throughput vs. Latency Pareto Frontier**: Balances competing performance objectives: maximize Throughput $T$ while minimizing Latency $L$. Point $p_a$ strictly dominates $p_b$ if $`T(a) \ge T(b) \land L(a) \le L(b) \land (T(a) > T(b) \lor L(a) < L(b))`$. Using $O(N \log N)$ sorting and monotonic scanning, non-dominated points are identified and rendered as an optimal stepped efficiency frontier curve.
+- **Client Verification Hash (`vh_xxxxxxxx`)**: Combines client hardware concurrency, screen resolution, and canvas fingerprint $`F_{\text{env}}`$ with canonical benchmark parameters to compute a SHA-256 digest:
 
 $$
 H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})
@@ -417,7 +417,7 @@ The global leaderboard operates entirely serverless via Supabase PostgREST API, 
 **Answer**: Modern web browsers enforce a strict security limit of 6 simultaneous active TCP connections per domain under HTTP/1.1. To benchmark higher concurrency (8, 16, 32, 50+), use the included Python suite (`python/llm_test_backend.py`), which uses AsyncIO with connection pooling supporting 256+ concurrent streams.
 
 ### Q2: Why does `ERROR: loop` appear during testing?
-**Answer**: This indicates that the **Repetition Watchdog** has triggered. Reasoning models (especially low-bit quantizations) can fall into infinite generation cycles. The watchdog trips when 4 identical cycles spanning $\ge 4096$ characters are detected, terminating runaway generation to protect GPU memory and prevent corrupted scores from polluting the leaderboard.
+**Answer**: This indicates that the **Repetition Watchdog** has triggered. Reasoning models (especially low-bit quantizations) can fall into infinite generation cycles. The watchdog trips when 4 identical cycles spanning $`\ge 4096`$ characters are detected, terminating runaway generation to protect GPU memory and prevent corrupted scores from polluting the leaderboard.
 
 ### Q3: Python CLI reports `ImportError: h2`？
 **Answer**: The high-concurrency engine utilizes HTTP/2 multiplexing for efficient connection pooling. Install the complete requirements:
