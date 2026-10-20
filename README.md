@@ -126,7 +126,7 @@ graph TB
 | **1. 架构部署形态** | **双模**：纯静态 GitHub Pages 免安装 + Python CLI | 本地 CLI 命令 | Python CLI 脚本 | Python CLI + Rich TUI |
 | **2. 零安装 Web 体验** | **✅ 支持**：点开网页即测，无任何前置依赖 | ❌ 不支持 | ❌ 不支持 | ❌ 不支持 |
 | **3. 并发测试范围** | **1 ～ 256+** (前端 1-6，Python 1-256+) | 仅单请求并发 (c=1) | 高并发 (由请求速率驱动) | 高并发矩阵配置 |
-| **4. 2D 压测参数矩阵** | **✅ 完整支持** (并发阶梯 $\times$ 上下文阶梯二维扫描) | ❌ 仅单点测试 | ❌ 仅单批次测试 | ✅ 支持并发 $\times$ 上下文扫描 |
+| **4. 2D 压测参数矩阵** | **✅ 完整支持** (并发阶梯 × 上下文阶梯二维扫描) | ❌ 仅单点测试 | ❌ 仅单批次测试 | ✅ 支持并发 × 上下文扫描 |
 | **5. 持续与突发基准模式** | **✅ 完整支持** (Sustained Decode 与 Burst 模式) | ❌ 不支持 | ❌ 仅请求排队突发 | ✅ 规范支持持续稳态与突发 |
 | **6. 毫秒级延迟分位数** | **✅ 完整采集** (TTFT 及 ITL P50/P90/P99) | 仅平均值与总时长 | 仅整体时延统计 | ✅ 采集各分位数与抖动标准差 |
 | **7. 物理真实墙上吞吐** | **✅ 真实墙上时间**跨度计算，杜绝单请求累加求和虚标 | 仅提供单请求单次数据 | 统计吞吐 (req/s, tok/s) | ✅ 严谨真实跨度时间算法 |
@@ -147,23 +147,54 @@ graph TB
 **定义**：从客户端发出 HTTP 请求网络封包的瞬间，到接收到服务端流式返回的第一个有效 Token（含思考推理标签）之间经历的真实物理时间。
 
 对于测试单元内的第 $i$ 个并发请求（$i \in [1, C]$）：
-$$\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}$$
 
-单元平均首 Token 延迟与分位数计算：
-$$\text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i$$
+$$
+\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}
+$$
+
+单元平均首 Token 延迟计算公式：
+
+$$
+\text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i
+$$
+
 分位数通过**连续线性插值法**计算：对于升序排列样本序列 $Y = [y_1, y_2, \dots, y_N]$，其 $p$ 分位数对应秩索引：
-$$k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f$$
-$$\text{Quantile}(Y, p) = y_f + \Delta \times (y_{f+1} - y_f)$$
-由此严谨推导出 $\text{TTFT}_{P50}$、$\text{TTFT}_{P90}$ 与 $\text{TTFT}_{P99}$。
+
+$$
+k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f
+$$
+
+$$
+\text{Quantile}(Y, p) = y_f + \Delta \times (y_{f+1} - y_f)
+$$
+
+由此严谨推导出关键分位延迟值（TTFT P50 / P90 / P99）：
+
+$$
+\text{TTFT}_{P50}, \quad \text{TTFT}_{P90}, \quad \text{TTFT}_{P99}
+$$
 
 ### 4.2 Token 间延迟抖动 (ITL Jitter)
 
 **定义**：模型在解码（Decode）阶段生成相邻两个 Token 的到达时间差 $\Delta t_j = t_j - t_{j-1}$。ITL 抖动反映了流式阅读的流畅度以及推理显存调度的平稳性。
 
-对于包含 $M$ 个生成 Token 间隔的测试集：
-$$\mu_{\text{ITL}} = \frac{1}{M}\sum_{j=1}^M \Delta t_j, \quad \sigma_{\text{ITL}} = \sqrt{\frac{1}{M}\sum_{j=1}^M (\Delta t_j - \mu_{\text{ITL}})^2}$$
-$$\text{Jitter CV (变异系数)} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}} \times 100\%$$
-同时给出 $\text{ITL}_{P50}$、$\text{ITL}_{P90}$ 与 $\text{ITL}_{P99}$，精准捕捉垃圾回收（GC）、PagedAttention 换页或批调度引起的掉帧与偶发卡顿。
+对于包含 $M$ 个生成 Token 间隔的测试集，其均值与标准差定义为：
+
+$$
+\mu_{\text{ITL}} = \frac{1}{M}\sum_{j=1}^M \Delta t_j, \quad \sigma_{\text{ITL}} = \sqrt{\frac{1}{M}\sum_{j=1}^M (\Delta t_j - \mu_{\text{ITL}})^2}
+$$
+
+$$
+\text{Jitter CV} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}} \times 100\%
+$$
+
+由此严谨导出 Token 间时延分位指标（ITL P50 / P90 / P99）：
+
+$$
+\text{ITL}_{P50}, \quad \text{ITL}_{P90}, \quad \text{ITL}_{P99}
+$$
+
+精准捕捉垃圾回收（GC）、PagedAttention 换页或批调度引起的掉帧与偶发卡顿。
 
 ### 4.3 真实物理墙上时间吞吐 (True Wall-Clock Throughput)
 
@@ -171,12 +202,25 @@ $$\text{Jitter CV (变异系数)} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}}
 
 本平台严格依据物理时间轴上的**跨度并集（Span Union）**计算系统级真实吞吐量：
 
-$$\Delta T_{\text{prefill, wall}} = \max_{i=1}^C(t_{\text{first}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
-$$\Delta T_{\text{decode, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{first}, i})$$
-$$\Delta T_{\text{e2e, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
+$$
+\Delta T_{\text{prefill, wall}} = \max_{i=1}^C(t_{\text{first}, i}) - \min_{i=1}^C(t_{\text{start}, i})
+$$
 
-$$\text{真实首包吞吐 (Prefill TPS)} = \frac{\sum_{i=1}^C N_{\text{prompt}, i}}{\Delta T_{\text{prefill, wall}}}$$
-$$\text{真实解码吞吐 (Decode TPS)} = \frac{\sum_{i=1}^C N_{\text{output}, i}}{\Delta T_{\text{decode, wall}}}$$
+$$
+\Delta T_{\text{decode, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{first}, i})
+$$
+
+$$
+\Delta T_{\text{e2e, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{start}, i})
+$$
+
+$$
+\text{真实首包吞吐 (Prefill TPS)} = \frac{\sum_{i=1}^C N_{\text{prompt}, i}}{\Delta T_{\text{prefill, wall}}}
+$$
+
+$$
+\text{真实解码吞吐 (Decode TPS)} = \frac{\sum_{i=1}^C N_{\text{output}, i}}{\Delta T_{\text{decode, wall}}}
+$$
 
 ### 4.4 持续稳态解码 (Sustained Decode) 与突发解码 (Burst Decode)
 
@@ -188,7 +232,11 @@ $$\text{真实解码吞吐 (Decode TPS)} = \frac{\sum_{i=1}^C N_{\text{output}, 
 当服务端内部调度槽位受限（例如 vLLM 的 `--max-num-seqs` 饱和或 llama.cpp 设置为单槽排队 `--parallel 1`）时，客户端发出的并发请求在服务端会被迫串行化排队。
 
 根据利特尔法则（Little's Law）推算实际有效重叠度：
-$$P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}$$
+
+$$
+P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}
+$$
+
 - 若 $P_{\text{inferred}} < 0.80 \times C$ 且 $C > 1$：表明服务端未能真正并行处理该批请求，平台在报告与天梯榜中打上 **`(X/Y)*`** 警示标记（如 `(1/8)*` 表示配置了 8 并发，但服务端实际按 1 并发串行排队）。
 
 ### 4.6 死循环熔断保护器 (Repetition Watchdog & Loop Guard)
@@ -205,7 +253,11 @@ $$P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start},
 
 - **吞吐-延迟帕累托前沿图**：在多目标优化中，吞吐量 $T$（越大越好）与时延 $L$（越小越好）构成冲突关系。对于点集 $S$，若不存在任何其他点能在时延更低的同时保持更高吞吐，则该点属于帕累托前沿 $\mathcal{P}$。平台通过 $O(N \log N)$ 排序及单调栈线性扫描，在散点图上绘制阶梯状最优前沿包络线。
 - **客户端防伪指纹认证哈希 (`vh_xxxxxxxx`)**：采集客户端无损 Canvas 渲染特征、硬件并发核数、屏幕分辨率等环境指纹向量 $F_{\text{env}}$，与规范化测试成绩载荷拼接计算 SHA-256：
-  $$H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})$$
+
+$$
+H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})
+$$
+
   生成独一无二的十六进制验证标识符 `vh_xxxxxxxx`，并在天梯榜上展现 `🛡️ 认证` 徽章，保障天梯榜的公开公信力。
 
 ---
@@ -383,7 +435,7 @@ pip install -r python/requirements.txt
 
 ### 9.1 更新日志 (v3.5.0 全新发布)
 - 🚀 **全面重构双语文档体系**：中英文文档 100% 章节对称，补充严谨学术级测速公式与 12 维功能对比矩阵；
-- ⚡ **2D 矩阵与稳态持续解码双引擎**：前端（`index.html`）与 Python 后端（`llm_test_backend.py`）全栈支持 2D Concurrency $\times$ Context 矩阵热力扫频与 Sustained Steady-State Decode 稳态解码压测；
+- ⚡ **2D 矩阵与稳态持续解码双引擎**：前端（`index.html`）与 Python 后端（`llm_test_backend.py`）全栈支持 2D Concurrency × Context 矩阵热力扫频与 Sustained Steady-State Decode 稳态解码压测；
 - 🛡️ **双通道 Watchdog 守卫与 DOM 健壮性**：内置基于二分周期的双通道循环检测熔断；彻底消除了停止测试时的 DOM null 异常并接入 `AbortController` 响应式即时中断；
 - 📊 **天梯榜高维飞跃**：上线帕累托前沿最优曲线、六维性能雷达图、2D 并发-上下文矩阵透视与防伪指纹认证徽章（`vh_xxxxxxxx`）；
 - 🐍 **高并发与服务端遥测**：Python 套件支持 256 并发 HTTP/2 连接池与 Prometheus `/metrics` KV Cache 实时状态探测，推算打标 `(X/Y)*` 有效并发率；

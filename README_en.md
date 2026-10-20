@@ -126,7 +126,7 @@ The table below contrasts this platform against major industry inference benchma
 | **1. Architecture & Deployment** | **Dual Mode**: Zero-install GitHub Pages + Python CLI | CLI Command | Python CLI Script | Python CLI + Rich TUI |
 | **2. Zero-Install Web Experience** | **✅ Supported**: Instant browser run, 0 dependencies | ❌ None | ❌ None | ❌ None |
 | **3. Concurrency Capability** | **1 ～ 256+** (Web 1-6, Python 1-256+) | Single request (c=1) | High (rate-driven) | Matrix batch concurrency |
-| **4. 2D Parameter Sweep Matrix** | **✅ Full Support** (Concurrency $\times$ Context grid) | ❌ Single point | ❌ Single batch | ✅ Concurrency $\times$ Context sweep |
+| **4. 2D Parameter Sweep Matrix** | **✅ Full Support** (Concurrency × Context grid) | ❌ Single point | ❌ Single batch | ✅ Concurrency × Context sweep |
 | **5. Sustained vs. Burst Modes** | **✅ Full Support** (Sustained steady & Burst capacity) | ❌ Not supported | ❌ Queue burst only | ✅ Standard sustained & burst |
 | **6. Sub-ms Latency Quantiles** | **✅ Full Quantiles** (TTFT and ITL P50/P90/P99) | Average & total only | Aggregate summary | ✅ P50/P90/P99 & StdDev Jitter |
 | **7. True Wall-Clock Throughput** | **✅ Physical Span Union**, eliminates deceptive summation | Single stream only | Server aggregate TPS | ✅ Rigorous span union formula |
@@ -147,23 +147,54 @@ Authoritative benchmark scores require uncompromising mathematical precision and
 **Definition**: The true physical elapsed duration between the exact microsecond the client dispatches the HTTP request payload and the arrival of the first non-empty streaming chunk (including reasoning/thinking markers).
 
 For the $i$-th concurrent request ($i \in [1, C]$) in a test cell:
-$$\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}$$
 
-The average TTFT and percentiles are derived rigorously:
-$$\text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i$$
+$$
+\text{TTFT}_i = t_{\text{first}, i} - t_{\text{start}, i}
+$$
+
+The average TTFT across all streams in the test cell:
+
+$$
+\text{TTFT}_{\text{avg}} = \frac{1}{C} \sum_{i=1}^C \text{TTFT}_i
+$$
+
 Percentiles are calculated via **continuous linear interpolation**: for sorted observations $Y = [y_1, y_2, \dots, y_N]$, the $p$-th percentile rank is:
-$$k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f$$
-$$\text{Quantile}(Y, p) = y_f + \Delta \times (y_{f+1} - y_f)$$
-Yielding precise values for $\text{TTFT}_{P50}$, $\text{TTFT}_{P90}$, and $\text{TTFT}_{P99}$.
+
+$$
+k = (N - 1) \times \frac{p}{100}, \quad f = \lfloor k \rfloor, \quad \Delta = k - f
+$$
+
+$$
+\text{Quantile}(Y, p) = y_f + \Delta \times (y_{f+1} - y_f)
+$$
+
+Yielding precise values for key latency percentiles (TTFT P50 / P90 / P99):
+
+$$
+\text{TTFT}_{P50}, \quad \text{TTFT}_{P90}, \quad \text{TTFT}_{P99}
+$$
 
 ### 4.2 Inter-Token Latency (ITL) & Latency Jitter
 
 **Definition**: The inter-arrival duration between successive emitted tokens during the autoregressive Decode phase: $\Delta t_j = t_j - t_{j-1}$. ITL jitter directly impacts streaming reading comfort and reflects serving memory scheduling turbulence.
 
-Across a population of $M$ inter-token intervals in a benchmark cell:
-$$\mu_{\text{ITL}} = \frac{1}{M}\sum_{j=1}^M \Delta t_j, \quad \sigma_{\text{ITL}} = \sqrt{\frac{1}{M}\sum_{j=1}^M (\Delta t_j - \mu_{\text{ITL}})^2}$$
-$$\text{Jitter CV (Coefficient of Variation)} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}} \times 100\%$$
-Together with $\text{ITL}_{P50}$, $\text{ITL}_{P90}$, and $\text{ITL}_{P99}$, this captures garbage collection stutters, PagedAttention block swapping delays, or continuous batching re-scheduling hiccups.
+Across a population of $M$ inter-token intervals in a benchmark cell, the mean and standard deviation are:
+
+$$
+\mu_{\text{ITL}} = \frac{1}{M}\sum_{j=1}^M \Delta t_j, \quad \sigma_{\text{ITL}} = \sqrt{\frac{1}{M}\sum_{j=1}^M (\Delta t_j - \mu_{\text{ITL}})^2}
+$$
+
+$$
+\text{Jitter CV} = \frac{\sigma_{\text{ITL}}}{\mu_{\text{ITL}}} \times 100\%
+$$
+
+Together with the key inter-token latency percentiles (ITL P50 / P90 / P99):
+
+$$
+\text{ITL}_{P50}, \quad \text{ITL}_{P90}, \quad \text{ITL}_{P99}
+$$
+
+This rigorously captures garbage collection stutters, PagedAttention block swapping delays, or continuous batching re-scheduling hiccups.
 
 ### 4.3 True Wall-Clock Throughput (Eradicating Arithmetic Sums)
 
@@ -171,12 +202,25 @@ Together with $\text{ITL}_{P50}$, $\text{ITL}_{P90}$, and $\text{ITL}_{P99}$, th
 
 This platform computes system-level throughput strictly over the **physical wall-clock span union**:
 
-$$\Delta T_{\text{prefill, wall}} = \max_{i=1}^C(t_{\text{first}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
-$$\Delta T_{\text{decode, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{first}, i})$$
-$$\Delta T_{\text{e2e, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{start}, i})$$
+$$
+\Delta T_{\text{prefill, wall}} = \max_{i=1}^C(t_{\text{first}, i}) - \min_{i=1}^C(t_{\text{start}, i})
+$$
 
-$$\text{True Prefill Throughput (Tok/s)} = \frac{\sum_{i=1}^C N_{\text{prompt}, i}}{\Delta T_{\text{prefill, wall}}}$$
-$$\text{True Decode Throughput (Tok/s)} = \frac{\sum_{i=1}^C N_{\text{output}, i}}{\Delta T_{\text{decode, wall}}}$$
+$$
+\Delta T_{\text{decode, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{first}, i})
+$$
+
+$$
+\Delta T_{\text{e2e, wall}} = \max_{i=1}^C(t_{\text{end}, i}) - \min_{i=1}^C(t_{\text{start}, i})
+$$
+
+$$
+\text{True Prefill Throughput (Tok/s)} = \frac{\sum_{i=1}^C N_{\text{prompt}, i}}{\Delta T_{\text{prefill, wall}}}
+$$
+
+$$
+\text{True Decode Throughput (Tok/s)} = \frac{\sum_{i=1}^C N_{\text{output}, i}}{\Delta T_{\text{decode, wall}}}
+$$
 
 ### 4.4 Sustained Decode vs. Burst Decode Benchmark Modes
 
@@ -188,7 +232,11 @@ $$\text{True Decode Throughput (Tok/s)} = \frac{\sum_{i=1}^C N_{\text{output}, i
 When serving execution slots are constrained (e.g., vLLM `--max-num-seqs` saturated or llama.cpp configured with `--parallel 1`), client concurrent requests are serialized inside the server queue.
 
 Applying Little's Law to infer observed parallelism:
-$$P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}$$
+
+$$
+P_{\text{inferred}} = \frac{\sum_{i=1}^C (t_{\text{end}, i} - t_{\text{start}, i})}{\Delta T_{\text{e2e, wall}}}
+$$
+
 - If $P_{\text{inferred}} < 0.80 \times C$ and $C > 1$: The server failed to execute streams concurrently. The benchmark cell and leaderboard record are tagged with the warning badge **`(X/Y)*`** (e.g., `(1/8)*` indicates 8 requests were dispatched, but the backend executed them serialized 1 at a time).
 
 ### 4.6 Repetition Watchdog Guard & Loop Abort
@@ -205,7 +253,11 @@ This platform implements a dual-channel real-time circuit breaker:
 
 - **Throughput vs. Latency Pareto Frontier**: Balances competing performance objectives: maximize Throughput $T$ while minimizing Latency $L$. Point $p_a$ strictly dominates $p_b$ if $T(a) \ge T(b) \land L(a) \le L(b) \land (T(a) > T(b) \lor L(a) < L(b))$. Using $O(N \log N)$ sorting and monotonic scanning, non-dominated points are identified and rendered as an optimal stepped efficiency frontier curve.
 - **Client Verification Hash (`vh_xxxxxxxx`)**: Combines client hardware concurrency, screen resolution, and canvas fingerprint $F_{\text{env}}$ with canonical benchmark parameters to compute a SHA-256 digest:
-  $$H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})$$
+
+$$
+H = \text{SHA-256}(P_{\text{payload}} \parallel F_{\text{env}})
+$$
+
   yielding a tamper-evident badge `vh_xxxxxxxx` with `🛡️ Verified` status on the global leaderboard.
 
 ---
@@ -354,7 +406,7 @@ The global leaderboard operates entirely serverless via Supabase PostgREST API, 
 - **Advanced Visualizations**:
   - **Pareto Frontier Scatter**: Real-time throughput vs. TTFT optimal envelope;
   - **6D Capability Radar**: Prefill TPS, Decode TPS, TTFT responsiveness, ITL jitter stability, concurrency scalability, long-context retention;
-  - **2D Matrix Perspective**: Interactive heatmap drill-down for Concurrency $\times$ Context performance degradation;
+  - **2D Matrix Perspective**: Interactive heatmap drill-down for Concurrency × Context performance degradation;
   - **Statistical Outlier Tagging**: Automated detection of anomalous or forged scores via IQR and domain sanity bounds.
 
 ---
@@ -382,7 +434,7 @@ pip install -r python/requirements.txt
 
 ### 9.1 Changelog (v3.5.0 Release)
 - 🚀 **Bilingual Documentation Overhaul**: 100% section parity between English and Chinese docs with academic-grade mathematical formulas and 12-factor comparison matrix;
-- ⚡ **2D Matrix & Sustained Steady-State Decode Engines**: Full-stack support across static web client (`index.html`) and Python backend (`llm_test_backend.py`) for 2D Concurrency $\times$ Context matrix sweep and Sustained Steady-State decode benchmarking;
+- ⚡ **2D Matrix & Sustained Steady-State Decode Engines**: Full-stack support across static web client (`index.html`) and Python backend (`llm_test_backend.py`) for 2D Concurrency × Context matrix sweep and Sustained Steady-State decode benchmarking;
 - 🛡️ **Dual-Channel Watchdog Guard & DOM Robustness**: Sliding-window binary search loop detector; completely eliminated DOM null exceptions on test cancellation with `AbortController` instant abort wiring;
 - 📊 **Leaderboard Visualization Leap**: Pareto frontier curve, 6D capability radar chart, 2D matrix perspective heatmap, and verification badge states (`vh_xxxxxxxx`);
 - 🐍 **High-Concurrency Telemetry Engine**: Python suite supporting 256 HTTP/2 concurrent connections, Prometheus `/metrics` scraping, and `(X/Y)*` queue saturation tagging;
