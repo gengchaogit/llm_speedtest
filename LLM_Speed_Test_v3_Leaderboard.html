@@ -3037,12 +3037,15 @@
                     <span class="filter-row-label" id="lblChipFilter">芯片架构</span>
                     <div class="filter-pills" id="chipFilterPills">
                         <button type="button" class="filter-pill pill-chip active" data-chip="all" onclick="setChipFilter('all')">全部芯片</button>
+                        <button type="button" class="filter-pill pill-chip" data-chip="blackwell" onclick="setChipFilter('blackwell')">NVIDIA Blackwell (50系/Spark)</button>
+                        <button type="button" class="filter-pill pill-chip" data-chip="ada" onclick="setChipFilter('ada')">NVIDIA Ada (40系)</button>
+                        <button type="button" class="filter-pill pill-chip" data-chip="ampere" onclick="setChipFilter('ampere')">NVIDIA Ampere (30系/A100)</button>
                         <button type="button" class="filter-pill pill-chip" data-chip="hopper" onclick="setChipFilter('hopper')">NVIDIA Hopper</button>
-                        <button type="button" class="filter-pill pill-chip" data-chip="ada" onclick="setChipFilter('ada')">NVIDIA Ada / Blackwell</button>
-                        <button type="button" class="filter-pill pill-chip" data-chip="ampere" onclick="setChipFilter('ampere')">NVIDIA Ampere</button>
                         <button type="button" class="filter-pill pill-chip" data-chip="apple" onclick="setChipFilter('apple')">Apple Silicon</button>
                         <button type="button" class="filter-pill pill-chip" data-chip="amd" onclick="setChipFilter('amd')">AMD ROCm</button>
+                        <button type="button" class="filter-pill pill-chip" data-chip="legacy_nvidia" onclick="setChipFilter('legacy_nvidia')">经典老卡</button>
                         <button type="button" class="filter-pill pill-chip" data-chip="cpu" onclick="setChipFilter('cpu')">CPU</button>
+                        <button type="button" class="filter-pill pill-chip" data-chip="other_chip" onclick="setChipFilter('other_chip')">其他硬件</button>
                     </div>
                 </div>
                 <div class="filter-row">
@@ -4229,16 +4232,16 @@
         const SMART_FILTER_CATALOGS = {
             chip: [
                 {
+                    id: 'blackwell',
+                    nameZh: 'NVIDIA Blackwell (50系/Spark/B200)',
+                    nameEn: 'NVIDIA Blackwell (RTX 50 / Spark)',
+                    matcher: (hw, full) => /(5090|5080|5070|5060|spark|gb10|gb200|b200|b100|blackwell)/i.test(full)
+                },
+                {
                     id: 'ada',
                     nameZh: 'NVIDIA Ada (40系/L40/6000)',
                     nameEn: 'NVIDIA Ada (RTX 40 / L40)',
-                    matcher: (hw, full) => /(4090|4080|4070|4060|l40|l4\b|l20|ada|rtxpro6000|6000\s*ada)/i.test(full) || (/6000/i.test(hw) && !/ampere/i.test(hw))
-                },
-                {
-                    id: 'legacy_nvidia',
-                    nameZh: 'NVIDIA 经典卡 (Volta/Turing/Pascal)',
-                    nameEn: 'NVIDIA Legacy (V100/2080/P40)',
-                    matcher: (hw, full) => /(v100|2080|titan|t4\b|t10\b|1660|1080|p40|p100|volta|turing|pascal)/i.test(full)
+                    matcher: (hw, full) => /(4090|4080|4070|4060|l40|l4\b|l20|ada|rtxpro6000|6000\s*ada|5880)/i.test(full) || (/6000/i.test(hw) && !/ampere|blackwell/i.test(hw))
                 },
                 {
                     id: 'ampere',
@@ -4248,33 +4251,39 @@
                 },
                 {
                     id: 'hopper',
-                    nameZh: 'NVIDIA Hopper / Blackwell',
-                    nameEn: 'NVIDIA Hopper / Blackwell',
-                    matcher: (hw, full) => /(h100|h800|h200|hopper|gh200|pg503|b200|blackwell)/i.test(full)
+                    nameZh: 'NVIDIA Hopper (H100/H800/H200)',
+                    nameEn: 'NVIDIA Hopper (H100 / H200)',
+                    matcher: (hw, full) => /(h100|h800|h200|hopper|gh200|pg503)/i.test(full)
+                },
+                {
+                    id: 'apple',
+                    nameZh: 'Apple Silicon (M1-M5)',
+                    nameEn: 'Apple Silicon (M1-M5)',
+                    matcher: (hw, full) => /(?:^|[^a-zA-Z0-9])(m[1-5](?:pro|max|ultra|air)?|apple|silicon)(?:$|[^a-zA-Z0-9])/i.test(full)
                 },
                 {
                     id: 'amd',
                     nameZh: 'AMD ROCm / Radeon',
                     nameEn: 'AMD ROCm / Radeon',
-                    matcher: (hw, full) => /(amd|mi300|mi250|rocm|radeon|7900)/i.test(full)
+                    matcher: (hw, full) => /(amd|mi300|mi250|mi50|rocm|radeon|7900|9070|6800|6600|395)/i.test(full)
                 },
                 {
-                    id: 'apple',
-                    nameZh: 'Apple Silicon (M1-M4)',
-                    nameEn: 'Apple Silicon (M1-M4)',
-                    matcher: (hw, full) => /(apple|m1|m2|m3|m4|silicon)/i.test(full)
+                    id: 'legacy_nvidia',
+                    nameZh: 'NVIDIA 经典卡 (Volta/Turing/Pascal)',
+                    nameEn: 'NVIDIA Legacy (V100/2080/P40)',
+                    matcher: (hw, full) => /(v100|2080|titan|t4\b|t10\b|1660|1080|p40|p100|volta|turing|pascal)/i.test(full)
                 },
                 {
                     id: 'cpu',
                     nameZh: 'CPU 处理器',
                     nameEn: 'CPU',
-                    matcher: (hw, full) => /(cpu|xeon|epyc|intel|ryzen|threadripper)/i.test(full)
+                    matcher: (hw, full) => /(cpu|xeon|epyc|intel|ryzen|threadripper|海光|c7285|\bi[3579][-_])/i.test(full)
                 },
                 {
                     id: 'other_chip',
                     nameZh: '其他硬件',
                     nameEn: 'Other Hardware',
-                    matcher: (hw, full) => !/(h100|h800|h200|hopper|gh200|pg503|b200|blackwell|4090|4080|4070|4060|l40|l4|l20|ada|rtxpro6000|a100|a800|3090|3080|3070|3060|a6000|a5000|a4000|a10|ampere|cmp|170hx|90hx|v100|2080|titan|t4|t10|1660|1080|p40|p100|volta|turing|pascal|apple|m1|m2|m3|m4|silicon|amd|mi300|mi250|rocm|radeon|7900|cpu|xeon|epyc|intel|ryzen|threadripper)/i.test(full)
+                    matcher: (hw, full) => !/(5090|5080|5070|5060|spark|gb10|gb200|b200|b100|blackwell|h100|h800|h200|hopper|gh200|pg503|4090|4080|4070|4060|l40|l4\b|l20|ada|rtxpro6000|6000\s*ada|5880|a100|a800|3090|3080|3070|3060|a6000|a5000|a4000|a10\b|ampere|cmp|170hx|90hx|v100|2080|titan|t4\b|t10\b|1660|1080|p40|p100|volta|turing|pascal|apple|silicon|amd|mi300|mi250|mi50|rocm|radeon|7900|9070|6800|6600|395|cpu|xeon|epyc|intel|ryzen|threadripper|海光|c7285|\bi[3579][-_])/i.test(full) && !/(?:^|[^a-zA-Z0-9])m[1-5](?:pro|max|ultra|air)?(?:$|[^a-zA-Z0-9])/i.test(full)
                 }
             ],
             quant: [
@@ -4563,14 +4572,13 @@
                 
                 let html = `<button type="button" class="filter-pill pill-${filterType} ${currentActive === 'all' ? 'active' : ''}" ${dataAttr}="all" onclick="${clickFnName}('all')">${allLabel}</button>`;
 
-                // 只展示数据库中存在记录 (count > 0) 的分类！
+                // 标准分类药丸常驻展示，若当前数据集有样本则展示计数徽章
                 catalog.forEach(item => {
                     const cnt = counts[item.id] || 0;
-                    if (cnt > 0) {
-                        const label = isEn ? (item.nameEn || item.id) : (item.nameZh || item.id);
-                        const isActive = (currentActive === item.id);
-                        html += `\n<button type="button" class="filter-pill pill-${filterType} ${isActive ? 'active' : ''}" ${dataAttr}="${item.id}" onclick="${clickFnName}('${item.id}')">${escapeHtml(label)} <span class="pill-badge">(${cnt})</span></button>`;
-                    }
+                    const label = isEn ? (item.nameEn || item.id) : (item.nameZh || item.id);
+                    const isActive = (currentActive === item.id);
+                    const badgeHtml = cnt > 0 ? ` <span class="pill-badge">(${cnt})</span>` : '';
+                    html += `\n<button type="button" class="filter-pill pill-${filterType} ${isActive ? 'active' : ''}" ${dataAttr}="${item.id}" onclick="${clickFnName}('${item.id}')">${escapeHtml(label)}${badgeHtml}</button>`;
                 });
 
                 container.innerHTML = html;
@@ -7563,6 +7571,116 @@
             }
         }
 
+        function getChipFilterPostgrestParam(chip) {
+            if (!chip || chip === 'all') return null;
+            switch (chip) {
+                case 'blackwell':
+                    return 'or=(hardware.ilike.*5090*,hardware.ilike.*5080*,hardware.ilike.*5070*,hardware.ilike.*5060*,hardware.ilike.*spark*,hardware.ilike.*gb10*,hardware.ilike.*gb200*,hardware.ilike.*b200*,hardware.ilike.*b100*,hardware.ilike.*blackwell*)';
+                case 'hopper':
+                    return 'or=(hardware.ilike.*h100*,hardware.ilike.*h800*,hardware.ilike.*h200*,hardware.ilike.*hopper*,hardware.ilike.*gh200*,hardware.ilike.*pg503*)';
+                case 'ada':
+                    return 'or=(hardware.ilike.*4090*,hardware.ilike.*4080*,hardware.ilike.*4070*,hardware.ilike.*4060*,hardware.ilike.*l40*,hardware.ilike.*l4*,hardware.ilike.*l20*,hardware.ilike.*ada*,hardware.ilike.*6000*,hardware.ilike.*5880*)';
+                case 'ampere':
+                    return 'or=(hardware.ilike.*a100*,hardware.ilike.*a800*,hardware.ilike.*3090*,hardware.ilike.*3080*,hardware.ilike.*3070*,hardware.ilike.*3060*,hardware.ilike.*a6000*,hardware.ilike.*a5000*,hardware.ilike.*a4000*,hardware.ilike.*a10*,hardware.ilike.*ampere*,hardware.ilike.*cmp*,hardware.ilike.*170hx*)';
+                case 'apple':
+                    return 'or=(hardware.ilike.*apple*,hardware.ilike.*m1*,hardware.ilike.*m2*,hardware.ilike.*m3*,hardware.ilike.*m4*,hardware.ilike.*m5*,hardware.ilike.*silicon*)';
+                case 'amd':
+                    return 'or=(hardware.ilike.*amd*,hardware.ilike.*mi300*,hardware.ilike.*mi250*,hardware.ilike.*mi50*,hardware.ilike.*rocm*,hardware.ilike.*radeon*,hardware.ilike.*7900*,hardware.ilike.*9070*,hardware.ilike.*6800*,hardware.ilike.*6600*,hardware.ilike.*395*)';
+                case 'legacy_nvidia':
+                    return 'or=(hardware.ilike.*v100*,hardware.ilike.*2080*,hardware.ilike.*titan*,hardware.ilike.*t4*,hardware.ilike.*t10*,hardware.ilike.*1660*,hardware.ilike.*1080*,hardware.ilike.*p40*,hardware.ilike.*p100*,hardware.ilike.*volta*,hardware.ilike.*turing*,hardware.ilike.*pascal*)';
+                case 'cpu':
+                    return 'or=(hardware.ilike.*cpu*,hardware.ilike.*xeon*,hardware.ilike.*epyc*,hardware.ilike.*intel*,hardware.ilike.*ryzen*,hardware.ilike.*threadripper*,hardware.ilike.*%E6%B5%B7%E5%85%89*,hardware.ilike.*c7285*)';
+                case 'other_chip':
+                    return 'not.or=(hardware.ilike.*5090*,hardware.ilike.*5080*,hardware.ilike.*5070*,hardware.ilike.*5060*,hardware.ilike.*spark*,hardware.ilike.*gb10*,hardware.ilike.*b200*,hardware.ilike.*blackwell*,hardware.ilike.*h100*,hardware.ilike.*h800*,hardware.ilike.*h200*,hardware.ilike.*hopper*,hardware.ilike.*4090*,hardware.ilike.*4080*,hardware.ilike.*4070*,hardware.ilike.*4060*,hardware.ilike.*ada*,hardware.ilike.*6000*,hardware.ilike.*a100*,hardware.ilike.*3090*,hardware.ilike.*3080*,hardware.ilike.*ampere*,hardware.ilike.*apple*,hardware.ilike.*silicon*,hardware.ilike.*amd*,hardware.ilike.*rocm*,hardware.ilike.*radeon*,hardware.ilike.*7900*,hardware.ilike.*cpu*,hardware.ilike.*epyc*,hardware.ilike.*intel*,hardware.ilike.*ryzen*,hardware.ilike.*v100*,hardware.ilike.*2080*)';
+                default:
+                    return null;
+            }
+        }
+
+        function getQuantFilterPostgrestParam(quant) {
+            if (!quant || quant === 'all') return null;
+            switch (quant) {
+                case 'fp8':
+                    return 'or=(quantization.ilike.*fp8*,quantization.ilike.*float8*)';
+                case 'nvfp4':
+                    return 'or=(quantization.ilike.*nvfp4*,quantization.ilike.*nv-fp4*,quantization.ilike.*fp4*)';
+                case 'awq':
+                    return 'quantization=ilike.*awq*';
+                case 'gguf':
+                    return 'or=(quantization.ilike.*gguf*,quantization.ilike.*q4*,quantization.ilike.*q8*,quantization.ilike.*q5*,quantization.ilike.*q6*,quantization.ilike.*iq3*,quantization.ilike.*iq4*)';
+                case 'fp16_bf16':
+                    return 'or=(quantization.ilike.*fp16*,quantization.ilike.*bf16*,quantization.ilike.*16bit*,quantization.ilike.*float16*,quantization.ilike.*bfloat16*,quantization.ilike.*%E5%8E%9F%E7%89%88*)';
+                case 'gptq':
+                    return 'quantization=ilike.*gptq*';
+                case 'int_quant':
+                    return 'or=(quantization.ilike.*int8*,quantization.ilike.*int4*)';
+                case 'exl2':
+                    return 'quantization=ilike.*exl2*';
+                default:
+                    return null;
+            }
+        }
+
+        function getEngineFilterPostgrestParam(engine) {
+            if (!engine || engine === 'all') return null;
+            switch (engine) {
+                case 'vllm':
+                    return 'or=(framework.ilike.*vllm*,framework.ilike.*1cat-vllm*)';
+                case 'llamacpp':
+                    return 'or=(framework.ilike.*llama.cpp*,framework.ilike.*llamacpp*,framework.ilike.*llama-server*)';
+                case 'sglang':
+                    return 'or=(framework.ilike.*sglang*,framework.ilike.*sglang-pennyroyal*)';
+                case 'strata':
+                    return 'or=(framework.ilike.*strata*,framework.ilike.*starta*,framework.ilike.*%E5%90%AF%E5%8A%A8%E5%99%A8*,framework.ilike.*lm%20studio*)';
+                case 'ollama':
+                    return 'framework=ilike.*ollama*';
+                case 'tgi':
+                    return 'or=(framework.ilike.*tgi*,framework.ilike.*text-generation-inference*)';
+                default:
+                    return null;
+            }
+        }
+
+        function getConcurrencyFilterPostgrestParam(c) {
+            if (!c || c === 'all') return null;
+            switch (c) {
+                case '1':
+                    return 'concurrency=eq.1';
+                case '2-3':
+                    return 'concurrency=gte.2&concurrency=lte.3';
+                case '4-7':
+                    return 'concurrency=gte.4&concurrency=lte.7';
+                case '8-15':
+                    return 'concurrency=gte.8&concurrency=lte.15';
+                case '16-31':
+                    return 'concurrency=gte.16&concurrency=lte.31';
+                case '32+':
+                    return 'concurrency=gte.32';
+                default:
+                    if (Number(c)) return `concurrency=eq.${Number(c)}`;
+                    return null;
+            }
+        }
+
+        function getBenchmarkModeFilterPostgrestParam(mode) {
+            if (!mode || mode === 'all' || isLegacySchemaMode()) return null;
+            switch (mode) {
+                case '1d_sweep':
+                    return 'or=(record_tags.cs.["mode:1d_sweep"],notes.ilike.*1D*)';
+                case '2d_matrix':
+                    return 'or=(record_tags.cs.["mode:2d_matrix"],notes.ilike.*2D*)';
+                case 'sustained_decode':
+                    return 'or=(record_tags.cs.["mode:sustained_decode"],notes.ilike.*%E7%A8%B3%E6%80%81*)';
+                default:
+                    return null;
+            }
+        }
+
+        function getTaskTypeFilterPostgrestParam(task) {
+            if (!task || task === 'all' || isLegacySchemaMode()) return null;
+            return `or=(record_tags.cs.["task:${task}"],record_tags.cs.["all_tasks"],notes.ilike.*${task}*)`;
+        }
+
         function buildGlobalFilterParams(includeMetricFilters = true) {
             const params = [];
             if (includeMetricFilters) {
@@ -7583,6 +7701,33 @@
             if (currentConcurrencyOne) {
                 params.push('concurrency=eq.1');
             }
+
+            // Smart Filters: 芯片架构 / 量化精度 / 引擎 / 并发等直推数据库端过滤，无需全量抓取
+            if (currentChipFilter && currentChipFilter !== 'all') {
+                const chipParam = getChipFilterPostgrestParam(currentChipFilter);
+                if (chipParam) params.push(chipParam);
+            }
+            if (currentQuantFilter && currentQuantFilter !== 'all') {
+                const quantParam = getQuantFilterPostgrestParam(currentQuantFilter);
+                if (quantParam) params.push(quantParam);
+            }
+            if (currentEngineFilter && currentEngineFilter !== 'all') {
+                const engineParam = getEngineFilterPostgrestParam(currentEngineFilter);
+                if (engineParam) params.push(engineParam);
+            }
+            if (currentConcurrencyFilter && currentConcurrencyFilter !== 'all') {
+                const concParam = getConcurrencyFilterPostgrestParam(currentConcurrencyFilter);
+                if (concParam) params.push(concParam);
+            }
+            if (currentBenchmarkModeFilter && currentBenchmarkModeFilter !== 'all') {
+                const modeParam = getBenchmarkModeFilterPostgrestParam(currentBenchmarkModeFilter);
+                if (modeParam) params.push(modeParam);
+            }
+            if (currentTaskTypeFilter && currentTaskTypeFilter !== 'all') {
+                const taskParam = getTaskTypeFilterPostgrestParam(currentTaskTypeFilter);
+                if (taskParam) params.push(taskParam);
+            }
+
             return params;
         }
 
@@ -9083,34 +9228,25 @@
 
                 const isSmartFiltering = (currentChipFilter !== 'all' || currentQuantFilter !== 'all' || currentEngineFilter !== 'all' || currentConcurrencyFilter !== 'all' || currentBenchmarkModeFilter !== 'all' || currentTaskTypeFilter !== 'all');
 
+                const pageRes = await fetchLeaderboardPage(mode, currentPage, currentPageSize, signal, personalUserCode);
+                const rawRows = pageRes.rows;
+                totalMatched = pageRes.total;
+
+                if (!rawRows || rawRows.length === 0 || totalMatched === 0) {
+                    loading.textContent = isEn ? 'No Matching Data Found 😥' : '暂无匹配数据 😥';
+                    updateDynamicSmartFilterPills([]);
+                    return;
+                }
+
+                data = normalizeLeaderboardRows(rawRows);
                 if (isSmartFiltering) {
-                    const allRows = await ensureAllDataLoaded();
-                    const scopedRows = allRows.filter(r => passesModeFilter(r, mode, personalUserCode) && passesMetricThresholds(r));
-                    const filtered = scopedRows.filter(r => passesSmartFilters(r));
-                    filtered.sort(compareRowsByCurrentSort);
-                    totalMatched = filtered.length;
-                    totalPages = Math.max(1, Math.ceil(totalMatched / currentPageSize));
-                    if (currentPage > totalPages) currentPage = 1;
-                    offset = (currentPage - 1) * currentPageSize;
-                    data = filtered.slice(offset, offset + currentPageSize);
-                    updateDynamicSmartFilterPills(scopedRows);
+                    data = data.filter(r => passesSmartFilters(r));
+                }
+                totalPages = Math.max(1, Math.ceil(totalMatched / currentPageSize));
+                if (globalAllLoadedRows.length > 0) {
+                    updateDynamicSmartFilterPills(globalAllLoadedRows);
                 } else {
-                    const pageRes = await fetchLeaderboardPage(mode, currentPage, currentPageSize, signal, personalUserCode);
-                    const rawRows = pageRes.rows;
-                    totalMatched = pageRes.total;
-
-                    if (!rawRows || rawRows.length === 0 || totalMatched === 0) {
-                        loading.textContent = isEn ? 'No Data Found 😥' : '暂无数据 😥';
-                        return;
-                    }
-
-                    data = normalizeLeaderboardRows(rawRows);
-                    totalPages = Math.max(1, Math.ceil(totalMatched / currentPageSize));
-                    if (globalAllLoadedRows.length > 0) {
-                        updateDynamicSmartFilterPills(globalAllLoadedRows);
-                    } else {
-                        updateDynamicSmartFilterPills(data);
-                    }
+                    updateDynamicSmartFilterPills(data);
                 }
 
                 if (!data || data.length === 0) {
